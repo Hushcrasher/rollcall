@@ -1,0 +1,80 @@
+# Tech Stack — Game Industry Credits Platform (POC)
+
+> Companion docs: `01-DESIGN.md`, `02-ARCHITECTURE.md`, `04-DATABASE-SCHEMA.md`.
+> Rationale in one line: Python is the team's shared language; the product is a classic relational CRUD app; velocity beats elegance at POC stage.
+
+## Backend
+
+| Component | Choice | Why / notes |
+|---|---|---|
+| Language | **Python 3.12+** | Team's common language (Hushcrasher is a Python/data shop); one language across app and seed pipeline; accessible to OSS contributors. |
+| Framework | **Django 5.x** | Batteries included: ORM, migrations, auth, **auto-generated admin** (recruiter approval + report triage for free), CSRF/session security. The product is exactly Django's home turf. |
+| API layer | None in POC | Server-rendered views. If/when a public API is needed: Django REST Framework endpoints beside existing views, no rewrite. |
+| Auth | **Django auth** (email+password, email verification, password reset) | Email verification required before creating contributions. No auth SaaS (breaks self-hosting/AGPL spirit). Post-POC: `django-allauth` for Discord OAuth (the industry's network). |
+| Templates/front | **Django templates + htmx** (+ optionally Alpine.js for micro-interactions) | No SPA. Native SEO for profile/game pages, session auth, half the work. CSS: keep it simple (vanilla or a light utility framework — implementer's choice, not architectural). |
+| i18n | Django i18n from day one, `en` only shipped | Cheap discipline now, painful retrofit later. |
+
+## Data
+
+| Component | Choice | Why / notes |
+|---|---|---|
+| Database | **PostgreSQL 16** (managed by the PaaS) | Already decided at product level; team culture is Postgres. Auto backups; rehearse one restore pre-launch. |
+| Search | **Postgres native**: `pg_trgm` (GIN) for typo-tolerant autocomplete; FTS if needed for broader search | No Meilisearch/Elastic at this scale (~400k games). Search code isolated in a `search` module for a future swap. |
+| Seed / ingestion | **DuckDB** inside a Django management command | Reads remote parquet natively (HTTP/S3), constant memory, SQL dedup Steam↔IGDB, then batched upserts into Postgres (`ON CONFLICT ... DO UPDATE`). Idempotent. |
+| Orchestration | **PaaS scheduled job (weekly cron)** | No Prefect/Airflow/Celery for one weekly job. Command is launcher-agnostic (Prefect-invocable later). Email alert on failure. |
+| Migrations | Django migrations, versioned, auto-run on deploy | Dormant tables/columns included from the initial migration. |
+
+## Infrastructure
+
+| Component | Choice | Why / notes |
+|---|---|---|
+| Hosting | **PaaS — Scalingo** (alt: Clever Cloud) | French/EU (GDPR file simplicity), git-push deploys, managed Postgres, scheduler. ~€30/mo. |
+| Packaging | **Dockerfile** for prod, **docker compose** for local dev (app + Postgres) | Anti-lock-in: same image on any PaaS or a VPS. `docker compose up` = contributor onboarding. |
+| Object storage | **S3-compatible bucket** via `django-storages` — prefer **Scaleway Object Storage** (EU); **Cloudflare R2** acceptable | Avatars only in POC (game images served from IGDB/Steam CDNs, never stored). PaaS disk is ephemeral → bucket mandatory. Provider switch = 3 env vars. |
+| Email | **Brevo** (alt: Postmark) | Transactional only: verification, reset, contact relay (Reply-To = sender), seed-failure alert. Never raw SMTP. |
+| Errors | **Sentry** (free tier) | Only observability beyond PaaS logs in POC. |
+| Rate limiting | **django-ratelimit** (IP-based on profiles/search) + DB-backed per-sender limit on contact relay (`contact_requests` table) | Anti-scraping & anti-spam, proportionate to POC. |
+
+## Quality & repo
+
+| Component | Choice | Why / notes |
+|---|---|---|
+| Repo | Monorepo under the **Hushcrasher GitHub org** | App + seed + infra files + docs + fixtures. |
+| License | **AGPL v3** at commit 1 | Deters closed-SaaS forks; relicensing later needs every contributor's consent. |
+| Contributions | **DCO** (`Signed-off-by`) | Provenance protection lighter than a CLA. |
+| CI | **GitHub Actions**: pytest + **ruff** on every PR | One hour of setup; installs the culture pre-contributors. |
+| Tests | **pytest + pytest-django** | Non-negotiable coverage: seed dedup, recruiter search query, account deletion (cascade + anonymization). |
+| Fixtures | Loadable fake dataset (a few hundred games, fake profiles) | Contributors have no parquet access. |
+| Secrets | Env vars + `.env.example`; never in git history | Parquet URL/creds, IGDB keys, Brevo key, `SECRET_KEY`, S3 creds. |
+
+## Key Python dependencies (indicative)
+
+```
+django>=5.0
+psycopg[binary]
+duckdb                # seed command only
+django-storages[s3]
+django-ratelimit
+django-htmx           # convenience middleware/helpers
+whitenoise            # static files from the container
+sentry-sdk
+gunicorn
+pytest, pytest-django, ruff   # dev
+# post-POC: django-allauth (Discord), djangorestframework
+```
+
+## Environment variables (`.env.example`)
+
+```
+DJANGO_SECRET_KEY=
+DATABASE_URL=postgres://...
+PARQUET_SOURCE_URL=          # private; forks plug their own source
+IGDB_CLIENT_ID=              # fallback fetch (post-POC automation)
+IGDB_CLIENT_SECRET=
+S3_ENDPOINT_URL=
+S3_ACCESS_KEY_ID=
+S3_SECRET_ACCESS_KEY=
+S3_BUCKET_NAME=
+EMAIL_API_KEY=               # Brevo
+SENTRY_DSN=
+```

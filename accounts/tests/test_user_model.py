@@ -1,0 +1,23 @@
+"""Smoke tests for the project skeleton — no database required."""
+
+from django.contrib.auth import get_user_model
+
+
+def test_custom_user_model_is_configured():
+    user_model = get_user_model()
+    assert user_model._meta.app_label == "accounts"
+    assert user_model.__name__ == "User"
+
+
+def test_email_is_the_login_identifier():
+    user_model = get_user_model()
+    assert user_model.USERNAME_FIELD == "email"
+    assert user_model.username is None
+
+
+def test_visibility_defaults_match_design():
+    """docs/01-DESIGN.md §3.4 — profile_public/contactable default true, open_to_work false."""
+    user_model = get_user_model()
+    assert user_model._meta.get_field("profile_public").default is True
+    assert user_model._meta.get_field("contactable").default is True
+    assert user_model._meta.get_field("open_to_work").default is False
