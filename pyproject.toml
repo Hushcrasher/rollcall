@@ -13,6 +13,7 @@ dependencies = [
     "django-storages[s3]>=1.14.6",
     "duckdb>=1.5.4",
     "gunicorn>=26.0.0",
+    "pillow>=12.3.0",
     "psycopg[binary]>=3.3.4",
     "sentry-sdk>=2.64.0",
     "whitenoise>=6.12.0",

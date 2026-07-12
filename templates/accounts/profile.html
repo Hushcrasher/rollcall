@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{{ profile_user.display_name }} · Rollcall{% endblock %}
+
+{% block content %}
+  <article>
+    {% if profile_user.avatar %}
+      <img src="{{ profile_user.avatar.url }}" alt="" width="120" height="120">
+    {% endif %}
+
+    <h1>{{ profile_user.display_name }}</h1>
+
+    {% if profile_user.open_to_work %}
+      <p class="badge">{% translate "Open to work" %}</p>
+    {% endif %}
+
+    {% if profile_user.location %}
+      <p>{{ profile_user.location }}</p>
+    {% endif %}
+
+    {% if profile_user.bio %}
+      <p>{{ profile_user.bio }}</p>
+    {% endif %}
+
+    {# Credits (contributions) are rendered here in Phase 4. #}
+    {# Contact button (relay, honors contactable) is added in Phase 6. #}
+  </article>
+{% endblock %}

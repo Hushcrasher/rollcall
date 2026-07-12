@@ -86,12 +86,13 @@ class User(AbstractUser):
         default=False,
         help_text=_("Badge + recruiter search filter. Independent from contactable."),
     )
-    avatar = models.CharField(
+    avatar = models.ImageField(
         _("avatar"),
+        upload_to="avatars/",
         max_length=500,
         blank=True,
         default="",
-        help_text=_("Object key in the S3 bucket."),
+        help_text=_("Stored in the S3 bucket (object key). Deleted on account deletion."),
     )
     bio = models.TextField(_("bio"), blank=True, default="")
     location = models.CharField(_("location"), max_length=150, blank=True, default="")

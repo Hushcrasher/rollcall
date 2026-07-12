@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% translate "Invalid link" %} · Rollcall{% endblock %}
+
+{% block content %}
+  <h1>{% translate "This link is invalid or has expired" %}</h1>
+  <p>{% blocktranslate %}The verification link is no longer valid. If your email
+  is not verified yet, request a new link from your account.{% endblocktranslate %}</p>
+
+  {% if user.is_authenticated %}
+    <form method="post" action="{% url 'accounts:resend_verification' %}">
+      {% csrf_token %}
+      <button type="submit">{% translate "Send a new verification email" %}</button>
+    </form>
+  {% else %}
+    <p><a href="{% url 'accounts:login' %}">{% translate "Log in" %}</a></p>
+  {% endif %}
+{% endblock %}

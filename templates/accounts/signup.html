@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% translate "Sign up" %} · Rollcall{% endblock %}
+
+{% block content %}
+  <h1>{% translate "Create your account" %}</h1>
+
+  <p>{% blocktranslate %}Declare the games you worked on. Your profile and credits
+  will be public and accessible to recruiters — that is the point of the platform.{% endblocktranslate %}</p>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">{% translate "Sign up" %}</button>
+  </form>
+
+  <p><a href="{% url 'accounts:login' %}">{% translate "Already have an account? Log in." %}</a></p>
+{% endblock %}

@@ -1,8 +1,13 @@
 """Test settings — used by pytest (see [tool.pytest.ini_options] in pyproject.toml)."""
 
 from .base import *  # noqa: F403
+from .base import MIDDLEWARE
 
 DEBUG = False
+
+# WhiteNoise serves static files from STATIC_ROOT, which isn't collected in
+# tests — drop it to keep test output free of "no directory" warnings.
+MIDDLEWARE = [m for m in MIDDLEWARE if "whitenoise" not in m.lower()]
 
 SECRET_KEY = "test-only-insecure-key"
 

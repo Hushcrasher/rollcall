@@ -14,7 +14,7 @@ These do not block Phases 0–1, but **must be resolved before coding the seed**
 
 - [ ] ⚠️ Written confirmation that IGDB/Twitch ToS cover this use (Hushcrasher-backed public product) — same check for Steam-derived data
 - [ ] ⚠️ Parquet audit: `igdb_id` / `steam_appid` present; Steam↔IGDB mapping available (else dedup prep is the first data task)
-- [ ] ⚠️ Accounts opened: PaaS (pick Scalingo vs Clever Cloud), S3-compatible bucket (EU preferred: Scaleway), Brevo, Sentry
+- [~] ⚠️ Accounts opened (chosen stack overrides docs' Scalingo/Scaleway defaults): **Railway** (PaaS — account created), **Cloudflare R2** (storage — bucket TODO), **Brevo** (account created; DNS/domain auth deferred to Phase 7), **Sentry** (TODO). None needed before Phase 7. GDPR: Railway + R2 are US → pick EU regions + sign DPAs.
 
 ---
 
@@ -66,18 +66,19 @@ Built test-first against a **documented assumed parquet schema** (`games/seed/sc
 - [ ] ⚠️ Adjust `schema.py` column names to the real parquet + wire `PARQUET_SOURCE_URL` in prod (after ToS + audit clear)
 - [ ] ⚠️ Schedule the weekly `seed_games` job on the PaaS (Phase 7 deploy)
 
-## Phase 3 — Accounts
+## Phase 3 — Accounts ✅
 
-Goal: the full account lifecycle, GDPR included.
+Goal: the full account lifecycle, GDPR included. Built TDD (32 account tests).
 
-- [ ] Signup (email + password, free display name) with clear consent copy: *"Your profile and credits will be public and accessible to recruiters — that is the point of the platform."*
-- [ ] Email verification flow (Brevo transactional API — never raw SMTP); **gate: no contribution creation before verified**
-- [ ] Login / logout / password reset
-- [ ] Profile page (`/{slug}`) honoring `profile_public`
-- [ ] Settings: the 3 visibility booleans — `contactable` toggle easy to find (ease of exit, no dark pattern)
-- [ ] Avatar upload to the S3 bucket (django-storages)
-- [ ] **Account deletion** (non-negotiable zone #3): contributions CASCADE, vouches emitted → `voter_id` SET NULL, contact_requests/reports SET NULL, avatar object deleted — with tests
-- [ ] **JSON export** of personal data (identity, credits, vouches emitted, contacts) — with tests
+- [x] Signup (email + password, free display name) with clear consent copy + required consent checkbox
+- [x] Email verification flow (console backend in dev; single-use replay-safe token). **Gate helper ready** (`user.is_email_verified`) — enforced on contribution create in Phase 4. Brevo API wired in Phase 7
+- [x] Login (by email) / logout / password reset (Django's flow + our templates)
+- [x] Profile page at `/u/<slug>/` honoring `profile_public` (private → 404 for others); **email never rendered**
+- [x] Settings: the 3 visibility booleans — `contactable` toggle plainly present
+- [x] Avatar upload (`ImageField` → default storage in dev, R2 in prod)
+- [x] **Account deletion** (non-negotiable zone #3): confirm → cascade contributions, anonymize vouches, delete avatar file, logout — with tests
+- [x] **JSON export** of personal data (identity, settings, credits, vouches, contacts) — with tests
+- [x] Verified end-to-end in the browser: signup → verification email → verified → settings → profile (no email leak)
 
 ## Phase 4 — Contributions & public pages
 
@@ -116,7 +117,9 @@ Goal: legally and operationally ready for real users.
 - [ ] Rate limiting: django-ratelimit (IP) on profile pages & search
 - [ ] robots.txt (allow profile indexing — SEO is an acquisition channel) + controlled sitemap
 - [ ] Sentry wired in prod (`send_default_pii=False`)
-- [ ] Deploy to the PaaS: managed Postgres, scheduled weekly `seed_games` job, env vars set
+- [ ] Deploy to **Railway**: Dockerfile deploy, managed Postgres (`DATABASE_URL`), scheduled weekly `seed_games` cron, env vars set; avatars → **R2** (django-storages); **Sentry** DSN
+  - URL: Railway's free `*.up.railway.app` subdomain (HTTPS included) — **no custom domain needed for the POC**; add `ALLOWED_HOSTS`
+  - Email: a **single verified sender** in Brevo is enough to test with a handful of users. A **custom domain + DNS authentication (SPF/DKIM)** is only for a real launch (deliverability at scale)
 - [ ] **Rehearse one Postgres backup restore** before launch
 - [ ] Legal pages: ToS (non-exclusive data license, no open-data promise), privacy policy, signup consent copy reviewed
 - [ ] Fallback if schedule slips: ship "For recruiters" page + contact relay first, advanced filters later

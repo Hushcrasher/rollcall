@@ -1,3 +1,144 @@
-# Accounts views land in the accounts phase (see ROADMAP.md):
-# signup, email verification, profile page, settings (3 visibility booleans),
-# account deletion (cascade + anonymization) and JSON export.
+"""Account views — signup, email verification, login helpers, profile,
+settings, and GDPR (deletion + export)."""
+
+from typing import Any
+
+from django.contrib import messages
+from django.contrib.auth import login, logout
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.exceptions import ObjectDoesNotExist
+from django.db.models import Q, QuerySet
+from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.shortcuts import redirect, render
+from django.urls import reverse_lazy
+from django.utils import timezone
+from django.utils.encoding import force_str
+from django.utils.http import urlsafe_base64_decode
+from django.utils.translation import gettext as _
+from django.views.decorators.http import require_POST
+from django.views.generic import DetailView, FormView, TemplateView, UpdateView
+
+from accounts.emails import send_verification_email
+from accounts.export import build_personal_data_export
+from accounts.forms import EmailAuthenticationForm, SettingsForm, SignupForm
+from accounts.models import User
+from accounts.tokens import email_verification_token
+
+__all__ = [
+    "AccountDeleteView",
+    "EmailAuthenticationForm",
+    "ProfileView",
+    "SettingsView",
+    "SignupView",
+    "VerificationSentView",
+    "export_personal_data",
+    "resend_verification",
+    "verify_email",
+]
+
+
+class AuthedHttpRequest(HttpRequest):
+    """An HttpRequest guaranteed to carry an authenticated user (login-gated
+    views). `request.user` is added by middleware and is invisible to the
+    static type checker otherwise."""
+
+    user: User
+
+
+class SignupView(FormView):
+    template_name = "accounts/signup.html"
+    form_class = SignupForm
+
+    def form_valid(self, form: SignupForm) -> HttpResponse:
+        user = form.save()
+        send_verification_email(self.request, user)
+        # Auto-login: the gate is on creating contributions, not on logging in.
+        login(self.request, user)
+        return redirect("accounts:verification_sent")
+
+
+class VerificationSentView(TemplateView):
+    template_name = "accounts/verification_sent.html"
+
+
+def _user_from_uidb64(uidb64: str) -> User | None:
+    try:
+        pk = force_str(urlsafe_base64_decode(uidb64))
+        return User.objects.get(pk=pk)
+    except (TypeError, ValueError, OverflowError, ObjectDoesNotExist):
+        return None
+
+
+def verify_email(request: HttpRequest, uidb64: str, token: str) -> HttpResponse:
+    user = _user_from_uidb64(uidb64)
+    if user is not None and email_verification_token.check_token(user, token):
+        if user.email_verified_at is None:
+            user.email_verified_at = timezone.now()
+            user.save(update_fields=["email_verified_at"])
+        messages.success(request, _("Your email is verified — you can now add credits."))
+        return redirect("accounts:settings")
+    messages.error(request, _("This verification link is invalid or has expired."))
+    return render(request, "accounts/verify_email_invalid.html")
+
+
+@require_POST
+@login_required
+def resend_verification(request: AuthedHttpRequest) -> HttpResponse:
+    user = request.user
+    if user.email_verified_at is None:
+        send_verification_email(request, user)
+        messages.success(request, _("Verification email sent."))
+        return redirect("accounts:verification_sent")
+    return redirect("accounts:settings")
+
+
+class ProfileView(DetailView):
+    template_name = "accounts/profile.html"
+    context_object_name = "profile_user"
+
+    def get_queryset(self) -> QuerySet[User]:
+        # Honor profile_public: a non-public profile is visible only to its owner.
+        if self.request.user.is_authenticated:
+            return User.objects.filter(Q(profile_public=True) | Q(pk=self.request.user.pk))
+        return User.objects.filter(profile_public=True)
+
+
+class SettingsView(LoginRequiredMixin, UpdateView):
+    form_class = SettingsForm
+    template_name = "accounts/settings.html"
+    success_url = reverse_lazy("accounts:settings")
+
+    def get_object(self, queryset: QuerySet[User] | None = None) -> User:
+        return self.request.user
+
+    def form_valid(self, form: SettingsForm) -> HttpResponse:
+        messages.success(self.request, _("Your settings were saved."))
+        return super().form_valid(form)
+
+
+class AccountDeleteView(LoginRequiredMixin, TemplateView):
+    """Confirm, then hard-delete: contributions cascade, vouches emitted are
+    anonymized (FK rules), and the avatar object is removed (GDPR §14)."""
+
+    template_name = "accounts/account_delete.html"
+
+    def post(self, request: AuthedHttpRequest, *args: object, **kwargs: object) -> HttpResponse:
+        user = request.user
+        # avatar is a FieldFile at runtime; the type checker sees the ImageField.
+        avatar: Any = user.avatar
+        if avatar:
+            avatar.delete(save=False)  # FK deletion doesn't remove files
+        logout(request)
+        user.delete()
+        messages.success(request, _("Your account and all your credits were deleted."))
+        return redirect("accounts:login")
+
+
+@login_required
+def export_personal_data(request: AuthedHttpRequest) -> JsonResponse:
+    response = JsonResponse(
+        build_personal_data_export(request.user), json_dumps_params={"indent": 2}
+    )
+    response["Content-Disposition"] = 'attachment; filename="rollcall-my-data.json"'
+    return response

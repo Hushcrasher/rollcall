@@ -92,6 +92,10 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # cannot change later (docs/04-DATABASE-SCHEMA.md §1).
 AUTH_USER_MODEL = "accounts.User"
 
+LOGIN_URL = "accounts:login"
+LOGIN_REDIRECT_URL = "accounts:settings"
+LOGOUT_REDIRECT_URL = "accounts:login"
+
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},

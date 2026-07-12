@@ -1,0 +1,7 @@
+{% load i18n %}{% blocktranslate with name=user.display_name %}Hi {{ name }},{% endblocktranslate %}
+
+{% blocktranslate %}Confirm your email address to finish setting up your Rollcall account and start adding your credits:{% endblocktranslate %}
+
+{{ verify_url }}
+
+{% blocktranslate %}If you did not create this account, you can ignore this email.{% endblocktranslate %}

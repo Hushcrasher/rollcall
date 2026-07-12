@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% translate "Verify your email" %} · Rollcall{% endblock %}
+
+{% block content %}
+  <h1>{% translate "Check your inbox" %}</h1>
+  <p>{% blocktranslate %}We sent you a verification link. Click it to confirm your
+  email — you need a verified email before you can add credits.{% endblocktranslate %}</p>
+
+  <form method="post" action="{% url 'accounts:resend_verification' %}">
+    {% csrf_token %}
+    <button type="submit">{% translate "Resend the verification email" %}</button>
+  </form>
+{% endblock %}
