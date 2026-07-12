@@ -50,17 +50,21 @@ Goal: the **complete** schema from [docs/04-DATABASE-SCHEMA.md](docs/04-DATABASE
 - [x] **Dev fixtures**: `manage.py load_dev_fixtures` — 300 fake games, 50 companies, 40 profiles, 150 contributions; deterministic & idempotent
 - [x] Tests (20): CHECK constraints, cascades/anonymization on account deletion, vouch uniqueness, trigram search, fixtures idempotency
 
-## Phase 2 — Seed pipeline (⚠️ gated on the prerequisites above)
+## Phase 2 — Seed pipeline ✅ (engine built; ⚠️ real-parquet wiring still gated)
 
 Goal: `python manage.py seed_games` — idempotent weekly refresh, DuckDB → Postgres.
 
-- [ ] DuckDB reads the remote parquet (HTTP/S3, `PARQUET_SOURCE_URL`), constant memory
-- [ ] Steam↔IGDB dedup/merge in SQL
-- [ ] Batched upserts: `ON CONFLICT (igdb_id) DO UPDATE`, by `steam_appid` for Steam-only rows; companies by `igdb_company_id`
-- [ ] Write-surface strictly limited to `[source]` columns (§13) — never platform-owned data; upstream deletions never delete locally
-- [ ] Genres/engines/game_companies link tables populated from IGDB taxonomies
-- [ ] Failure handling: logs + email alert; launcher-agnostic (PaaS cron now, Prefect-invocable later)
-- [ ] **Tests on dedup** (non-negotiable zone #1) — fixture parquets covering: IGDB-only, Steam-only, both-linked, conflicting rows, re-run idempotency
+Built test-first against a **documented assumed parquet schema** (`games/seed/schema.py`) — the contract a fork or the real Hushcrasher parquet must match. Pointing it at the real source later = adjust column names in `schema.py` + clear the prerequisites above.
+
+- [x] DuckDB reads the parquet (local path, or HTTP/S3 via httpfs, `PARQUET_SOURCE_URL`), constant memory (`fetchmany` streaming)
+- [x] Steam↔IGDB dedup/merge in SQL (`games/seed/pipeline.py`)
+- [x] Idempotent upserts: by `igdb_id`, else `steam_appid`; companies by name
+- [x] Write-surface strictly limited to `[source]` columns (§13) — slug/contributions preserved; upstream deletions never delete locally
+- [x] Genres/engines/game_companies link tables populated + reset from source each run
+- [x] Failure handling: logs + optional email alert (`SEED_ALERT_EMAIL`); launcher-agnostic (`--source` arg for Prefect later)
+- [x] **Tests on dedup** (non-negotiable zone #1): IGDB-only, Steam-only, both-linked merge, dedup-within — plus upsert idempotency/write-surface and end-to-end command tests (23 seed tests)
+- [ ] ⚠️ Adjust `schema.py` column names to the real parquet + wire `PARQUET_SOURCE_URL` in prod (after ToS + audit clear)
+- [ ] ⚠️ Schedule the weekly `seed_games` job on the PaaS (Phase 7 deploy)
 
 ## Phase 3 — Accounts
 

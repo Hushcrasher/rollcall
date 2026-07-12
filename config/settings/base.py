@@ -131,3 +131,10 @@ MEDIA_ROOT = BASE_DIR / "media"
 # --- Email ------------------------------------------------------------------
 
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="noreply@rollcall.example")
+
+# --- Seed pipeline (docs/02-ARCHITECTURE.md §3) -----------------------------
+
+# Remote parquet the seed reads (private; a fork plugs its own source here).
+PARQUET_SOURCE_URL = env("PARQUET_SOURCE_URL", default="")
+# Optional address alerted when a scheduled seed run fails.
+SEED_ALERT_EMAIL = env("SEED_ALERT_EMAIL", default="")
