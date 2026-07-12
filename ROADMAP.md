@@ -33,21 +33,21 @@ Goal: a Django skeleton that runs, with license, CI and containers in place.
 - [x] `.env.example` with every secret/endpoint; `.gitignore` excludes `.env`
 - [x] README with transparency paragraph (AGPL code / private Hushcrasher DB) + CONTRIBUTING with DCO
 - [x] Initial commit — **LICENSE included in it** (AGPL v3: code only; user data stays private under Hushcrasher)
-- [ ] Repo created under the Hushcrasher GitHub org and pushed
+- [x] Repo created on GitHub (`Micro-SAS/rollcall`) and pushed
 
-## Phase 1 — Database schema & fixtures
+## Phase 1 — Database schema & fixtures ✅
 
 Goal: the **complete** schema from [docs/04-DATABASE-SCHEMA.md](docs/04-DATABASE-SCHEMA.md), dormant parts included, in the initial migrations.
 
-- [ ] `pg_trgm` extension migration (`TrigramExtension`)
-- [ ] `accounts`: User migration (GIN trgm index on `display_name`) + `RecruiterApplication` (§2)
-- [ ] `games`: `Game` (§3, incl. dormant `parent_game_id`), `Genre`/`Engine` + M2M link tables (§4), `Company` + dormant `CompanyAlias`/`claimed_by` (§5), `GameCompany` (§6) — GIN trgm indexes on `title`, `name`, `alias`
-- [ ] `contributions`: `Discipline` (§7) + **data migration seeding the ~10–12 disciplines** · `Contribution` (§8: CASCADE user, PROTECT game/discipline, SET NULL company, CHECK `end_date >= start_date`, month/year dates as DATE day=01, dormant `status`) · dormant `Vouch` (§9, nullable `voter_id`, ships empty)
-- [ ] `contact`: `ContactRequest` (§10) + `Report` (§11) — nullable/SET NULL sender & reporter FKs
-- [ ] Composite indexes for the recruiter query: `(discipline_id, game_id)` etc. (§8)
-- [ ] Django admin registrations ([source] columns read-only)
-- [ ] **Dev fixtures**: a few hundred fake games + fake profiles/contributions, loadable in one command (contributors have no parquet access)
-- [ ] Tests: model constraints (CHECK, unique, cascades) pass on Postgres in CI
+- [x] `pg_trgm` extension migration (`TrigramExtension`, first operation of `accounts/0001`)
+- [x] `accounts`: User migration (GIN trgm index on `display_name`) + `RecruiterApplication` (§2)
+- [x] `games`: `Game` (§3, incl. dormant `parent_game_id`), `Genre`/`Engine` + M2M link tables (§4), `Company` + dormant `CompanyAlias`/`claimed_by` (§5), `GameCompany` (§6) — GIN trgm indexes on `title`, `name`, `alias`
+- [x] `contributions`: `Discipline` (§7) + **data migration seeding the 11 disciplines** · `Contribution` (§8: CASCADE user, PROTECT game/discipline, SET NULL company, CHECK `end_date >= start_date`, month/year dates as DATE day=01, dormant `status`) · dormant `Vouch` (§9, nullable `voter_id`, ships empty)
+- [x] `contact`: `ContactRequest` (§10) + `Report` (§11) — nullable/SET NULL sender & reporter FKs
+- [x] Composite indexes for the recruiter query: `(discipline_id, game_id)` etc. (§8)
+- [x] Django admin registrations ([source] columns read-only for seeded rows)
+- [x] **Dev fixtures**: `manage.py load_dev_fixtures` — 300 fake games, 50 companies, 40 profiles, 150 contributions; deterministic & idempotent
+- [x] Tests (20): CHECK constraints, cascades/anonymization on account deletion, vouch uniqueness, trigram search, fixtures idempotency
 
 ## Phase 2 — Seed pipeline (⚠️ gated on the prerequisites above)
 

@@ -7,7 +7,8 @@ services:
       POSTGRES_PASSWORD: rollcall
       POSTGRES_DB: rollcall
     ports:
-      - "5432:5432"
+      # Override with POSTGRES_PORT in .env if 5432 is taken on your machine.
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:

@@ -1,5 +1,6 @@
-"""Smoke tests for the project skeleton — no database required."""
+"""User model behavior and skeleton smoke tests."""
 
+import pytest
 from django.contrib.auth import get_user_model
 
 
@@ -21,3 +22,16 @@ def test_visibility_defaults_match_design():
     assert user_model._meta.get_field("profile_public").default is True
     assert user_model._meta.get_field("contactable").default is True
     assert user_model._meta.get_field("open_to_work").default is False
+
+
+@pytest.mark.django_db
+def test_slug_generated_from_display_name_with_collision_suffix():
+    user_model = get_user_model()
+    first = user_model.objects.create_user(
+        email="a@example.com", password="x", display_name="Jane Doe"
+    )
+    second = user_model.objects.create_user(
+        email="b@example.com", password="x", display_name="Jane Doe"
+    )
+    assert first.slug == "jane-doe"
+    assert second.slug == "jane-doe-2"

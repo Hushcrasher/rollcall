@@ -32,7 +32,8 @@ With Docker (recommended for a first run):
 
 ```bash
 docker compose up
-# app on http://localhost:8000, Postgres on localhost:5432
+# app on http://localhost:8000 — Postgres on localhost:5432
+# (port taken? put POSTGRES_PORT=5433 in .env)
 ```
 
 Natively with [uv](https://docs.astral.sh/uv/) (Postgres required, e.g. `docker compose up db`):
@@ -41,6 +42,7 @@ Natively with [uv](https://docs.astral.sh/uv/) (Postgres required, e.g. `docker 
 cp .env.example .env          # fill in DJANGO_SECRET_KEY at least
 uv sync
 uv run python manage.py migrate
+uv run python manage.py load_dev_fixtures   # fake games/users/credits (dev only)
 uv run python manage.py runserver
 ```
 
@@ -51,9 +53,10 @@ uv run ruff check . && uv run ruff format --check .
 uv run pytest
 ```
 
-Contributors don't need access to the production parquet source — dev fixtures
-(fake games and profiles) are loadable in one command (coming with the schema
-phase, see ROADMAP.md). See [CONTRIBUTING.md](CONTRIBUTING.md) (DCO required).
+Contributors don't need access to the production parquet source —
+`load_dev_fixtures` creates a deterministic fake dataset (games, companies,
+profiles, credits) in one command. See [CONTRIBUTING.md](CONTRIBUTING.md)
+(DCO required).
 
 ## Non-negotiable product rules
 

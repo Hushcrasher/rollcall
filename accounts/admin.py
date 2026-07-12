@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.utils.translation import gettext_lazy as _
 
-from .models import User
+from .models import RecruiterApplication, User
 
 
 @admin.register(User)
@@ -47,3 +47,15 @@ class UserAdmin(DjangoUserAdmin):
             },
         ),
     )
+
+
+@admin.register(RecruiterApplication)
+class RecruiterApplicationAdmin(admin.ModelAdmin):
+    """Manual recruiter validation, one by one — each approval doubles as a
+    user interview. The approval flow (set user.role='recruiter') lands in
+    the recruiter phase; until then, review/approve by editing the status."""
+
+    list_display = ("full_name", "company_name", "work_email", "status", "created_at")
+    list_filter = ("status",)
+    search_fields = ("full_name", "company_name", "work_email")
+    readonly_fields = ("user", "created_at", "updated_at")

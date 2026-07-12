@@ -1,15 +1,13 @@
-"""User model — docs/04-DATABASE-SCHEMA.md §1.
+"""Users & recruiter applications — docs/04-DATABASE-SCHEMA.md §1–2.
 
 Custom user with email as the login identifier, decided at project start
 (cannot change after the first migration). The email is NEVER displayed
 anywhere on the platform; contact goes through the relay only.
-
-Also owned by this app (added in the schema phase, see ROADMAP.md):
-RecruiterApplication (§2).
 """
 
 from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.models import AbstractUser
+from django.contrib.postgres.indexes import GinIndex
 from django.db import models
 from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
@@ -105,8 +103,14 @@ class User(AbstractUser):
     class Meta:
         verbose_name = _("user")
         verbose_name_plural = _("users")
-        # GIN trigram index on display_name is added in the schema-phase
-        # migration (people search — docs/04-DATABASE-SCHEMA.md §1).
+        indexes = [
+            # People search (typo-tolerant) — docs/04-DATABASE-SCHEMA.md §1.
+            GinIndex(
+                fields=["display_name"],
+                name="user_display_name_trgm",
+                opclasses=["gin_trgm_ops"],
+            ),
+        ]
 
     def __str__(self):
         return self.display_name
@@ -129,3 +133,48 @@ class User(AbstractUser):
     @property
     def is_email_verified(self) -> bool:
         return self.email_verified_at is not None
+
+
+class RecruiterApplication(models.Model):
+    """§2 — "do things that don't scale": manual validation, one by one,
+    through Django admin. On approval, set user.role = 'recruiter'."""
+
+    class Status(models.TextChoices):
+        PENDING = "pending", _("Pending")
+        APPROVED = "approved", _("Approved")
+        REJECTED = "rejected", _("Rejected")
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="recruiter_applications")
+    full_name = models.CharField(_("full name"), max_length=200)
+    company_name = models.CharField(  # free text — may not exist in `companies`
+        _("company name"), max_length=200
+    )
+    work_email = models.EmailField(_("work email"))  # for manual verification
+    linkedin_url = models.URLField(_("LinkedIn URL"), blank=True, default="")
+    message = models.TextField(_("message"), blank=True, default="")
+    status = models.CharField(
+        _("status"), max_length=20, choices=Status.choices, default=Status.PENDING
+    )
+    reviewed_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="reviewed_recruiter_applications",
+    )
+    reviewed_at = models.DateTimeField(_("reviewed at"), null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user"],
+                condition=models.Q(status="pending"),
+                name="one_pending_application_per_user",
+            ),
+        ]
+
+    def __str__(self):
+        return f"[{self.status}] {self.full_name} ({self.company_name})"
