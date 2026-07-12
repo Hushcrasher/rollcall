@@ -5,6 +5,8 @@ email NEVER appears in any page or response. Both tables keep nullable
 SET NULL user FKs: GDPR anonymization while preserving the abuse trail.
 """
 
+from typing import ClassVar
+
 from django.conf import settings
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -13,6 +15,8 @@ from django.utils.translation import gettext_lazy as _
 class ContactRequest(models.Model):
     """§10 — every relay contact. Doubles as the rate-limit backend
     (count rows per sender per 24h) and the abuse audit trail."""
+
+    objects: ClassVar[models.Manager["ContactRequest"]] = models.Manager()
 
     sender = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -36,7 +40,7 @@ class ContactRequest(models.Model):
             models.Index(fields=["sender", "sent_at"], name="contact_sender_sent_at"),
         ]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.sender or 'anonymized'} → {self.recipient or 'anonymized'}: {self.subject}"
 
 
@@ -55,6 +59,8 @@ class Report(models.Model):
         OPEN = "open", _("Open")
         RESOLVED = "resolved", _("Resolved")
         DISMISSED = "dismissed", _("Dismissed")
+
+    objects: ClassVar[models.Manager["Report"]] = models.Manager()
 
     reporter = models.ForeignKey(  # logged-in only in POC
         settings.AUTH_USER_MODEL,
@@ -79,5 +85,5 @@ class Report(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"[{self.status}] {self.target_type} #{self.target_id}"

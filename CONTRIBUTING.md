@@ -28,7 +28,11 @@ source — that's the cleanliness test we hold ourselves to.
 
 ## Quality bar
 
+- Python is **fully typed**: annotate every function, method and fixture.
+  Toolchain is the Astral stack — uv (packages), ruff (lint + format),
+  ty (type checking).
 - `uv run ruff check . && uv run ruff format --check .` must pass.
+- `uv run ty check` must pass.
 - `uv run pytest` must pass. New behavior comes with tests; the seed dedup,
   recruiter search query, and account deletion paths are non-negotiable
   test zones (docs/02-ARCHITECTURE.md §7).

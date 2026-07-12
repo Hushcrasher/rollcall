@@ -3,6 +3,7 @@ owned by the seed and overwritten on every weekly refresh — editing them here
 would silently be undone (docs/02-ARCHITECTURE.md §2.4)."""
 
 from django.contrib import admin
+from django.http import HttpRequest
 
 from .models import (
     Company,
@@ -52,7 +53,7 @@ class GameAdmin(admin.ModelAdmin):
     readonly_fields = ("slug", "last_synced_at", "created_at", "updated_at")
     inlines = [GameGenreInline, GameEngineInline, GameCompanyInline]
 
-    def get_readonly_fields(self, request, obj=None):
+    def get_readonly_fields(self, request: HttpRequest, obj: Game | None = None) -> list[str]:
         # Manually-created games are fully editable; seeded ones lock [source].
         readonly = list(super().get_readonly_fields(request, obj))
         if obj is not None and obj.source != Game.Source.MANUAL:
@@ -67,7 +68,7 @@ class CompanyAdmin(admin.ModelAdmin):
     search_fields = ("name",)
     readonly_fields = ("slug", "claimed_by", "created_at", "updated_at")
 
-    def get_readonly_fields(self, request, obj=None):
+    def get_readonly_fields(self, request: HttpRequest, obj: Company | None = None) -> list[str]:
         readonly = list(super().get_readonly_fields(request, obj))
         if obj is not None and obj.source != Company.Source.MANUAL:
             readonly.extend(COMPANY_SOURCE_FIELDS)

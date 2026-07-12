@@ -8,34 +8,34 @@ contribution, contact requests SET NULL both directions, reports SET NULL.
 from datetime import date
 
 import pytest
-from django.contrib.auth import get_user_model
 
+from accounts.models import User
 from contact.models import ContactRequest, Report
 from contributions.models import Contribution, Discipline, Vouch
 from games.models import Game
 
-User = get_user_model()
-
 
 @pytest.fixture
-def users():
+def users() -> tuple[User, User]:
     alice = User.objects.create_user(email="alice@example.com", password="x", display_name="Alice")
     bob = User.objects.create_user(email="bob@example.com", password="x", display_name="Bob")
     return alice, bob
 
 
 @pytest.fixture
-def game():
+def game() -> Game:
     return Game.objects.create(title="Test Game", source=Game.Source.MANUAL)
 
 
 @pytest.fixture
-def discipline():
+def discipline() -> Discipline:
     return Discipline.objects.get(name="Programming")  # seeded by data migration
 
 
 @pytest.mark.django_db
-def test_contributions_cascade_on_delete(users, game, discipline):
+def test_contributions_cascade_on_delete(
+    users: tuple[User, User], game: Game, discipline: Discipline
+) -> None:
     alice, bob = users
     own = Contribution.objects.create(
         user=alice, game=game, discipline=discipline, job_title="Dev", start_date=date(2020, 1, 1)
@@ -51,7 +51,9 @@ def test_contributions_cascade_on_delete(users, game, discipline):
 
 
 @pytest.mark.django_db
-def test_vouches_emitted_are_anonymized_not_deleted(users, game, discipline):
+def test_vouches_emitted_are_anonymized_not_deleted(
+    users: tuple[User, User], game: Game, discipline: Discipline
+) -> None:
     alice, bob = users
     bobs_contribution = Contribution.objects.create(
         user=bob, game=game, discipline=discipline, job_title="Dev", start_date=date(2020, 1, 1)
@@ -65,7 +67,9 @@ def test_vouches_emitted_are_anonymized_not_deleted(users, game, discipline):
 
 
 @pytest.mark.django_db
-def test_vouches_received_die_with_the_contribution(users, game, discipline):
+def test_vouches_received_die_with_the_contribution(
+    users: tuple[User, User], game: Game, discipline: Discipline
+) -> None:
     alice, bob = users
     alices_contribution = Contribution.objects.create(
         user=alice, game=game, discipline=discipline, job_title="Dev", start_date=date(2020, 1, 1)
@@ -78,7 +82,7 @@ def test_vouches_received_die_with_the_contribution(users, game, discipline):
 
 
 @pytest.mark.django_db
-def test_contact_requests_anonymized_both_directions(users):
+def test_contact_requests_anonymized_both_directions(users: tuple[User, User]) -> None:
     alice, bob = users
     sent = ContactRequest.objects.create(sender=alice, recipient=bob, subject="s", message="m")
     received = ContactRequest.objects.create(sender=bob, recipient=alice, subject="s", message="m")
@@ -92,7 +96,7 @@ def test_contact_requests_anonymized_both_directions(users):
 
 
 @pytest.mark.django_db
-def test_reports_keep_anonymized_trail(users):
+def test_reports_keep_anonymized_trail(users: tuple[User, User]) -> None:
     alice, _ = users
     report = Report.objects.create(
         reporter=alice, target_type=Report.TargetType.OTHER, reason="spam"

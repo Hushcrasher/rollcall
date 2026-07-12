@@ -4,6 +4,8 @@ One contribution = "person X worked on game G, [as an employee of company C],
 as [job title] ([discipline]), from A to B".
 """
 
+from typing import ClassVar
+
 from django.conf import settings
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -12,6 +14,8 @@ from django.utils.translation import gettext_lazy as _
 class Discipline(models.Model):
     """§7 — fixed reference list (~11 rows), seeded by a data migration.
     Future sub-disciplines = nullable parent FK, trivial migration."""
+
+    objects: ClassVar[models.Manager["Discipline"]] = models.Manager()
 
     name = models.CharField(_("name"), max_length=100, unique=True)
     sort_order = models.IntegerField(_("sort order"))
@@ -22,8 +26,8 @@ class Discipline(models.Model):
     class Meta:
         ordering = ["sort_order"]
 
-    def __str__(self):
-        return self.name
+    def __str__(self) -> str:
+        return str(self.name)
 
 
 class Contribution(models.Model):
@@ -35,6 +39,8 @@ class Contribution(models.Model):
         ACTIVE = "active", _("Active")
         DISPUTED = "disputed", _("Disputed")  # dormant — never shown publicly
         REMOVED = "removed", _("Removed")  # dormant
+
+    objects: ClassVar[models.Manager["Contribution"]] = models.Manager()
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -97,13 +103,15 @@ class Contribution(models.Model):
             models.Index(fields=["discipline", "game"], name="contrib_discipline_game"),
         ]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.user} · {self.game or self.company} · {self.job_title}"
 
 
 class Vouch(models.Model):
     """§9 — dormant, ships empty. Peer confirmation of a contribution.
     Positive-only: negative feedback goes through reports, never votes."""
+
+    objects: ClassVar[models.Manager["Vouch"]] = models.Manager()
 
     contribution = models.ForeignKey(Contribution, on_delete=models.CASCADE, related_name="vouches")
     voter = models.ForeignKey(
@@ -126,5 +134,5 @@ class Vouch(models.Model):
             ),
         ]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.voter or 'anonymized'} vouches {self.contribution}"

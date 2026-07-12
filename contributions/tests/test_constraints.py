@@ -3,33 +3,31 @@
 from datetime import date
 
 import pytest
-from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
 from django.db.models import ProtectedError
 
+from accounts.models import User
 from contributions.models import Contribution, Discipline, Vouch
 from games.models import Company, Game
 
-User = get_user_model()
-
 
 @pytest.fixture
-def user():
+def user() -> User:
     return User.objects.create_user(email="dev@example.com", password="x", display_name="Dev")
 
 
 @pytest.fixture
-def game():
+def game() -> Game:
     return Game.objects.create(title="Some Game", source=Game.Source.MANUAL)
 
 
 @pytest.fixture
-def discipline():
+def discipline() -> Discipline:
     return Discipline.objects.get(name="Programming")
 
 
 @pytest.mark.django_db
-def test_disciplines_seeded_by_migration():
+def test_disciplines_seeded_by_migration() -> None:
     names = list(Discipline.objects.values_list("name", flat=True))
     assert len(names) == 11
     assert names[0] == "Programming"  # ordered by sort_order
@@ -37,7 +35,9 @@ def test_disciplines_seeded_by_migration():
 
 
 @pytest.mark.django_db
-def test_end_date_before_start_date_rejected(user, game, discipline):
+def test_end_date_before_start_date_rejected(
+    user: User, game: Game, discipline: Discipline
+) -> None:
     with pytest.raises(IntegrityError):
         Contribution.objects.create(
             user=user,
@@ -50,7 +50,7 @@ def test_end_date_before_start_date_rejected(user, game, discipline):
 
 
 @pytest.mark.django_db
-def test_game_and_company_both_null_rejected(user, discipline):
+def test_game_and_company_both_null_rejected(user: User, discipline: Discipline) -> None:
     with pytest.raises(IntegrityError):
         Contribution.objects.create(
             user=user,
@@ -63,7 +63,9 @@ def test_game_and_company_both_null_rejected(user, discipline):
 
 
 @pytest.mark.django_db
-def test_company_only_contribution_allowed_at_schema_level(user, discipline):
+def test_company_only_contribution_allowed_at_schema_level(
+    user: User, discipline: Discipline
+) -> None:
     """Future 'unannounced project at company C' — POC forms still require a game."""
     company = Company.objects.create(name="Some Studio", source=Company.Source.MANUAL)
     contribution = Contribution.objects.create(
@@ -78,7 +80,9 @@ def test_company_only_contribution_allowed_at_schema_level(user, discipline):
 
 
 @pytest.mark.django_db
-def test_multiple_contributions_per_user_game_allowed(user, game, discipline):
+def test_multiple_contributions_per_user_game_allowed(
+    user: User, game: Game, discipline: Discipline
+) -> None:
     """Promotion mid-project, left and came back — a feature, not a bug."""
     for start in (date(2018, 1, 1), date(2021, 6, 1)):
         Contribution.objects.create(
@@ -88,7 +92,9 @@ def test_multiple_contributions_per_user_game_allowed(user, game, discipline):
 
 
 @pytest.mark.django_db
-def test_game_with_contributions_is_protected(user, game, discipline):
+def test_game_with_contributions_is_protected(
+    user: User, game: Game, discipline: Discipline
+) -> None:
     Contribution.objects.create(
         user=user, game=game, discipline=discipline, job_title="Dev", start_date=date(2020, 1, 1)
     )
@@ -97,7 +103,9 @@ def test_game_with_contributions_is_protected(user, game, discipline):
 
 
 @pytest.mark.django_db
-def test_vouch_unique_per_voter_but_anonymized_duplicates_allowed(user, game, discipline):
+def test_vouch_unique_per_voter_but_anonymized_duplicates_allowed(
+    user: User, game: Game, discipline: Discipline
+) -> None:
     voter = User.objects.create_user(email="v@example.com", password="x", display_name="Voter")
     contribution = Contribution.objects.create(
         user=user, game=game, discipline=discipline, job_title="Dev", start_date=date(2020, 1, 1)

@@ -23,6 +23,7 @@ dev = [
     "pytest>=9.1.1",
     "pytest-django>=4.12.0",
     "ruff>=0.15.21",
+    "ty>=0.0.58",
 ]
 
 [tool.pytest.ini_options]
@@ -44,4 +45,8 @@ select = [
     "B",   # bugbear
     "UP",  # pyupgrade
     "DJ",  # flake8-django
+    "ANN", # flake8-annotations — code is fully typed
+]
+ignore = [
+    "ANN401",  # typing.Any is legitimate in *args/**kwargs pass-throughs
 ]

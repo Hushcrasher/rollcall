@@ -12,11 +12,13 @@ Implementation comes in the seed phase (ROADMAP.md), AFTER the blocking
 prerequisites: IGDB/Steam ToS written confirmation + parquet audit.
 """
 
+from typing import Any
+
 from django.core.management.base import BaseCommand
 
 
 class Command(BaseCommand):
     help = "Seed/refresh the games database from the parquet source (idempotent)."
 
-    def handle(self, *args, **options):
+    def handle(self, *args: Any, **options: Any) -> None:
         raise NotImplementedError("seed_games is not implemented yet — see ROADMAP.md, seed phase.")

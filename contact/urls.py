@@ -1,3 +1,5 @@
+from django.urls import URLPattern, URLResolver
+
 app_name = "contact"
 
-urlpatterns: list = []
+urlpatterns: list[URLPattern | URLResolver] = []

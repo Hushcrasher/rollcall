@@ -28,7 +28,8 @@ Goal: a Django skeleton that runs, with license, CI and containers in place.
 - [x] **Custom user model** (email as login identifier) defined *before any migration* — cannot change later
 - [x] i18n wired from day one (`LocaleMiddleware`, `LANGUAGES=[en]`, `locale/`)
 - [x] `Dockerfile` (prod image, whitenoise static) + `compose.yml` (app + Postgres 16)
-- [x] CI: GitHub Actions — ruff + pytest on every push/PR
+- [x] CI: GitHub Actions — ruff + ty + pytest on every push/PR
+- [x] Coding rules: Python fully typed, Astral stack (uv, ruff, ty) — enforced via ruff `ANN` rules and `ty check` in CI
 - [x] `LICENSE` = AGPL v3 (must be in the **first commit**)
 - [x] `.env.example` with every secret/endpoint; `.gitignore` excludes `.env`
 - [x] README with transparency paragraph (AGPL code / private Hushcrasher DB) + CONTRIBUTING with DCO

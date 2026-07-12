@@ -6,6 +6,7 @@ All secrets and infrastructure endpoints come from environment variables
 """
 
 from pathlib import Path
+from typing import Any
 
 import environ
 
@@ -17,7 +18,7 @@ environ.Env.read_env(BASE_DIR / ".env")
 
 SECRET_KEY = env("DJANGO_SECRET_KEY", default=None)
 
-DEBUG = False
+DEBUG: bool = False
 
 ALLOWED_HOSTS: list[str] = env.list("DJANGO_ALLOWED_HOSTS", default=[])
 
@@ -114,7 +115,7 @@ STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 
-STORAGES = {
+STORAGES: dict[str, dict[str, Any]] = {
     # Media (avatars only in POC) goes to an S3 bucket in prod; local in dev.
     "default": {
         "BACKEND": "django.core.files.storage.FileSystemStorage",

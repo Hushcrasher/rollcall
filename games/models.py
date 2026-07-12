@@ -9,6 +9,8 @@ Rules that shape these models:
 - Cover/logo images are never stored by us — URLs to IGDB/Steam CDNs only.
 """
 
+from typing import Any, ClassVar
+
 from django.conf import settings
 from django.contrib.postgres.indexes import GinIndex
 from django.db import models
@@ -16,12 +18,12 @@ from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 
 
-def generate_unique_slug(model, text, pk=None):
+def generate_unique_slug(manager: models.Manager, text: str, pk: int | None = None) -> str:
     """Platform-generated stable slug: slugified text + numeric suffix on collision."""
-    base = slugify(text)[:200] or model._meta.model_name
+    base = slugify(text)[:200] or "item"
     slug = base
     suffix = 2
-    qs = model.objects.exclude(pk=pk) if pk is not None else model.objects.all()
+    qs = manager.exclude(pk=pk) if pk is not None else manager.all()
     while qs.filter(slug=slug).exists():
         slug = f"{base}-{suffix}"
         suffix += 1
@@ -31,6 +33,8 @@ def generate_unique_slug(model, text, pk=None):
 class Genre(models.Model):
     """Reference table populated by the seed from IGDB taxonomies (§4)."""
 
+    objects: ClassVar[models.Manager["Genre"]] = models.Manager()
+
     igdb_id = models.IntegerField(null=True, blank=True, unique=True)
     name = models.CharField(_("name"), max_length=100, unique=True)
 
@@ -40,13 +44,15 @@ class Genre(models.Model):
     class Meta:
         ordering = ["name"]
 
-    def __str__(self):
-        return self.name
+    def __str__(self) -> str:
+        return str(self.name)
 
 
 class Engine(models.Model):
     """Reference table populated by the seed from IGDB taxonomies (§4)."""
 
+    objects: ClassVar[models.Manager["Engine"]] = models.Manager()
+
     igdb_id = models.IntegerField(null=True, blank=True, unique=True)
     name = models.CharField(_("name"), max_length=100, unique=True)
 
@@ -56,8 +62,8 @@ class Engine(models.Model):
     class Meta:
         ordering = ["name"]
 
-    def __str__(self):
-        return self.name
+    def __str__(self) -> str:
+        return str(self.name)
 
 
 class Company(models.Model):
@@ -67,6 +73,8 @@ class Company(models.Model):
     class Source(models.TextChoices):
         SEED = "seed", _("Seed")
         MANUAL = "manual", _("Manual")
+
+    objects: ClassVar[models.Manager["Company"]] = models.Manager()
 
     igdb_company_id = models.IntegerField(null=True, blank=True, unique=True)
     name = models.CharField(_("name"), max_length=300)  # [source] when seeded
@@ -102,17 +110,22 @@ class Company(models.Model):
             GinIndex(fields=["name"], name="company_name_trgm", opclasses=["gin_trgm_ops"]),
         ]
 
-    def __str__(self):
-        return self.name
+    def __str__(self) -> str:
+        return str(self.name)
 
-    def save(self, *args, **kwargs):
+    def save(self, *args: Any, **kwargs: Any) -> None:
         if not self.slug:
-            self.slug = generate_unique_slug(type(self), self.name, pk=self.pk)
+            # ty can't see Django's descriptor magic (a str lives in the field attr).
+            self.slug = generate_unique_slug(  # ty: ignore[invalid-assignment]
+                Company.objects, str(self.name), pk=self.pk
+            )
         super().save(*args, **kwargs)
 
 
 class CompanyAlias(models.Model):
     """Dormant (§5) — alternate names for search ("Square" finds "Square Enix")."""
+
+    objects: ClassVar[models.Manager["CompanyAlias"]] = models.Manager()
 
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="aliases")
     alias = models.CharField(_("alias"), max_length=300)
@@ -129,7 +142,7 @@ class CompanyAlias(models.Model):
             GinIndex(fields=["alias"], name="company_alias_trgm", opclasses=["gin_trgm_ops"]),
         ]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.alias} → {self.company}"
 
 
@@ -140,6 +153,8 @@ class Game(models.Model):
         SEED = "seed", _("Seed")
         IGDB_LIVE = "igdb_live", _("IGDB live")
         MANUAL = "manual", _("Manual")
+
+    objects: ClassVar[models.Manager["Game"]] = models.Manager()
 
     # External IDs — nullable + unique; the internal id is the pivot.
     igdb_id = models.IntegerField(null=True, blank=True, unique=True)
@@ -193,16 +208,21 @@ class Game(models.Model):
             models.Index(fields=["steam_positive_pct"]),
         ]
 
-    def __str__(self):
-        return self.title
+    def __str__(self) -> str:
+        return str(self.title)
 
-    def save(self, *args, **kwargs):
+    def save(self, *args: Any, **kwargs: Any) -> None:
         if not self.slug:
-            self.slug = generate_unique_slug(type(self), self.title, pk=self.pk)
+            # ty can't see Django's descriptor magic (a str lives in the field attr).
+            self.slug = generate_unique_slug(  # ty: ignore[invalid-assignment]
+                Game.objects, str(self.title), pk=self.pk
+            )
         super().save(*args, **kwargs)
 
 
 class GameGenre(models.Model):
+    objects: ClassVar[models.Manager["GameGenre"]] = models.Manager()
+
     game = models.ForeignKey(Game, on_delete=models.CASCADE)
     genre = models.ForeignKey(Genre, on_delete=models.CASCADE)
 
@@ -214,11 +234,13 @@ class GameGenre(models.Model):
             models.Index(fields=["genre", "game"], name="gamegenre_genre_game"),
         ]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.game} · {self.genre}"
 
 
 class GameEngine(models.Model):
+    objects: ClassVar[models.Manager["GameEngine"]] = models.Manager()
+
     game = models.ForeignKey(Game, on_delete=models.CASCADE)
     engine = models.ForeignKey(Engine, on_delete=models.CASCADE)
 
@@ -230,7 +252,7 @@ class GameEngine(models.Model):
             models.Index(fields=["engine", "game"], name="gameengine_engine_game"),
         ]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.game} · {self.engine}"
 
 
@@ -244,6 +266,8 @@ class GameCompany(models.Model):
         PORTING = "porting", _("Porting")
         SUPPORTING = "supporting", _("Supporting")
 
+    objects: ClassVar[models.Manager["GameCompany"]] = models.Manager()
+
     game = models.ForeignKey(Game, on_delete=models.CASCADE, related_name="company_links")
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="game_links")
     role = models.CharField(_("role"), max_length=20, choices=Role.choices)
@@ -256,5 +280,5 @@ class GameCompany(models.Model):
             ),
         ]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.game} · {self.company} ({self.role})"

@@ -1,6 +1,7 @@
 """Report triage — the Django admin is the POC back-office."""
 
 from django.contrib import admin
+from django.http import HttpRequest
 
 from .models import ContactRequest, Report
 
@@ -12,7 +13,7 @@ class ContactRequestAdmin(admin.ModelAdmin):
     search_fields = ("subject", "sender__display_name", "recipient__display_name")
     readonly_fields = ("sender", "recipient", "subject", "message", "sent_at")
 
-    def has_add_permission(self, request):
+    def has_add_permission(self, request: HttpRequest) -> bool:
         return False
 
 
@@ -22,5 +23,5 @@ class ReportAdmin(admin.ModelAdmin):
     list_filter = ("status", "target_type")
     readonly_fields = ("reporter", "target_type", "target_id", "reason", "created_at")
 
-    def has_add_permission(self, request):
+    def has_add_permission(self, request: HttpRequest) -> bool:
         return False

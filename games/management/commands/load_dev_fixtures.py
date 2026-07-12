@@ -11,25 +11,26 @@ admin@example.com / "admin". Never run against a production database.
 
 import random
 from datetime import date
+from typing import Any
 
-from django.contrib.auth import get_user_model
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandParser
 from django.utils import timezone
 
+from accounts.models import User
 from contributions.models import Contribution, Discipline
 from games.models import Company, Engine, Game, GameCompany, GameEngine, GameGenre, Genre
 
-GENRES = [
+GENRES: list[str] = [
     "Action", "Adventure", "RPG", "Strategy", "Shooter", "Puzzle",
     "Platformer", "Racing", "Simulation", "Sports", "Indie", "Horror",
 ]  # fmt: skip
 
-ENGINES = [
+ENGINES: list[str] = [
     "Unreal Engine", "Unity", "Godot", "GameMaker", "CryEngine",
     "Source", "RE Engine", "Frostbite", "In-house engine",
 ]  # fmt: skip
 
-COMPANY_PARTS = (
+COMPANY_PARTS: tuple[list[str], list[str], list[str]] = (
     ["Iron", "Pixel", "Crimson", "Neon", "Silver", "Lunar", "Ember", "Frost",
      "Turbo", "Quantum", "Velvet", "Cobalt", "Golden", "Rogue", "Static"],
     ["Owl", "Forge", "Anvil", "Fox", "Raven", "Titan", "Harbor", "Peak",
@@ -37,7 +38,7 @@ COMPANY_PARTS = (
     ["Studios", "Games", "Interactive", "Entertainment", "Works", "Collective"],
 )  # fmt: skip
 
-TITLE_PARTS = (
+TITLE_PARTS: tuple[list[str], list[str]] = (
     ["Crimson", "Forgotten", "Endless", "Shattered", "Neon", "Silent",
      "Burning", "Frozen", "Hidden", "Iron", "Lost", "Savage", "Golden",
      "Hollow", "Wild", "Broken", "Astral", "Grim", "Radiant", "Feral"],
@@ -47,19 +48,19 @@ TITLE_PARTS = (
      "Sanctum", "Overdrive"],
 )  # fmt: skip
 
-FIRST_NAMES = [
+FIRST_NAMES: list[str] = [
     "Alex", "Sam", "Jordan", "Casey", "Morgan", "Riley", "Quinn", "Avery",
     "Rowan", "Sasha", "Noor", "Yuki", "Mateo", "Ines", "Kofi", "Mina",
     "Leon", "Zara", "Hugo", "Ada",
 ]  # fmt: skip
 
-LAST_NAMES = [
+LAST_NAMES: list[str] = [
     "Reyes", "Kim", "Novak", "Dubois", "Tanaka", "Okafor", "Larsen",
     "Moreau", "Silva", "Haddad", "Kowalski", "Nguyen", "Berg", "Rossi",
     "Iyer", "Fontaine", "Weber", "Costa", "Andersson", "Petrov",
 ]  # fmt: skip
 
-JOB_TITLES = {
+JOB_TITLES: dict[str, list[str]] = {
     "Programming": ["Gameplay Programmer", "Engine Programmer", "Tools Programmer"],
     "Design": ["Game Designer", "Level Designer", "Narrative Designer"],
     "Art": ["3D Artist", "Concept Artist", "Technical Artist", "Art Director"],
@@ -77,14 +78,13 @@ JOB_TITLES = {
 class Command(BaseCommand):
     help = "Load a deterministic fake dataset (games, companies, users, contributions). Dev only."
 
-    def add_arguments(self, parser):
+    def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument("--games", type=int, default=300)
         parser.add_argument("--users", type=int, default=40)
         parser.add_argument("--contributions", type=int, default=150)
 
-    def handle(self, *args, **options):
+    def handle(self, *args: Any, **options: Any) -> None:
         rng = random.Random(42)
-        user_model = get_user_model()
 
         genres = [Genre.objects.get_or_create(name=name)[0] for name in GENRES]
         engines = [Engine.objects.get_or_create(name=name)[0] for name in ENGINES]
@@ -94,11 +94,11 @@ class Command(BaseCommand):
 
         companies = self._create_companies(rng)
         games = self._create_games(rng, options["games"], genres, engines, companies)
-        users = self._create_users(rng, options["users"], user_model)
+        users = self._create_users(rng, options["users"])
         n_contribs = self._create_contributions(
             rng, options["contributions"], users, games, companies, disciplines
         )
-        self._create_admin(user_model)
+        self._create_admin()
 
         self.stdout.write(
             self.style.SUCCESS(
@@ -109,9 +109,9 @@ class Command(BaseCommand):
             )
         )
 
-    def _create_companies(self, rng):
-        companies = []
-        seen = set()
+    def _create_companies(self, rng: random.Random) -> list[Company]:
+        companies: list[Company] = []
+        seen: set[str] = set()
         while len(companies) < 50:
             words = (rng.choice(part) for part in COMPANY_PARTS)
             name = " ".join(words)
@@ -124,9 +124,16 @@ class Command(BaseCommand):
             companies.append(company)
         return companies
 
-    def _create_games(self, rng, count, genres, engines, companies):
-        games = []
-        seen = set()
+    def _create_games(
+        self,
+        rng: random.Random,
+        count: int,
+        genres: list[Genre],
+        engines: list[Engine],
+        companies: list[Company],
+    ) -> list[Game]:
+        games: list[Game] = []
+        seen: set[str] = set()
         igdb_id = 1000
         steam_appid = 200000
         while len(games) < count:
@@ -142,7 +149,7 @@ class Command(BaseCommand):
             has_steam = rng.random() < 0.7 or not has_igdb
             # Draw ALL random values before get_or_create: the rng sequence
             # must be identical whether rows exist or not (idempotency).
-            defaults = {
+            defaults: dict[str, Any] = {
                 "igdb_id": igdb_id if has_igdb else None,
                 "steam_appid": steam_appid if has_steam else None,
                 "release_date": date(rng.randint(1998, 2025), rng.randint(1, 12), 1),
@@ -174,11 +181,11 @@ class Command(BaseCommand):
                 )
         return games
 
-    def _create_users(self, rng, count, user_model):
-        users = []
+    def _create_users(self, rng: random.Random, count: int) -> list[User]:
+        users: list[User] = []
         for i in range(1, count + 1):
             display_name = f"{rng.choice(FIRST_NAMES)} {rng.choice(LAST_NAMES)}"
-            user, created = user_model.objects.get_or_create(
+            user, created = User.objects.get_or_create(
                 email=f"devuser{i}@example.com",
                 defaults={
                     "display_name": display_name,
@@ -195,7 +202,15 @@ class Command(BaseCommand):
             users.append(user)
         return users
 
-    def _create_contributions(self, rng, count, users, games, companies, disciplines):
+    def _create_contributions(
+        self,
+        rng: random.Random,
+        count: int,
+        users: list[User],
+        games: list[Game],
+        companies: list[Company],
+        disciplines: list[Discipline],
+    ) -> int:
         created_count = 0
         for _ in range(count):
             user = rng.choice(users)
@@ -215,16 +230,16 @@ class Command(BaseCommand):
                 start_date=start,
                 defaults={
                     "company": rng.choice(companies) if rng.random() < 0.5 else None,
-                    "job_title": rng.choice(JOB_TITLES[discipline.name]),
+                    "job_title": rng.choice(JOB_TITLES[str(discipline.name)]),
                     "end_date": end,
                 },
             )
             created_count += int(created)
         return created_count
 
-    def _create_admin(self, user_model):
-        if not user_model.objects.filter(email="admin@example.com").exists():
-            user_model.objects.create_superuser(
+    def _create_admin(self) -> None:
+        if not User.objects.filter(email="admin@example.com").exists():
+            User.objects.create_superuser(
                 email="admin@example.com",
                 password="admin",
                 display_name="Dev Admin",

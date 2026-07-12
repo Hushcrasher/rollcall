@@ -2,23 +2,23 @@
 and stay idempotent (docs/02-ARCHITECTURE.md §6)."""
 
 import pytest
-from django.contrib.auth import get_user_model
 from django.core.management import call_command
 
+from accounts.models import User
 from contributions.models import Contribution
 from games.models import Company, Game
 
 pytestmark = pytest.mark.django_db
 
 
-def test_load_dev_fixtures_is_idempotent():
+def test_load_dev_fixtures_is_idempotent() -> None:
     args = ["--games", "30", "--users", "8", "--contributions", "20"]
     call_command("load_dev_fixtures", *args)
 
     counts = (
         Game.objects.count(),
         Company.objects.count(),
-        get_user_model().objects.count(),
+        User.objects.count(),
         Contribution.objects.count(),
     )
     assert counts[0] == 30
@@ -29,6 +29,6 @@ def test_load_dev_fixtures_is_idempotent():
     assert counts == (
         Game.objects.count(),
         Company.objects.count(),
-        get_user_model().objects.count(),
+        User.objects.count(),
         Contribution.objects.count(),
     )

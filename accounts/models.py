@@ -5,6 +5,8 @@ Custom user with email as the login identifier, decided at project start
 anywhere on the platform; contact goes through the relay only.
 """
 
+from typing import Any, ClassVar
+
 from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.models import AbstractUser
 from django.contrib.postgres.indexes import GinIndex
@@ -18,7 +20,7 @@ class UserManager(BaseUserManager):
 
     use_in_migrations = True
 
-    def _create_user(self, email, password, **extra_fields):
+    def _create_user(self, email: str, password: str | None, **extra_fields: Any) -> "User":
         if not email:
             raise ValueError("An email address is required")
         email = self.normalize_email(email)
@@ -27,12 +29,14 @@ class UserManager(BaseUserManager):
         user.save(using=self._db)
         return user
 
-    def create_user(self, email, password=None, **extra_fields):
+    def create_user(self, email: str, password: str | None = None, **extra_fields: Any) -> "User":
         extra_fields.setdefault("is_staff", False)
         extra_fields.setdefault("is_superuser", False)
         return self._create_user(email, password, **extra_fields)
 
-    def create_superuser(self, email, password=None, **extra_fields):
+    def create_superuser(
+        self, email: str, password: str | None = None, **extra_fields: Any
+    ) -> "User":
         extra_fields.setdefault("is_staff", True)
         extra_fields.setdefault("is_superuser", True)
         extra_fields.setdefault("role", User.Role.ADMIN)
@@ -98,7 +102,7 @@ class User(AbstractUser):
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ["display_name"]
 
-    objects = UserManager()
+    objects: ClassVar[UserManager] = UserManager()
 
     class Meta:
         verbose_name = _("user")
@@ -112,15 +116,16 @@ class User(AbstractUser):
             ),
         ]
 
-    def __str__(self):
-        return self.display_name
+    def __str__(self) -> str:
+        return str(self.display_name)
 
-    def save(self, *args, **kwargs):
+    def save(self, *args: Any, **kwargs: Any) -> None:
         if not self.slug:
-            self.slug = self._generate_unique_slug()
+            # ty can't see Django's descriptor magic (a str lives in the field attr).
+            self.slug = self._generate_unique_slug()  # ty: ignore[invalid-assignment]
         super().save(*args, **kwargs)
 
-    def _generate_unique_slug(self):
+    def _generate_unique_slug(self) -> str:
         base = slugify(self.display_name) or "user"
         slug = base
         suffix = 2
@@ -143,6 +148,8 @@ class RecruiterApplication(models.Model):
         PENDING = "pending", _("Pending")
         APPROVED = "approved", _("Approved")
         REJECTED = "rejected", _("Rejected")
+
+    objects: ClassVar[models.Manager["RecruiterApplication"]] = models.Manager()
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="recruiter_applications")
     full_name = models.CharField(_("full name"), max_length=200)
@@ -176,5 +183,5 @@ class RecruiterApplication(models.Model):
             ),
         ]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"[{self.status}] {self.full_name} ({self.company_name})"
