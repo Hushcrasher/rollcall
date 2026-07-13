@@ -73,9 +73,9 @@ python manage.py seed_games
 - Set `SEED_ALERT_EMAIL` to be notified on failure. Weekly: a Railway cron
   service can run both commands (prepare then seed), or Hushcrasher's pipeline
   produces the prepared parquet and the cron only runs `seed_games`.
-- ⚠️ **Initial cold load is slow** with the current per-row upsert (~50 min for
-  the full 392k). See "Known follow-ups" in ROADMAP.md — a bulk-load path is
-  the fix. Weekly refreshes (mostly updates) are less affected.
+- **Performance:** the bulk loader does the full ~392k catalog in ~2 minutes
+  (prepare ~2s + seed ~2min), so both the cold load and the weekly refresh are
+  cheap.
 
 ## 6. Before launch
 

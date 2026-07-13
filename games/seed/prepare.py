@@ -24,7 +24,31 @@ import duckdb
 from games.seed.pipeline import configure_remote_access
 
 
+def _clean_names(expr: str, limit: int) -> str:
+    """Trim + truncate each name to the DB column limit and drop blanks —
+    real dev/publisher/genre names carry stray whitespace and garbage."""
+    return (
+        f"list_filter("
+        f"  list_transform({expr}, x -> left(trim(x), {limit})),"
+        f"  y -> y IS NOT NULL AND y <> '')"
+    )
+
+
 def _build_sql(igdb: str, hushcrasher: str, steamdb: str, release_dates: str) -> str:
+    genres_ig = _clean_names("COALESCE(hc.genres, []::VARCHAR[])", 100)
+    engines_ig = _clean_names(
+        "COALESCE(NULLIF(ig.engine_names, []::VARCHAR[]), hc.game_engines, []::VARCHAR[])", 100
+    )
+    developers_ig = _clean_names(
+        "COALESCE(NULLIF(ig.developer_names, []::VARCHAR[]), hc.developers, []::VARCHAR[])", 300
+    )
+    publishers_ig = _clean_names(
+        "COALESCE(NULLIF(ig.publisher_names, []::VARCHAR[]), hc.publishers, []::VARCHAR[])", 300
+    )
+    genres_so = _clean_names("COALESCE(hc.genres, []::VARCHAR[])", 100)
+    engines_so = _clean_names("COALESCE(hc.game_engines, []::VARCHAR[])", 100)
+    developers_so = _clean_names("COALESCE(hc.developers, []::VARCHAR[])", 300)
+    publishers_so = _clean_names("COALESCE(hc.publishers, []::VARCHAR[])", 300)
     return f"""
 WITH first_release AS (
     SELECT igdb_id, min(date) AS release_date
@@ -49,21 +73,18 @@ igdb_games AS (
     SELECT
         ig.igdb_id                                                       AS igdb_id,
         ig.steam_app_id                                                  AS steam_appid,
-        ig.game_name                                                     AS title,
+        left(ig.game_name, 500)                                          AS title,
         COALESCE(fr.release_date, CAST(hc.steam_release_date AS DATE))   AS release_date,
         COALESCE(NULLIF(ig.summary, ''), sd.short_description, '')        AS summary,
-        COALESCE(sd.header_image, '')                                     AS cover_url,
+        left(COALESCE(sd.header_image, ''), 500)                          AS cover_url,
         NULL::DOUBLE                                                      AS igdb_rating,
         NULL::DOUBLE                                                      AS igdb_aggregated_rating,
         CAST(hc.review_score AS DOUBLE)                                   AS steam_positive_pct,
         CAST(hc.reviews_steam AS BIGINT)                                  AS steam_review_count,
-        COALESCE(hc.genres, []::VARCHAR[])                                AS genres,
-        COALESCE(NULLIF(ig.engine_names, []::VARCHAR[]),
-                 hc.game_engines, []::VARCHAR[])                          AS engines,
-        COALESCE(NULLIF(ig.developer_names, []::VARCHAR[]),
-                 hc.developers, []::VARCHAR[])                            AS developers,
-        COALESCE(NULLIF(ig.publisher_names, []::VARCHAR[]),
-                 hc.publishers, []::VARCHAR[])                            AS publishers,
+        {genres_ig}                                                      AS genres,
+        {engines_ig}                                                     AS engines,
+        {developers_ig}                                                  AS developers,
+        {publishers_ig}                                                  AS publishers,
         []::VARCHAR[]                                                     AS porting,
         []::VARCHAR[]                                                     AS supporting
     FROM igdb ig
@@ -75,18 +96,18 @@ steam_only AS (
     SELECT
         NULL::BIGINT                                       AS igdb_id,
         hc.app_id                                          AS steam_appid,
-        hc.name                                            AS title,
+        left(hc.name, 500)                                 AS title,
         CAST(hc.steam_release_date AS DATE)                AS release_date,
         COALESCE(sd.short_description, hc.about_the_game, '') AS summary,
-        COALESCE(sd.header_image, '')                      AS cover_url,
+        left(COALESCE(sd.header_image, ''), 500)           AS cover_url,
         NULL::DOUBLE                                       AS igdb_rating,
         NULL::DOUBLE                                       AS igdb_aggregated_rating,
         CAST(hc.review_score AS DOUBLE)                    AS steam_positive_pct,
         CAST(hc.reviews_steam AS BIGINT)                   AS steam_review_count,
-        COALESCE(hc.genres, []::VARCHAR[])                 AS genres,
-        COALESCE(hc.game_engines, []::VARCHAR[])           AS engines,
-        COALESCE(hc.developers, []::VARCHAR[])             AS developers,
-        COALESCE(hc.publishers, []::VARCHAR[])             AS publishers,
+        {genres_so}                                        AS genres,
+        {engines_so}                                       AS engines,
+        {developers_so}                                    AS developers,
+        {publishers_so}                                    AS publishers,
         []::VARCHAR[]                                      AS porting,
         []::VARCHAR[]                                      AS supporting
     FROM hc
