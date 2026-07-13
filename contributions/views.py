@@ -14,6 +14,7 @@ from django.views.generic import CreateView, DeleteView, UpdateView
 
 from contributions.forms import ContributionForm
 from contributions.models import Contribution
+from games.igdb import IGDBClient
 
 
 class EmailVerifiedRequiredMixin(LoginRequiredMixin):
@@ -38,7 +39,17 @@ class _OwnerProfileRedirectMixin:
         return reverse("accounts:profile", kwargs={"slug": self.request.user.slug})
 
 
-class ContributionCreateView(EmailVerifiedRequiredMixin, _OwnerProfileRedirectMixin, CreateView):
+class _IGDBContextMixin:
+    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
+        # super() resolves to the Django CBV this is mixed into.
+        context: dict[str, Any] = super().get_context_data(**kwargs)  # ty: ignore[unresolved-attribute]
+        context["igdb_enabled"] = IGDBClient().configured
+        return context
+
+
+class ContributionCreateView(
+    EmailVerifiedRequiredMixin, _OwnerProfileRedirectMixin, _IGDBContextMixin, CreateView
+):
     model = Contribution
     form_class = ContributionForm
     template_name = "contributions/contribution_form.html"
@@ -49,7 +60,9 @@ class ContributionCreateView(EmailVerifiedRequiredMixin, _OwnerProfileRedirectMi
         return super().form_valid(form)
 
 
-class ContributionUpdateView(LoginRequiredMixin, _OwnerProfileRedirectMixin, UpdateView):
+class ContributionUpdateView(
+    LoginRequiredMixin, _OwnerProfileRedirectMixin, _IGDBContextMixin, UpdateView
+):
     model = Contribution
     form_class = ContributionForm
     template_name = "contributions/contribution_form.html"

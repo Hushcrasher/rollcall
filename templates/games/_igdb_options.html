@@ -1,0 +1,15 @@
+{% load i18n %}
+{% if error == "unconfigured" %}
+  <p class="autocomplete-empty">{% translate "IGDB search is not configured on this server." %}</p>
+{% elif error == "unavailable" %}
+  <p class="autocomplete-empty">{% translate "IGDB is unavailable right now — try again later." %}</p>
+{% else %}
+  {% for option in options %}
+    <button type="button" class="igdb-option"
+            data-igdb-id="{{ option.igdb_id }}" data-label="{{ option.label }}">
+      {{ option.label }}
+    </button>
+  {% empty %}
+    <p class="autocomplete-empty">{% translate "No games found on IGDB." %}</p>
+  {% endfor %}
+{% endif %}

@@ -21,6 +21,17 @@
       <div class="results"></div>
       <p class="chosen">{% if form.game.value %}{{ form.instance.game }}{% endif %}</p>
       {{ form.game.errors }}
+
+      {% if igdb_enabled %}
+        <details class="igdb-fallback">
+          <summary>{% translate "Can't find your game? Search IGDB" %}</summary>
+          <input type="text" class="igdb-input" name="q" autocomplete="off"
+                 placeholder="{% translate 'Search IGDB…' %}"
+                 hx-get="{% url 'games:igdb_search' %}" hx-trigger="keyup changed delay:400ms"
+                 hx-target="#igdb-results">
+          <div id="igdb-results"></div>
+        </details>
+      {% endif %}
     </div>
 
     {# Company — optional employer. #}
@@ -67,6 +78,35 @@
       wrapper.querySelector(".chosen").textContent = option.dataset.label;
       wrapper.querySelector(".results").innerHTML = "";
       wrapper.querySelector(".autocomplete-input").value = "";
+    });
+
+    // IGDB fallback: clicking a result imports the game, then selects it as the
+    // chosen game (fills the same hidden field as the local autocomplete).
+    document.addEventListener("click", async function (event) {
+      const option = event.target.closest(".igdb-option");
+      if (!option) return;
+      const csrf = document.querySelector("[name=csrfmiddlewaretoken]").value;
+      option.disabled = true;
+      const original = option.textContent;
+      option.textContent = "{% translate 'Importing…' %}";
+      try {
+        const response = await fetch("{% url 'games:igdb_import' %}", {
+          method: "POST",
+          headers: { "X-CSRFToken": csrf, "Content-Type": "application/x-www-form-urlencoded" },
+          body: "igdb_id=" + encodeURIComponent(option.dataset.igdbId),
+        });
+        if (!response.ok) throw new Error("import failed");
+        const game = await response.json();
+        const gameField = document.getElementById("{{ form.game.auto_id }}");
+        gameField.value = game.id;
+        const wrapper = gameField.closest(".autocomplete");
+        wrapper.querySelector(".chosen").textContent = game.label + " {% translate '(imported from IGDB)' %}";
+        document.getElementById("igdb-results").innerHTML = "";
+      } catch (err) {
+        option.textContent = original;
+        option.disabled = false;
+        alert("{% translate 'Could not import from IGDB. Please try again.' %}");
+      }
     });
   </script>
 {% endblock %}

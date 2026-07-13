@@ -141,6 +141,10 @@ DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="noreply@rollcall.example
 
 # Remote parquet the seed reads (private; a fork plugs its own source here).
 PARQUET_SOURCE_URL = env("PARQUET_SOURCE_URL", default="")
+
+# IGDB API (via Twitch OAuth) — live fallback for games missing from the seed.
+IGDB_CLIENT_ID = env("IGDB_CLIENT_ID", default="")
+IGDB_CLIENT_SECRET = env("IGDB_CLIENT_SECRET", default="")
 # Optional address alerted when a scheduled seed run fails.
 SEED_ALERT_EMAIL = env("SEED_ALERT_EMAIL", default="")
 

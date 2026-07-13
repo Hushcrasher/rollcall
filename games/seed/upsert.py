@@ -57,7 +57,7 @@ def _find_existing(game: CanonicalGame) -> Game | None:
     return None
 
 
-def _upsert_one(game: CanonicalGame) -> bool:
+def _upsert_one(game: CanonicalGame, source: str) -> bool:
     """Create or refresh a single game. Returns True if it was created."""
     source_values = {
         "igdb_id": game.igdb_id,
@@ -70,7 +70,7 @@ def _upsert_one(game: CanonicalGame) -> bool:
         "igdb_aggregated_rating": game.igdb_aggregated_rating,
         "steam_positive_pct": game.steam_positive_pct,
         "steam_review_count": game.steam_review_count,
-        "source": Game.Source.SEED,
+        "source": source,
         "last_synced_at": timezone.now(),
     }
 
@@ -124,13 +124,18 @@ def _sync_companies(game: Game, canonical: CanonicalGame) -> None:
             GameCompany.objects.get_or_create(game=game, company=company, role=role)
 
 
-def upsert_games(games: Iterable[CanonicalGame], batch_size: int = 500) -> UpsertStats:
-    """Idempotently upsert canonical games, one transaction per batch."""
+def upsert_games(
+    games: Iterable[CanonicalGame],
+    batch_size: int = 500,
+    source: str = Game.Source.SEED,
+) -> UpsertStats:
+    """Idempotently upsert canonical games, one transaction per batch. `source`
+    marks provenance (`seed` for the batch job, `igdb_live` for live fallback)."""
     stats: UpsertStats = {"created": 0, "updated": 0}
     for batch in _chunks(games, batch_size):
         with transaction.atomic():
             for game in batch:
-                if _upsert_one(game):
+                if _upsert_one(game, source):
                     stats["created"] += 1
                 else:
                     stats["updated"] += 1

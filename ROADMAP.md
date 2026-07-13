@@ -130,6 +130,11 @@ Goal: legally and operationally ready for real users. Buildable pieces done TDD 
 - [ ] ⚠️ Weekly `seed_games` cron — after the ToS + parquet prerequisites clear
 - [x] Fallback documented (DEPLOY.md): ship "For recruiters" + contact relay first if the schedule slips
 
+## Post-roadmap additions
+
+- [x] **Dev email backend** — prints a clean, copy-friendly body so console verification/reset links aren't corrupted by quoted-printable wrapping
+- [x] **IGDB live fallback** (docs §3.1): `games/igdb.py` client (Twitch OAuth, cached token) + `import_igdb_game` (reuses the seed upsert, `source=igdb_live`) + login-gated search/import endpoints + a "Can't find your game? Search IGDB" section on the credit form (hidden unless `IGDB_CLIENT_ID`/`SECRET` are set). 16 tests, all mocked (no network). Set the two Twitch env vars to go live.
+
 ---
 
 ## Deliberately NOT in the POC
