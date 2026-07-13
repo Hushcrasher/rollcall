@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% translate "Contact" %} {{ target.display_name }} · Rollcall{% endblock %}
+
+{% block content %}
+  <h1>{% blocktranslate with name=target.display_name %}Contact {{ name }}{% endblocktranslate %}</h1>
+  <p>{% blocktranslate %}Your message is delivered by email. Your address is set as
+  the reply-to, so {{ target.display_name }} can reply to you directly — their
+  address is never shared.{% endblocktranslate %}</p>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">{% translate "Send message" %}</button>
+  </form>
+{% endblock %}

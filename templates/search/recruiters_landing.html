@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% translate "For recruiters" %} · Rollcall{% endblock %}
+
+{% block content %}
+  <h1>{% translate "Find the people behind the games" %}</h1>
+
+  <p>{% blocktranslate %}Rollcall lets you search industry professionals by what
+  they actually worked on — the engine, genre, and reception of their games,
+  crossed with their discipline. No self-declared skills, just credits.{% endblocktranslate %}</p>
+
+  <p>{% blocktranslate %}Being small and honest matters more to us than big numbers.
+  Here's exactly where we are today:{% endblocktranslate %}</p>
+  <ul>
+    <li>{% blocktranslate count counter=public_profiles %}{{ counter }} public profile{% plural %}{{ counter }} public profiles{% endblocktranslate %}</li>
+    <li>{% blocktranslate count counter=games %}{{ counter }} game{% plural %}{{ counter }} games{% endblocktranslate %}</li>
+  </ul>
+
+  <p>{% blocktranslate %}Recruiter accounts are reviewed manually.{% endblocktranslate %}</p>
+  <p><a href="{% url 'accounts:recruiter_apply' %}">{% translate "Apply for a recruiter account" %}</a></p>
+{% endblock %}

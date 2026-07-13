@@ -1,7 +1,9 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
+from django.db.models import QuerySet
 from django.utils.translation import gettext_lazy as _
 
+from .http import AuthedHttpRequest
 from .models import RecruiterApplication, User
 
 
@@ -52,10 +54,26 @@ class UserAdmin(DjangoUserAdmin):
 @admin.register(RecruiterApplication)
 class RecruiterApplicationAdmin(admin.ModelAdmin):
     """Manual recruiter validation, one by one — each approval doubles as a
-    user interview. The approval flow (set user.role='recruiter') lands in
-    the recruiter phase; until then, review/approve by editing the status."""
+    user interview. Approving promotes the applicant to `recruiter`."""
 
     list_display = ("full_name", "company_name", "work_email", "status", "created_at")
     list_filter = ("status",)
     search_fields = ("full_name", "company_name", "work_email")
-    readonly_fields = ("user", "created_at", "updated_at")
+    readonly_fields = ("user", "reviewed_by", "reviewed_at", "created_at", "updated_at")
+    actions = ["approve_selected", "reject_selected"]
+
+    @admin.action(description=_("Approve selected (promotes user to recruiter)"))
+    def approve_selected(
+        self, request: AuthedHttpRequest, queryset: QuerySet[RecruiterApplication]
+    ) -> None:
+        for application in queryset:
+            application.approve(reviewer=request.user)
+        self.message_user(request, _("Approved %(n)d application(s).") % {"n": queryset.count()})
+
+    @admin.action(description=_("Reject selected"))
+    def reject_selected(
+        self, request: AuthedHttpRequest, queryset: QuerySet[RecruiterApplication]
+    ) -> None:
+        for application in queryset:
+            application.reject(reviewer=request.user)
+        self.message_user(request, _("Rejected %(n)d application(s).") % {"n": queryset.count()})

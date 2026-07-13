@@ -12,6 +12,7 @@ from django.contrib.auth.models import AbstractUser
 from django.contrib.postgres.indexes import GinIndex
 from django.db import models
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 
@@ -144,6 +145,10 @@ class User(AbstractUser):
     def is_email_verified(self) -> bool:
         return self.email_verified_at is not None
 
+    @property
+    def is_recruiter(self) -> bool:
+        return self.role == self.Role.RECRUITER or bool(self.is_superuser)
+
 
 class RecruiterApplication(models.Model):
     """§2 — "do things that don't scale": manual validation, one by one,
@@ -190,3 +195,20 @@ class RecruiterApplication(models.Model):
 
     def __str__(self) -> str:
         return f"[{self.status}] {self.full_name} ({self.company_name})"
+
+    def approve(self, reviewer: "User") -> None:
+        """Approve and promote the applicant to recruiter (docs §3.6)."""
+        self._review(self.Status.APPROVED, reviewer)
+        user: Any = self.user  # FK descriptor is opaque to the type checker
+        user.role = User.Role.RECRUITER
+        user.save(update_fields=["role", "updated_at"])
+
+    def reject(self, reviewer: "User") -> None:
+        self._review(self.Status.REJECTED, reviewer)
+
+    def _review(self, status: str, reviewer: "User") -> None:
+        obj: Any = self  # model field descriptors are opaque to the type checker
+        obj.status = status
+        obj.reviewed_by = reviewer
+        obj.reviewed_at = timezone.now()
+        self.save(update_fields=["status", "reviewed_by", "reviewed_at", "updated_at"])

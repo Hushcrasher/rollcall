@@ -14,9 +14,9 @@ urlpatterns = [
     # "who worked on X" wants clean profile URLs). Later phases add /games etc.
     path("", include("accounts.urls")),
     path("", include("games.urls")),
+    path("", include("contact.urls")),
     path("credits/", include("contributions.urls")),
     path("search/", include("search.urls")),
-    # Phase 6 — recruiters & contact relay: path("", include("contact.urls")),
 ]
 
 if settings.DEBUG:

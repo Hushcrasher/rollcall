@@ -1,0 +1,8 @@
+{% load i18n %}{% blocktranslate with name=target.display_name %}Hi {{ name }},{% endblocktranslate %}
+
+{% blocktranslate with sender=sender.display_name %}{{ sender }} sent you a message through Rollcall:{% endblocktranslate %}
+
+{{ message }}
+
+--
+{% blocktranslate %}Reply directly to this email to answer. Your address is not shared unless you choose to reply.{% endblocktranslate %}

@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% translate "Apply as a recruiter" %} · Rollcall{% endblock %}
+
+{% block content %}
+  <h1>{% translate "Apply for a recruiter account" %}</h1>
+  <p>{% blocktranslate %}Recruiter accounts are approved manually. Tell us who you
+  are and we'll review your request.{% endblocktranslate %}</p>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">{% translate "Submit application" %}</button>
+  </form>
+{% endblock %}

@@ -17,12 +17,18 @@ from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST
-from django.views.generic import DetailView, FormView, TemplateView, UpdateView
+from django.views.generic import CreateView, DetailView, FormView, TemplateView, UpdateView
 
 from accounts.emails import send_verification_email
 from accounts.export import build_personal_data_export
-from accounts.forms import EmailAuthenticationForm, SettingsForm, SignupForm
-from accounts.models import User
+from accounts.forms import (
+    EmailAuthenticationForm,
+    RecruiterApplicationForm,
+    SettingsForm,
+    SignupForm,
+)
+from accounts.http import AuthedHttpRequest
+from accounts.models import RecruiterApplication, User
 from accounts.tokens import email_verification_token
 from contributions.models import Contribution
 
@@ -30,6 +36,7 @@ __all__ = [
     "AccountDeleteView",
     "EmailAuthenticationForm",
     "ProfileView",
+    "RecruiterApplyView",
     "SettingsView",
     "SignupView",
     "VerificationSentView",
@@ -37,14 +44,6 @@ __all__ = [
     "resend_verification",
     "verify_email",
 ]
-
-
-class AuthedHttpRequest(HttpRequest):
-    """An HttpRequest guaranteed to carry an authenticated user (login-gated
-    views). `request.user` is added by middleware and is invisible to the
-    static type checker otherwise."""
-
-    user: User
 
 
 class SignupView(FormView):
@@ -143,6 +142,33 @@ class AccountDeleteView(LoginRequiredMixin, TemplateView):
         user.delete()
         messages.success(request, _("Your account and all your credits were deleted."))
         return redirect("accounts:login")
+
+
+class RecruiterApplyView(LoginRequiredMixin, CreateView):
+    """Members apply to become recruiters; an admin approves manually (§3.6)."""
+
+    model = RecruiterApplication
+    form_class = RecruiterApplicationForm
+    template_name = "accounts/recruiter_apply.html"
+    success_url = reverse_lazy("accounts:settings")
+
+    def dispatch(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
+        user = self.request.user
+        if user.is_authenticated:
+            if user.is_recruiter:
+                return redirect("search:recruiter_search")
+            pending = RecruiterApplication.objects.filter(
+                user=user, status=RecruiterApplication.Status.PENDING
+            ).exists()
+            if pending:
+                messages.info(request, _("Your recruiter application is already under review."))
+                return redirect("accounts:settings")
+        return super().dispatch(request, *args, **kwargs)
+
+    def form_valid(self, form: RecruiterApplicationForm) -> HttpResponse:
+        form.instance.user = self.request.user
+        messages.success(self.request, _("Application submitted — we'll review it soon."))
+        return super().form_valid(form)
 
 
 @login_required

@@ -103,15 +103,16 @@ Goal: find games and people, open to all. Built TDD (9 tests); verified in the b
 - [x] Autocomplete endpoints (htmx) shared with Phase 4's contribution form
 - [x] No exhaustive "all people" listing — a blank query returns nothing (anti-scraping posture)
 
-## Phase 6 — Recruiter side
+## Phase 6 — Recruiter side ✅
 
-Goal: the full two-sided loop the POC must test.
+Goal: the full two-sided loop the POC must test. Built TDD (27 tests); the whole loop verified in the browser (apply → approve → search → contact).
 
-- [ ] Recruiter application form (name, company, work email, LinkedIn) → `pending`
-- [ ] Manual approval in Django admin → sets `role='recruiter'`
-- [ ] **Recruiter search** (non-negotiable zone #2): discipline × engine × genre × rating (`steam_positive_pct` / IGDB fallback) × dates × `open_to_work`, honoring `profile_public` — **with tests on the query** (it is the product promise); rating never a default sort; 2D/3D filter best-effort or deferred, never blocking
-- [ ] **Contact relay**: form → email to the target (if `contactable`), Reply-To = sender, recipient email never in any page/response; per-sender rate limit backed by `contact_requests` (with tests)
-- [ ] Public "For recruiters" page — honest copy, no inflated counters
+- [x] Recruiter application form (name, company, work email, LinkedIn) → `pending`; one pending per user
+- [x] Manual approval via Django admin action → `RecruiterApplication.approve()` sets `role='recruiter'`, `reviewed_by`/`reviewed_at`
+- [x] **Recruiter search** (non-negotiable zone #2): discipline × engine × genre × rating (`steam_positive_pct` **or** IGDB) × `year_from` × `open_to_work`, honoring `profile_public`, only `status='active'` — every filter crosses within a SINGLE contribution; **8 query tests + view tests**; rating never a sort (order by display_name); gated to recruiters
+- [x] **Contact relay**: form → email to the target (only if `contactable`), Reply-To = sender, recipient email never in any page/response — verified live; per-sender 24h rate limit backed by `contact_requests` (with tests); can't contact self
+- [x] Public "For recruiters" page — honest **real** counts (no inflation), apply CTA
+- [x] 2D/3D filter: deferred per docs (no direct IGDB field) — not blocking
 
 ## Phase 7 — Hardening & launch prep
 

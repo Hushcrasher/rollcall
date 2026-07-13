@@ -53,6 +53,8 @@ urlpatterns: list[URLPattern | URLResolver] = [
         ),
         name="password_reset_complete",
     ),
+    # Recruiter application (approved manually in the admin)
+    path("recruiters/apply/", views.RecruiterApplyView.as_view(), name="recruiter_apply"),
     # Settings + GDPR (deletion, export)
     path("settings/", views.SettingsView.as_view(), name="settings"),
     path("settings/delete/", views.AccountDeleteView.as_view(), name="account_delete"),

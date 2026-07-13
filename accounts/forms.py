@@ -4,7 +4,7 @@ from django import forms
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.utils.translation import gettext_lazy as _
 
-from accounts.models import User
+from accounts.models import RecruiterApplication, User
 
 CONSENT_LABEL = _(
     "I understand my profile and credits will be public and accessible to "
@@ -27,6 +27,12 @@ class EmailAuthenticationForm(AuthenticationForm):
         super().__init__(*args, **kwargs)
         self.fields["username"].label = _("Email")
         self.fields["username"].widget = forms.EmailInput(attrs={"autofocus": True})
+
+
+class RecruiterApplicationForm(forms.ModelForm):
+    class Meta:
+        model = RecruiterApplication
+        fields = ["full_name", "company_name", "work_email", "linkedin_url", "message"]
 
 
 class SettingsForm(forms.ModelForm):

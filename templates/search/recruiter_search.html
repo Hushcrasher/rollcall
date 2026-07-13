@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% translate "Recruiter search" %} · Rollcall{% endblock %}
+
+{% block content %}
+  <h1>{% translate "Find people by what they've worked on" %}</h1>
+
+  <form method="get">
+    {{ form.as_p }}
+    <button type="submit">{% translate "Search" %}</button>
+  </form>
+
+  {% if searched %}
+    <section>
+      <h2>{% translate "Results" %}</h2>
+      {% for person in results %}
+        <p>
+          <a href="{% url 'accounts:profile' person.slug %}">{{ person.display_name }}</a>
+          {% if person.open_to_work %}<span class="badge">{% translate "Open to work" %}</span>{% endif %}
+          {% if person.contactable %}
+            — <a href="{% url 'contact:contact' person.slug %}">{% translate "Contact" %}</a>
+          {% endif %}
+        </p>
+      {% empty %}
+        <p>{% translate "No people match these filters." %}</p>
+      {% endfor %}
+    </section>
+  {% endif %}
+{% endblock %}

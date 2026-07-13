@@ -142,3 +142,8 @@ DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="noreply@rollcall.example
 PARQUET_SOURCE_URL = env("PARQUET_SOURCE_URL", default="")
 # Optional address alerted when a scheduled seed run fails.
 SEED_ALERT_EMAIL = env("SEED_ALERT_EMAIL", default="")
+
+# --- Contact relay ----------------------------------------------------------
+
+# Max relay messages one sender may send per rolling 24h (anti-spam, §3.6).
+CONTACT_RATE_LIMIT_PER_DAY = env.int("CONTACT_RATE_LIMIT_PER_DAY", default=20)
