@@ -5,5 +5,14 @@
     {{ game.title }}{% if game.release_date %} ({{ game.release_date|date:"Y" }}){% endif %}
   </button>
 {% empty %}
-  <p class="autocomplete-empty">{% translate "No games found." %}</p>
+  <p class="autocomplete-empty">{% translate "No games found locally." %}</p>
 {% endfor %}
+
+{% if igdb_enabled and query %}
+  {# Local-first: IGDB is queried only when this is clicked (rate-friendly). #}
+  <button type="button" class="igdb-trigger"
+          hx-get="{% url 'games:igdb_search' %}?q={{ query|urlencode }}"
+          hx-target="closest .results">
+    {% blocktranslate %}Not it? Search IGDB for "{{ query }}"{% endblocktranslate %}
+  </button>
+{% endif %}

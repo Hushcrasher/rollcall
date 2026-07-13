@@ -1,5 +1,7 @@
 """htmx autocomplete endpoints — return HTML fragments of matching options."""
 
+from typing import Any
+
 import pytest
 from django.test import Client
 from django.urls import reverse
@@ -34,3 +36,16 @@ def test_company_autocomplete_returns_matching_options(client: Client) -> None:
 
     assert response.status_code == 200
     assert b"Supergiant Games" in response.content
+
+
+def test_game_autocomplete_offers_igdb_when_configured(client: Client, settings: Any) -> None:
+    settings.IGDB_CLIENT_ID = "cid"
+    settings.IGDB_CLIENT_SECRET = "secret"
+    response = client.get(reverse("search:game_autocomplete"), {"q": "obscure"})
+    assert b"igdb/search" in response.content  # inline "Search IGDB" fallback
+
+
+def test_game_autocomplete_hides_igdb_when_unconfigured(client: Client) -> None:
+    # No IGDB creds in the default test settings.
+    response = client.get(reverse("search:game_autocomplete"), {"q": "obscure"})
+    assert b"igdb/search" not in response.content

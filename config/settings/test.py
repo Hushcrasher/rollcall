@@ -19,6 +19,11 @@ EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 # Rate limiting off by default in tests; the rate-limit test re-enables it.
 RATELIMIT_ENABLE = False
 
+# Deterministic regardless of a developer's local .env (which may hold real
+# IGDB creds). Tests that exercise IGDB set these explicitly.
+IGDB_CLIENT_ID = ""
+IGDB_CLIENT_SECRET = ""
+
 STORAGES["staticfiles"] = {  # noqa: F405
     "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
 }

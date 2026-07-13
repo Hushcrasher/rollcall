@@ -5,15 +5,38 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Rollcall{% endblock %}</title>
   <script src="{% static 'vendor/htmx.min.js' %}" defer></script>
+  <style>
+    .nav-search, .autocomplete { position: relative; display: inline-block; }
+    .results, .nav-suggest {
+      position: absolute; z-index: 100; left: 0; top: 100%;
+      min-width: 20rem; max-height: 20rem; overflow-y: auto;
+      background: Canvas; color: CanvasText; border: 1px solid GrayText;
+    }
+    .results:empty, .nav-suggest:empty { display: none; }
+    .autocomplete-option, .igdb-option, .igdb-trigger, .suggest-item {
+      display: block; width: 100%; text-align: left; box-sizing: border-box;
+      padding: .35rem .6rem; background: none; border: none; cursor: pointer;
+      color: inherit; text-decoration: none; font: inherit;
+    }
+    .autocomplete-option:hover, .igdb-option:hover,
+    .igdb-trigger:hover, .suggest-item:hover { background: Highlight; color: HighlightText; }
+    .igdb-trigger { border-top: 1px solid GrayText; font-style: italic; }
+    .suggest-item small { opacity: .6; }
+  </style>
   {% block extra_head %}{% endblock %}
 </head>
 <body>
   <header>
     <nav>
       <a href="{% url 'accounts:settings' %}">Rollcall</a>
-      <form action="{% url 'search:search' %}" method="get" role="search" style="display:inline">
-        <input type="search" name="q" placeholder="{% translate 'Search…' %}">
-      </form>
+      <span class="nav-search">
+        <form action="{% url 'search:search' %}" method="get" role="search" style="display:inline">
+          <input type="search" name="q" placeholder="{% translate 'Search…' %}" autocomplete="off"
+                 hx-get="{% url 'search:suggest' %}" hx-trigger="keyup changed delay:250ms"
+                 hx-target="#nav-suggest">
+        </form>
+        <div id="nav-suggest" class="nav-suggest"></div>
+      </span>
       {% if user.is_authenticated %}
         <a href="{% url 'accounts:profile' user.slug %}">{% translate "My profile" %}</a>
         <a href="{% url 'accounts:settings' %}">{% translate "Settings" %}</a>

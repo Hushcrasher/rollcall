@@ -18,20 +18,10 @@
              placeholder="{% translate 'Search a game…' %}"
              hx-get="{% url 'search:game_autocomplete' %}" hx-trigger="keyup changed delay:250ms"
              hx-target="next .results">
+      {# Local matches + an inline "Search IGDB" fallback appear here. #}
       <div class="results"></div>
       <p class="chosen">{% if form.game.value %}{{ form.instance.game }}{% endif %}</p>
       {{ form.game.errors }}
-
-      {% if igdb_enabled %}
-        <details class="igdb-fallback">
-          <summary>{% translate "Can't find your game? Search IGDB" %}</summary>
-          <input type="text" class="igdb-input" name="q" autocomplete="off"
-                 placeholder="{% translate 'Search IGDB…' %}"
-                 hx-get="{% url 'games:igdb_search' %}" hx-trigger="keyup changed delay:400ms"
-                 hx-target="#igdb-results">
-          <div id="igdb-results"></div>
-        </details>
-      {% endif %}
     </div>
 
     {# Company — optional employer. #}
@@ -101,7 +91,7 @@
         gameField.value = game.id;
         const wrapper = gameField.closest(".autocomplete");
         wrapper.querySelector(".chosen").textContent = game.label + " {% translate '(imported from IGDB)' %}";
-        document.getElementById("igdb-results").innerHTML = "";
+        wrapper.querySelector(".results").innerHTML = "";
       } catch (err) {
         option.textContent = original;
         option.disabled = false;

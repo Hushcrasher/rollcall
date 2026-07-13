@@ -17,6 +17,7 @@ from django.views.generic import TemplateView
 from django_ratelimit.decorators import ratelimit
 
 from accounts.models import User
+from games.igdb import IGDBClient
 from games.models import Game
 from search.forms import RecruiterSearchForm
 from search.services import recruiter_search, search_companies, search_games, search_people
@@ -85,9 +86,32 @@ class RecruiterSearchView(RecruiterRequiredMixin, TemplateView):
         return context
 
 
+def suggest(request: HttpRequest) -> HttpResponse:
+    """Nav live-search dropdown — top games + public people, as you type."""
+    query = request.GET.get("q", "")
+    return render(
+        request,
+        "search/_suggest.html",
+        {
+            "query": query,
+            "games": search_games(query, limit=5),
+            "people": search_people(query, limit=5),
+        },
+    )
+
+
 def game_autocomplete(request: HttpRequest) -> HttpResponse:
-    games = search_games(request.GET.get("q", ""))
-    return render(request, "search/_game_options.html", {"games": games})
+    query = request.GET.get("q", "")
+    return render(
+        request,
+        "search/_game_options.html",
+        {
+            "games": search_games(query),
+            "query": query,
+            # Inline IGDB fallback option — only when IGDB is configured.
+            "igdb_enabled": IGDBClient().configured,
+        },
+    )
 
 
 def company_autocomplete(request: HttpRequest) -> HttpResponse:

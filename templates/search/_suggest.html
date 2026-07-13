@@ -1,0 +1,17 @@
+{% load i18n %}
+{% if query %}
+  {% for game in games %}
+    <a href="{{ game.get_absolute_url }}" class="suggest-item">
+      {{ game.title }}{% if game.release_date %} ({{ game.release_date|date:"Y" }}){% endif %}
+      <small>{% translate "game" %}</small>
+    </a>
+  {% endfor %}
+  {% for person in people %}
+    <a href="{{ person.get_absolute_url }}" class="suggest-item">
+      {{ person.display_name }} <small>{% translate "person" %}</small>
+    </a>
+  {% endfor %}
+  {% if not games and not people %}
+    <p class="suggest-empty">{% translate "No matches." %}</p>
+  {% endif %}
+{% endif %}
