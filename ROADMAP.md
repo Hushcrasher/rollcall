@@ -133,7 +133,16 @@ Goal: legally and operationally ready for real users. Buildable pieces done TDD 
 ## Post-roadmap additions
 
 - [x] **Dev email backend** — prints a clean, copy-friendly body so console verification/reset links aren't corrupted by quoted-printable wrapping
-- [x] **IGDB live fallback** (docs §3.1): `games/igdb.py` client (Twitch OAuth, cached token) + `import_igdb_game` (reuses the seed upsert, `source=igdb_live`) + login-gated search/import endpoints + a "Can't find your game? Search IGDB" section on the credit form (hidden unless `IGDB_CLIENT_ID`/`SECRET` are set). 16 tests, all mocked (no network). Set the two Twitch env vars to go live.
+- [x] **IGDB live fallback** (docs §3.1): `games/igdb.py` client (Twitch OAuth, cached token) + `import_igdb_game` (reuses the seed upsert, `source=igdb_live`) + login-gated search/import endpoints, folded inline into the credit-form game search as a "Not it? Search IGDB" option (local-first; IGDB only on deliberate click — rate-friendly). Hidden unless `IGDB_CLIENT_ID`/`SECRET` are set. Verified live end-to-end.
+- [x] **Live search everywhere**: nav bar typeahead dropdown (`/search/suggest/`) over games + people + companies; the full search page and nav both match companies now
+- [x] **Constrained employer field**: picking a game loads its studios as quick-picks (`/games/<pk>/employers/`), with a "Worked for another company?" live search and a "Not there? Create '<name>'" path (`/companies/create/`, `source=manual`) for outsourcing studios missing from IGDB
+
+## Known follow-ups (tech debt, not blocking the POC)
+
+- [ ] **Company dedup / merge**: user-created companies (`source=manual`) are keyed only by exact name — near-duplicate spellings ("Virtuos" vs "Virtuos Games") can proliferate. Add a light admin merge tool (repoint `game_companies` + `contributions` to a canonical company, delete the dupe) once manual companies grow. The dormant `company_aliases` table (docs/04 §5) can back the merged names.
+- [ ] Rate limiting uses the per-process cache — add Redis for limits that hold across gunicorn workers (see DEPLOY.md).
+- [ ] `sitemap.xml` is a single sitemap — switch to a paginated sitemap index at ~400k games (see DEPLOY.md).
+- [ ] `ty` runs without Django awareness (no plugin) — the codebase carries small typed accommodations (`AuthedHttpRequest`, `ClassVar` managers, `Any` bridges); revisit if `ty` ships Django support or if the tax grows.
 
 ---
 
