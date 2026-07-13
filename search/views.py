@@ -6,12 +6,15 @@ query returns nothing (anti-scraping posture, docs/02-ARCHITECTURE.md §5).
 
 from typing import Any
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
+from django.utils.decorators import method_decorator
 from django.utils.translation import gettext as _
 from django.views.generic import TemplateView
+from django_ratelimit.decorators import ratelimit
 
 from accounts.models import User
 from games.models import Game
@@ -19,6 +22,11 @@ from search.forms import RecruiterSearchForm
 from search.services import recruiter_search, search_companies, search_games, search_people
 
 
+def _search_rate(group: str, request: HttpRequest) -> str:
+    return settings.SEARCH_RATELIMIT
+
+
+@method_decorator(ratelimit(key="ip", rate=_search_rate, method="GET", block=True), name="get")
 class SearchView(TemplateView):
     template_name = "search/search.html"
 

@@ -16,6 +16,9 @@ PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 
 EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 
+# Rate limiting off by default in tests; the rate-limit test re-enables it.
+RATELIMIT_ENABLE = False
+
 STORAGES["staticfiles"] = {  # noqa: F405
     "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
 }

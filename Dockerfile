@@ -25,5 +25,6 @@ RUN DJANGO_SECRET_KEY=build-only-not-a-secret python manage.py collectstatic --n
 
 EXPOSE 8000
 
-# Migrations run on deploy (PaaS release phase / compose command), not here.
-CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "2"]
+# Bind to $PORT when the platform sets one (Railway), else 8000. Migrations
+# run on deploy via the release command (see railway.json / DEPLOY.md).
+CMD ["sh", "-c", "gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 2"]

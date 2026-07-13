@@ -116,18 +116,19 @@ Goal: the full two-sided loop the POC must test. Built TDD (27 tests); the whole
 
 ## Phase 7 — Hardening & launch prep
 
-Goal: legally and operationally ready for real users.
+Goal: legally and operationally ready for real users. Buildable pieces done TDD (11 tests); deploy is documented and awaits the external prerequisites.
 
-- [ ] Report/flag form (logged-in, target type + reason) + admin triage
-- [ ] Rate limiting: django-ratelimit (IP) on profile pages & search
-- [ ] robots.txt (allow profile indexing — SEO is an acquisition channel) + controlled sitemap
-- [ ] Sentry wired in prod (`send_default_pii=False`)
-- [ ] Deploy to **Railway**: Dockerfile deploy, managed Postgres (`DATABASE_URL`), scheduled weekly `seed_games` cron, env vars set; avatars → **R2** (django-storages); **Sentry** DSN
-  - URL: Railway's free `*.up.railway.app` subdomain (HTTPS included) — **no custom domain needed for the POC**; add `ALLOWED_HOSTS`
-  - Email: a **single verified sender** in Brevo is enough to test with a handful of users. A **custom domain + DNS authentication (SPF/DKIM)** is only for a real launch (deliverability at scale)
-- [ ] **Rehearse one Postgres backup restore** before launch
-- [ ] Legal pages: ToS (non-exclusive data license, no open-data promise), privacy policy, signup consent copy reviewed
-- [ ] Fallback if schedule slips: ship "For recruiters" page + contact relay first, advanced filters later
+- [x] Report/flag form (logged-in, target type + optional id + reason) + report links + admin triage; verified in the browser
+- [x] Rate limiting: django-ratelimit (IP) on profile pages & search (settings-driven; disabled in tests except a focused 403 test)
+- [x] robots.txt (allows `/u/ /g/ /c/`, disallows private areas) + `sitemap.xml` (public profiles + games + companies; private profiles excluded)
+- [x] Home page at `/` (no more root 404); legal pages linked in the footer
+- [x] Sentry wired in prod (`send_default_pii=False`) — already in `config/settings/prod.py`
+- [x] Deploy **config prepared**: `railway.json` (migrate on release), Dockerfile binds `$PORT`, prod Brevo SMTP backend (console fallback), R2 media, `.env.example` updated, **DEPLOY.md** with the full runbook
+- [x] Legal pages: ToS (non-exclusive data license, no open-data promise, AGPL) + privacy (GDPR rights, EU hosting) — POC drafts, flagged for counsel review
+- [ ] ⚠️ **Execute the deploy** (Railway/R2/Brevo/Sentry accounts) — manual; see [DEPLOY.md](DEPLOY.md)
+- [ ] ⚠️ **Rehearse one Postgres backup restore** before launch — manual
+- [ ] ⚠️ Weekly `seed_games` cron — after the ToS + parquet prerequisites clear
+- [x] Fallback documented (DEPLOY.md): ship "For recruiters" + contact relay first if the schedule slips
 
 ---
 

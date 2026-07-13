@@ -12,13 +12,14 @@ from django.core.mail import EmailMessage
 from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.template.loader import render_to_string
+from django.urls import reverse_lazy
 from django.utils import timezone
 from django.utils.translation import gettext as _
-from django.views.generic import FormView
+from django.views.generic import CreateView, FormView
 
 from accounts.models import User
-from contact.forms import ContactForm
-from contact.models import ContactRequest
+from contact.forms import ContactForm, ReportForm
+from contact.models import ContactRequest, Report
 
 _DEFAULT_RATE_LIMIT = 20
 
@@ -77,3 +78,28 @@ class ContactView(LoginRequiredMixin, FormView):
             to=[self.target.email],  # used only to deliver; never rendered
             reply_to=[sender.email],  # replies reach the sender directly
         ).send()
+
+
+class ReportView(LoginRequiredMixin, CreateView):
+    """Signal anything for private moderation (docs/04 §11). Handled in the
+    admin. There is no public accusatory content anywhere by design."""
+
+    model = Report
+    form_class = ReportForm
+    template_name = "contact/report_form.html"
+    success_url = reverse_lazy("accounts:settings")
+
+    def get_initial(self) -> dict[str, Any]:
+        initial = super().get_initial()
+        target_type = self.request.GET.get("type")
+        target_id = self.request.GET.get("id")
+        if target_type:
+            initial["target_type"] = target_type
+        if target_id and target_id.isdigit():
+            initial["target_id"] = int(target_id)
+        return initial
+
+    def form_valid(self, form: ReportForm) -> HttpResponse:
+        form.instance.reporter = self.request.user
+        messages.success(self.request, _("Thanks — your report was submitted for review."))
+        return super().form_valid(form)

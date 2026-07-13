@@ -6,4 +6,5 @@ app_name = "contact"
 
 urlpatterns: list[URLPattern | URLResolver] = [
     path("contact/<slug:slug>/", views.ContactView.as_view(), name="contact"),
+    path("report/", views.ReportView.as_view(), name="report"),
 ]

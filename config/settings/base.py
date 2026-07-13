@@ -32,6 +32,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "whitenoise.runserver_nostatic",
     "django.contrib.staticfiles",
+    "django.contrib.sitemaps",
     "django.contrib.postgres",  # pg_trgm search features
     # Third-party
     "django_htmx",
@@ -147,3 +148,9 @@ SEED_ALERT_EMAIL = env("SEED_ALERT_EMAIL", default="")
 
 # Max relay messages one sender may send per rolling 24h (anti-spam, §3.6).
 CONTACT_RATE_LIMIT_PER_DAY = env.int("CONTACT_RATE_LIMIT_PER_DAY", default=20)
+
+# --- Rate limiting (anti-scraping on public pages) --------------------------
+# Per-IP limits; tune via env. NB: the default cache is per-process — add a
+# shared cache (Redis) in prod for limits that hold across workers.
+PROFILE_RATELIMIT = env("PROFILE_RATELIMIT", default="120/m")
+SEARCH_RATELIMIT = env("SEARCH_RATELIMIT", default="60/m")

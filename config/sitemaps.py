@@ -1,0 +1,52 @@
+"""SEO surface — sitemap of public pages + robots.txt.
+
+Public profile and game pages are a major acquisition channel ("who worked on
+X"), so we let crawlers index them; private profiles are excluded, and
+account/moderation areas are disallowed.
+"""
+
+from django.contrib.sitemaps import Sitemap
+from django.db.models import QuerySet
+from django.http import HttpRequest, HttpResponse
+from django.urls import reverse
+
+from accounts.models import User
+from games.models import Company, Game
+
+_DISALLOW = ["/admin/", "/settings/", "/credits/", "/contact/", "/report/", "/search/"]
+
+
+class ProfileSitemap(Sitemap):
+    changefreq = "weekly"
+
+    def items(self) -> QuerySet[User]:
+        return User.objects.filter(profile_public=True).order_by("id")  # private excluded
+
+
+class GameSitemap(Sitemap):
+    changefreq = "weekly"
+
+    def items(self) -> QuerySet[Game]:
+        return Game.objects.order_by("id")
+
+
+class CompanySitemap(Sitemap):
+    changefreq = "weekly"
+
+    def items(self) -> QuerySet[Company]:
+        return Company.objects.order_by("id")
+
+
+SITEMAPS = {
+    "profiles": ProfileSitemap,
+    "games": GameSitemap,
+    "companies": CompanySitemap,
+}
+
+
+def robots_txt(request: HttpRequest) -> HttpResponse:
+    sitemap_url = request.build_absolute_uri(reverse("sitemap"))
+    lines = ["User-agent: *", "Allow: /u/", "Allow: /g/", "Allow: /c/"]
+    lines += [f"Disallow: {path}" for path in _DISALLOW]
+    lines.append(f"Sitemap: {sitemap_url}")
+    return HttpResponse("\n".join(lines) + "\n", content_type="text/plain")

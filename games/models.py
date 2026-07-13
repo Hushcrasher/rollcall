@@ -14,6 +14,7 @@ from typing import Any, ClassVar
 from django.conf import settings
 from django.contrib.postgres.indexes import GinIndex
 from django.db import models
+from django.urls import reverse
 from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 
@@ -121,6 +122,9 @@ class Company(models.Model):
             )
         super().save(*args, **kwargs)
 
+    def get_absolute_url(self) -> str:
+        return reverse("games:company", kwargs={"slug": self.slug})
+
 
 class CompanyAlias(models.Model):
     """Dormant (§5) — alternate names for search ("Square" finds "Square Enix")."""
@@ -218,6 +222,9 @@ class Game(models.Model):
                 Game.objects, str(self.title), pk=self.pk
             )
         super().save(*args, **kwargs)
+
+    def get_absolute_url(self) -> str:
+        return reverse("games:game", kwargs={"slug": self.slug})
 
 
 class GameGenre(models.Model):

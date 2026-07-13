@@ -3,6 +3,7 @@ settings, and GDPR (deletion + export)."""
 
 from typing import Any
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
@@ -13,11 +14,13 @@ from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse_lazy
 from django.utils import timezone
+from django.utils.decorators import method_decorator
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST
 from django.views.generic import CreateView, DetailView, FormView, TemplateView, UpdateView
+from django_ratelimit.decorators import ratelimit
 
 from accounts.emails import send_verification_email
 from accounts.export import build_personal_data_export
@@ -44,6 +47,10 @@ __all__ = [
     "resend_verification",
     "verify_email",
 ]
+
+
+def _profile_rate(group: str, request: HttpRequest) -> str:
+    return settings.PROFILE_RATELIMIT
 
 
 class SignupView(FormView):
@@ -93,6 +100,7 @@ def resend_verification(request: AuthedHttpRequest) -> HttpResponse:
     return redirect("accounts:settings")
 
 
+@method_decorator(ratelimit(key="ip", rate=_profile_rate, method="GET", block=True), name="get")
 class ProfileView(DetailView):
     template_name = "accounts/profile.html"
     context_object_name = "profile_user"

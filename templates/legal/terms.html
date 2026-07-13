@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% translate "Terms of Service" %} · Rollcall{% endblock %}
+
+{% block content %}
+  <h1>{% translate "Terms of Service" %}</h1>
+  <p><em>{% translate "Draft for the POC — review with counsel before launch." %}</em></p>
+
+  <h2>{% translate "The service" %}</h2>
+  <p>{% blocktranslate %}Rollcall is a credits database for the video game industry.
+  You declare the games you worked on; your profile and credits are public and
+  accessible to everyone, including recruiters — that is the point of the platform.{% endblocktranslate %}</p>
+
+  <h2>{% translate "Your data and your rights" %}</h2>
+  <p>{% blocktranslate %}You own the content you submit. By posting it you grant
+  Hushcrasher a non-exclusive licence to host and display it as part of operating
+  the platform. We make no open-data promise. You can export or delete your data
+  at any time from your settings.{% endblocktranslate %}</p>
+
+  <h2>{% translate "Code and database" %}</h2>
+  <p>{% blocktranslate %}The platform's source code is open source under the AGPL v3.
+  The production database is private and operated by Hushcrasher.{% endblocktranslate %}</p>
+
+  <h2>{% translate "Conduct" %}</h2>
+  <p>{% blocktranslate %}Declare only work you actually did. Use the private report
+  button to flag problems — we don't host public accusations or negative ratings.{% endblocktranslate %}</p>
+{% endblock %}

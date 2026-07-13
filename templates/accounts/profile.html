@@ -20,6 +20,9 @@
     {% if profile_user.contactable and user.is_authenticated and user != profile_user %}
       <p><a href="{% url 'contact:contact' profile_user.slug %}">{% translate "Contact" %}</a></p>
     {% endif %}
+    {% if user.is_authenticated and user != profile_user %}
+      <p><a href="{% url 'contact:report' %}?type=user&amp;id={{ profile_user.pk }}">{% translate "Report this profile" %}</a></p>
+    {% endif %}
   </article>
 
   <section>

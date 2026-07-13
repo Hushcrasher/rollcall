@@ -6,10 +6,19 @@ App URL modules are included here as their phases land (see ROADMAP.md).
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
+from django.contrib.sitemaps.views import sitemap
 from django.urls import include, path
+from django.views.generic import TemplateView
+
+from config.sitemaps import SITEMAPS, robots_txt
 
 urlpatterns = [
+    path("", TemplateView.as_view(template_name="home.html"), name="home"),
     path("admin/", admin.site.urls),
+    path("robots.txt", robots_txt),
+    path("sitemap.xml", sitemap, {"sitemaps": SITEMAPS}, name="sitemap"),
+    path("terms/", TemplateView.as_view(template_name="legal/terms.html"), name="terms"),
+    path("privacy/", TemplateView.as_view(template_name="legal/privacy.html"), name="privacy"),
     # Accounts own the root: /signup, /login, /settings, /u/<slug>/ … (SEO for
     # "who worked on X" wants clean profile URLs). Later phases add /games etc.
     path("", include("accounts.urls")),

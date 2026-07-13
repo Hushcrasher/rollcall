@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% translate "Report" %} · Rollcall{% endblock %}
+
+{% block content %}
+  <h1>{% translate "Report something" %}</h1>
+  <p>{% blocktranslate %}Reports are private and reviewed by our team. We never
+  publish accusations or negative signals on profiles.{% endblocktranslate %}</p>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">{% translate "Submit report" %}</button>
+  </form>
+{% endblock %}

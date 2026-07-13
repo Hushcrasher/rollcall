@@ -31,9 +31,20 @@ if _s3_configured:
         },
     }
 
-# --- Email (Brevo) -----------------------------------------------------------
-# Wired in the accounts phase: transactional API (never raw SMTP from the
-# server — docs/03-TECH-STACK.md). EMAIL_API_KEY comes from the environment.
+# --- Email (Brevo transactional relay) ---------------------------------------
+# Send through Brevo's SMTP relay (their infrastructure — not a mail daemon on
+# our own server). Falls back to console output if unconfigured, so a fresh
+# deploy never crashes on email.
+_brevo_key = env("EMAIL_HOST_PASSWORD", default=None)
+if _brevo_key:
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+    EMAIL_HOST = env("EMAIL_HOST", default="smtp-relay.brevo.com")
+    EMAIL_PORT = env.int("EMAIL_PORT", default=587)
+    EMAIL_USE_TLS = True
+    EMAIL_HOST_USER = env("EMAIL_HOST_USER")  # Brevo SMTP login
+    EMAIL_HOST_PASSWORD = _brevo_key  # Brevo SMTP key
+else:
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
 # --- Sentry ------------------------------------------------------------------
 
