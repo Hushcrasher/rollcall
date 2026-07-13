@@ -11,7 +11,12 @@
       {{ person.display_name }} <small>{% translate "person" %}</small>
     </a>
   {% endfor %}
-  {% if not games and not people %}
+  {% for company in companies %}
+    <a href="{{ company.get_absolute_url }}" class="suggest-item">
+      {{ company.name }} <small>{% translate "company" %}</small>
+    </a>
+  {% endfor %}
+  {% if not games and not people and not companies %}
     <p class="suggest-empty">{% translate "No matches." %}</p>
   {% endif %}
 {% endif %}

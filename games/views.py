@@ -10,7 +10,7 @@ from typing import Any
 
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse, JsonResponse
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, render
 from django.views.decorators.http import require_POST
 from django.views.generic import DetailView
 
@@ -79,6 +79,36 @@ def igdb_search(request: HttpRequest) -> HttpResponse:
         except IGDBError:
             context["error"] = "unavailable"
     return render(request, "games/_igdb_options.html", context)
+
+
+def game_employers(request: HttpRequest, pk: int) -> HttpResponse:
+    """The companies credited on this game — quick-picks for the employer field.
+    Deduplicated across roles; ordered developer → publisher → porting → support."""
+    game = get_object_or_404(Game, pk=pk)
+    employers: list[dict[str, Any]] = []
+    seen: set[int] = set()
+    for link in GameCompany.objects.filter(game=game).select_related("company").order_by("role"):
+        if link.company_id in seen:
+            continue
+        seen.add(link.company_id)
+        employers.append(
+            {"id": link.company.pk, "name": link.company.name, "role": link.get_role_display()}
+        )
+    return render(request, "games/_employer_options.html", {"employers": employers})
+
+
+@require_POST
+@login_required
+def company_create(request: HttpRequest) -> JsonResponse:
+    """Create (or reuse) a company by name — for employers not in IGDB
+    (outsourcing studios etc.). Marked source=manual."""
+    name = request.POST.get("name", "").strip()
+    if not name:
+        return JsonResponse({"error": "name required"}, status=400)
+    company, _ = Company.objects.get_or_create(
+        name=name, defaults={"source": Company.Source.MANUAL}
+    )
+    return JsonResponse({"id": company.pk, "label": company.name})
 
 
 @require_POST

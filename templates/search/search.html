@@ -8,7 +8,7 @@
 
   <form method="get" action="{% url 'search:search' %}">
     <input type="search" name="q" value="{{ query }}"
-           placeholder="{% translate 'Search games and people…' %}" autofocus>
+           placeholder="{% translate 'Search games, people, companies…' %}" autofocus>
     <button type="submit">{% translate "Search" %}</button>
   </form>
 
@@ -31,6 +31,15 @@
           {% if game.release_date %}({{ game.release_date|date:"Y" }}){% endif %}</p>
       {% empty %}
         <p>{% translate "No games found." %}</p>
+      {% endfor %}
+    </section>
+
+    <section>
+      <h2>{% translate "Companies" %}</h2>
+      {% for company in companies %}
+        <p><a href="{% url 'games:company' company.slug %}">{{ company.name }}</a></p>
+      {% empty %}
+        <p>{% translate "No companies found." %}</p>
       {% endfor %}
     </section>
   {% else %}

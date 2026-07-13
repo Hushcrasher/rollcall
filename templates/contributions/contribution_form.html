@@ -24,15 +24,20 @@
       {{ form.game.errors }}
     </div>
 
-    {# Company — optional employer. #}
-    <div class="autocomplete" data-hidden="{{ form.company.auto_id }}">
+    {# Employer — constrained to the game's studios, then search / create. #}
+    <div class="autocomplete" id="employer-field" data-hidden="{{ form.company.auto_id }}"
+         data-employers-url="{% url 'games:game_employers' 0 %}">
       <label>{% translate "Employer company (optional)" %}</label>
       {{ form.company }}
-      <input type="text" class="autocomplete-input" name="q" autocomplete="off"
-             placeholder="{% translate 'Search a company…' %}"
-             hx-get="{% url 'search:company_autocomplete' %}" hx-trigger="keyup changed delay:250ms"
-             hx-target="next .results">
-      <div class="results"></div>
+      <p class="employer-hint">{% translate "Pick a game above to see its studios." %}</p>
+      <div id="employer-quickpicks"></div>
+      <div class="employer-search" hidden>
+        <input type="text" class="autocomplete-input" name="q" autocomplete="off"
+               placeholder="{% translate 'Search companies…' %}"
+               hx-get="{% url 'search:company_autocomplete' %}" hx-trigger="keyup changed delay:250ms"
+               hx-target="next .results">
+        <div class="results"></div>
+      </div>
       <p class="chosen">{% if form.company.value %}{{ form.instance.company }}{% endif %}</p>
       {{ form.company.errors }}
     </div>
@@ -59,6 +64,31 @@
   </form>
 
   <script>
+    const GAME_FIELD = "{{ form.game.auto_id }}";
+    const COMPANY_FIELD = "{{ form.company.auto_id }}";
+
+    function csrfToken() {
+      return document.querySelector("[name=csrfmiddlewaretoken]").value;
+    }
+
+    // Load the picked game's studios as employer quick-picks. reset=true wipes
+    // any current employer selection (used when the game changes).
+    function loadEmployers(gameId, reset) {
+      const field = document.getElementById("employer-field");
+      if (!field) return;
+      if (reset) {
+        document.getElementById(COMPANY_FIELD).value = "";
+        field.querySelector(".chosen").textContent = "";
+        field.querySelector(".employer-search").hidden = true;
+        field.querySelector(".employer-search .results").innerHTML = "";
+      }
+      const url = field.dataset.employersUrl.replace("/0/", "/" + gameId + "/");
+      fetch(url).then((r) => r.text()).then((html) => {
+        document.getElementById("employer-quickpicks").innerHTML = html;
+        field.querySelector(".employer-hint").hidden = true;
+      });
+    }
+
     // Autocomplete pick: clicking an option fills the hidden field + shows the label.
     document.addEventListener("click", function (event) {
       const option = event.target.closest(".autocomplete-option");
@@ -68,35 +98,73 @@
       wrapper.querySelector(".chosen").textContent = option.dataset.label;
       wrapper.querySelector(".results").innerHTML = "";
       wrapper.querySelector(".autocomplete-input").value = "";
+      if (wrapper.dataset.hidden === GAME_FIELD) loadEmployers(option.dataset.id, true);
     });
 
-    // IGDB fallback: clicking a result imports the game, then selects it as the
-    // chosen game (fills the same hidden field as the local autocomplete).
+    // "Worked for another company?" → reveal the company search.
+    document.addEventListener("click", function (event) {
+      if (!event.target.closest(".employer-other-toggle")) return;
+      const search = document.querySelector("#employer-field .employer-search");
+      search.hidden = false;
+      search.querySelector(".autocomplete-input").focus();
+    });
+
+    // Create a company that isn't in our database (outsourcing studios etc.).
+    document.addEventListener("click", async function (event) {
+      const button = event.target.closest(".company-create");
+      if (!button) return;
+      button.disabled = true;
+      try {
+        const response = await fetch("{% url 'games:company_create' %}", {
+          method: "POST",
+          headers: { "X-CSRFToken": csrfToken(), "Content-Type": "application/x-www-form-urlencoded" },
+          body: "name=" + encodeURIComponent(button.dataset.name),
+        });
+        if (!response.ok) throw new Error("create failed");
+        const company = await response.json();
+        const field = document.getElementById("employer-field");
+        document.getElementById(COMPANY_FIELD).value = company.id;
+        field.querySelector(".chosen").textContent = company.label;
+        field.querySelector(".employer-search .results").innerHTML = "";
+        field.querySelector(".employer-search .autocomplete-input").value = "";
+      } catch (err) {
+        button.disabled = false;
+        alert("{% translate 'Could not create the company. Please try again.' %}");
+      }
+    });
+
+    // IGDB fallback: clicking a result imports the game, then selects it.
     document.addEventListener("click", async function (event) {
       const option = event.target.closest(".igdb-option");
       if (!option) return;
-      const csrf = document.querySelector("[name=csrfmiddlewaretoken]").value;
       option.disabled = true;
       const original = option.textContent;
       option.textContent = "{% translate 'Importing…' %}";
       try {
         const response = await fetch("{% url 'games:igdb_import' %}", {
           method: "POST",
-          headers: { "X-CSRFToken": csrf, "Content-Type": "application/x-www-form-urlencoded" },
+          headers: { "X-CSRFToken": csrfToken(), "Content-Type": "application/x-www-form-urlencoded" },
           body: "igdb_id=" + encodeURIComponent(option.dataset.igdbId),
         });
         if (!response.ok) throw new Error("import failed");
         const game = await response.json();
-        const gameField = document.getElementById("{{ form.game.auto_id }}");
+        const gameField = document.getElementById(GAME_FIELD);
         gameField.value = game.id;
         const wrapper = gameField.closest(".autocomplete");
         wrapper.querySelector(".chosen").textContent = game.label + " {% translate '(imported from IGDB)' %}";
         wrapper.querySelector(".results").innerHTML = "";
+        loadEmployers(game.id, true);
       } catch (err) {
         option.textContent = original;
         option.disabled = false;
         alert("{% translate 'Could not import from IGDB. Please try again.' %}");
       }
     });
+
+    // On edit, the game is already set — show its studios (without resetting).
+    (function () {
+      const gameId = document.getElementById(GAME_FIELD).value;
+      if (gameId) loadEmployers(gameId, false);
+    })();
   </script>
 {% endblock %}

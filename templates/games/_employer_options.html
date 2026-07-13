@@ -1,0 +1,10 @@
+{% load i18n %}
+{% for employer in employers %}
+  <button type="button" class="autocomplete-option"
+          data-id="{{ employer.id }}" data-label="{{ employer.name }}">
+    {{ employer.name }} <small>{{ employer.role }}</small>
+  </button>
+{% endfor %}
+<button type="button" class="employer-other-toggle">
+  {% translate "Worked for another company?" %}
+</button>

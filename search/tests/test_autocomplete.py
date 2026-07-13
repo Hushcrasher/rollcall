@@ -38,6 +38,12 @@ def test_company_autocomplete_returns_matching_options(client: Client) -> None:
     assert b"Supergiant Games" in response.content
 
 
+def test_company_autocomplete_offers_a_create_option(client: Client) -> None:
+    response = client.get(reverse("search:company_autocomplete"), {"q": "Brand New Studio"})
+    assert b"company-create" in response.content
+    assert b"Brand New Studio" in response.content
+
+
 def test_game_autocomplete_offers_igdb_when_configured(client: Client, settings: Any) -> None:
     settings.IGDB_CLIENT_ID = "cid"
     settings.IGDB_CLIENT_SECRET = "secret"

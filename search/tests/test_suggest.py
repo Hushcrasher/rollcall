@@ -5,9 +5,15 @@ from django.test import Client
 from django.urls import reverse
 
 from accounts.models import User
-from games.models import Game
+from games.models import Company, Game
 
 pytestmark = pytest.mark.django_db
+
+
+def test_suggest_includes_companies(client: Client) -> None:
+    company = Company.objects.create(name="Hadron Studios", source=Company.Source.MANUAL)
+    response = client.get(reverse("search:suggest"), {"q": "hadr"})
+    assert company.get_absolute_url().encode() in response.content
 
 
 def test_suggest_returns_games_and_people(client: Client) -> None:

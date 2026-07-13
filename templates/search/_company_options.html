@@ -7,3 +7,9 @@
 {% empty %}
   <p class="autocomplete-empty">{% translate "No companies found." %}</p>
 {% endfor %}
+
+{% if query %}
+  <button type="button" class="company-create" data-name="{{ query }}">
+    {% blocktranslate %}Not there? Create "{{ query }}"{% endblocktranslate %}
+  </button>
+{% endif %}

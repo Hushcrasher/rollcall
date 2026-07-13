@@ -5,9 +5,15 @@ from django.test import Client
 from django.urls import reverse
 
 from accounts.models import User
-from games.models import Game
+from games.models import Company, Game
 
 pytestmark = pytest.mark.django_db
+
+
+def test_search_finds_companies(client: Client) -> None:
+    company = Company.objects.create(name="Hadron Studios", source=Company.Source.MANUAL)
+    response = client.get(reverse("search:search"), {"q": "hadron"})
+    assert company.get_absolute_url().encode() in response.content
 
 
 def test_search_finds_games(client: Client) -> None:

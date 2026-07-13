@@ -37,6 +37,7 @@ class SearchView(TemplateView):
         context["query"] = query
         context["people"] = search_people(query)
         context["games"] = search_games(query, limit=20)
+        context["companies"] = search_companies(query, limit=20)
         return context
 
 
@@ -96,6 +97,7 @@ def suggest(request: HttpRequest) -> HttpResponse:
             "query": query,
             "games": search_games(query, limit=5),
             "people": search_people(query, limit=5),
+            "companies": search_companies(query, limit=5),
         },
     )
 
@@ -115,5 +117,9 @@ def game_autocomplete(request: HttpRequest) -> HttpResponse:
 
 
 def company_autocomplete(request: HttpRequest) -> HttpResponse:
-    companies = search_companies(request.GET.get("q", ""))
-    return render(request, "search/_company_options.html", {"companies": companies})
+    query = request.GET.get("q", "")
+    return render(
+        request,
+        "search/_company_options.html",
+        {"companies": search_companies(query), "query": query},
+    )
