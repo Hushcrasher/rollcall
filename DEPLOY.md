@@ -47,17 +47,35 @@ PaaS or a VPS.
 
 Set `SENTRY_DSN`. Prod initialises Sentry with `send_default_pii=False`.
 
-## 5. Weekly seed job (after the ToS/parquet prerequisites)
+## 5. Seed the games catalog (after the ToS/parquet prerequisites)
 
-Add a second Railway service (or a cron service) that runs, on a weekly
-schedule, the launcher-agnostic command:
+Two steps — a **prepare** (join the raw source files into one parquet) and a
+**seed** (load that parquet into Postgres):
 
 ```
+# 1. Join Hushcrasher's normalized source files into one prepared parquet.
+#    Expects, under --source-dir: igdb/igdb_games.parquet,
+#    igdb/igdb_release_dates.parquet, hushcrasher.parquet, steamdb.parquet
+python manage.py prepare_seed_parquet --source-dir data --out data/rollcall_games.parquet
+#    → upload data/rollcall_games.parquet to the private R2 bucket.
+
+# 2. Load it into Postgres (reads PARQUET_SOURCE_URL, or --source).
 python manage.py seed_games
 ```
 
-It reads `PARQUET_SOURCE_URL`. Set `SEED_ALERT_EMAIL` to be notified on failure.
-Adjust the column names in `games/seed/schema.py` to the real parquet first.
+- **Where the raw files live:** only the *prepared* parquet needs to reach the
+  app — put it in the private R2 bucket and point `PARQUET_SOURCE_URL` at it
+  (`s3://…` with the S3 creds, or an https URL). The raw source files stay in
+  Hushcrasher's data pipeline / R2 and never touch the code repo (they're
+  gitignored — `data/`, `*.parquet`).
+- The prepared parquet is ~392k games (all IGDB + Steam-only). If the upstream
+  files change column names, adjust `games/seed/prepare.py`.
+- Set `SEED_ALERT_EMAIL` to be notified on failure. Weekly: a Railway cron
+  service can run both commands (prepare then seed), or Hushcrasher's pipeline
+  produces the prepared parquet and the cron only runs `seed_games`.
+- ⚠️ **Initial cold load is slow** with the current per-row upsert (~50 min for
+  the full 392k). See "Known follow-ups" in ROADMAP.md — a bulk-load path is
+  the fix. Weekly refreshes (mostly updates) are less affected.
 
 ## 6. Before launch
 

@@ -1,24 +1,19 @@
-"""The parquet contract — what the seed EXPECTS to read.
+"""The prepared-parquet contract — what the seed EXPECTS to read.
 
-This is the source-agnostic boundary of the project (docs/02-ARCHITECTURE.md
-§2.5): a fork points PARQUET_SOURCE_URL at any parquet that provides these
-columns. Derived from docs/04-DATABASE-SCHEMA.md §3–6.
+One row per canonical game. The Steam↔IGDB merge happens upstream in the
+`prepare_seed_parquet` step (a DuckDB join of Hushcrasher's normalized source
+files), which writes exactly these columns. The seed then just upserts them.
 
-Shape: one row per (game, originating system). A single real game may appear
-as up to two rows — its IGDB representation and its Steam representation —
-linked by `steam_appid`; the pipeline merges them (see `pipeline.py`).
-
-If Hushcrasher's real parquet uses different column names, adjust the
-constants here and the `read_parquet` projection in `pipeline.py`; no other
-code changes.
+This is the source-agnostic boundary (docs/02-ARCHITECTURE.md §2.5): a fork
+points PARQUET_SOURCE_URL at any parquet that provides these columns, however
+it was produced. Derived from docs/04-DATABASE-SCHEMA.md §3–6.
 """
 
 from dataclasses import dataclass, field
 from datetime import date
 
-# --- Column names (edit these to match a real parquet) ----------------------
+# --- Column names -----------------------------------------------------------
 
-COL_SOURCE_KIND = "source_kind"  # 'igdb' | 'steam' — which system this row is
 COL_IGDB_ID = "igdb_id"
 COL_STEAM_APPID = "steam_appid"
 COL_TITLE = "title"
@@ -29,19 +24,16 @@ COL_IGDB_RATING = "igdb_rating"
 COL_IGDB_AGGREGATED_RATING = "igdb_aggregated_rating"
 COL_STEAM_POSITIVE_PCT = "steam_positive_pct"
 COL_STEAM_REVIEW_COUNT = "steam_review_count"
-COL_GENRES = "genres"  # VARCHAR[] — IGDB taxonomy names
-COL_ENGINES = "engines"  # VARCHAR[] — IGDB taxonomy names
+COL_GENRES = "genres"  # VARCHAR[]
+COL_ENGINES = "engines"  # VARCHAR[]
 COL_DEVELOPERS = "developers"  # VARCHAR[] — company names
 COL_PUBLISHERS = "publishers"  # VARCHAR[]
 COL_PORTING = "porting"  # VARCHAR[]
 COL_SUPPORTING = "supporting"  # VARCHAR[]
 
-SOURCE_KIND_IGDB = "igdb"
-SOURCE_KIND_STEAM = "steam"
-
-# Ordered (name, DuckDB type) contract — also used to build synthetic parquets.
+# Ordered (name, DuckDB type) contract — also used to build synthetic parquets
+# and the SELECT projection in pipeline.py.
 PARQUET_COLUMNS: list[tuple[str, str]] = [
-    (COL_SOURCE_KIND, "VARCHAR"),
     (COL_IGDB_ID, "BIGINT"),
     (COL_STEAM_APPID, "BIGINT"),
     (COL_TITLE, "VARCHAR"),

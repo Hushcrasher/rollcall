@@ -1,11 +1,12 @@
-"""DuckDB read + Steam↔IGDB dedup/merge — the SQL heart of the seed.
+"""Read the prepared parquet and stream canonical games.
 
-Reads a parquet (local path, or HTTP/S3 URL via httpfs), merges the IGDB and
-Steam representations of each game in SQL, and yields canonical games. Constant
-memory: rows are streamed with fetchmany, never materialized all at once.
+The Steam↔IGDB merge already happened in `prepare.py` (a DuckDB join over the
+normalized source files), so this is a straight projection — one row in, one
+CanonicalGame out. Constant memory: rows stream via fetchmany.
 """
 
 import os
+import urllib.error
 from collections.abc import Iterator
 from typing import Any
 
@@ -14,108 +15,16 @@ import duckdb
 from games.seed import schema
 from games.seed.schema import CanonicalGame
 
-# Explicit column order for the final projection — must match CanonicalGame's
-# field order so we can map rows positionally.
-_SELECT_COLUMNS = [
-    schema.COL_IGDB_ID,
-    schema.COL_STEAM_APPID,
-    schema.COL_TITLE,
-    schema.COL_RELEASE_DATE,
-    schema.COL_SUMMARY,
-    schema.COL_COVER_URL,
-    schema.COL_IGDB_RATING,
-    schema.COL_IGDB_AGGREGATED_RATING,
-    schema.COL_STEAM_POSITIVE_PCT,
-    schema.COL_STEAM_REVIEW_COUNT,
-    schema.COL_GENRES,
-    schema.COL_ENGINES,
-    schema.COL_DEVELOPERS,
-    schema.COL_PUBLISHERS,
-    schema.COL_PORTING,
-    schema.COL_SUPPORTING,
-]
+# Column order for the projection — matches CanonicalGame's field order so rows
+# map positionally.
+_SELECT_COLUMNS = [name for name, _ in schema.PARQUET_COLUMNS]
 
-# The merge (docs/02-ARCHITECTURE.md §3):
-#   - dedup within each system (QUALIFY keeps one row per igdb_id / steam_appid),
-#   - IGDB rows are canonical; their Steam review stats come from the matching
-#     Steam row (LEFT JOIN on steam_appid),
-#   - Steam rows whose appid no IGDB row claims become Steam-only canonical games.
-_MERGE_SQL = f"""
-WITH src AS (
-    SELECT * FROM read_parquet(?)
-),
-igdb AS (
-    SELECT * FROM src
-    WHERE {schema.COL_SOURCE_KIND} = '{schema.SOURCE_KIND_IGDB}'
-    QUALIFY row_number() OVER (
-        PARTITION BY {schema.COL_IGDB_ID}
-        ORDER BY {schema.COL_STEAM_APPID} NULLS LAST, {schema.COL_TITLE}
-    ) = 1
-),
-steam AS (
-    SELECT * FROM src
-    WHERE {schema.COL_SOURCE_KIND} = '{schema.SOURCE_KIND_STEAM}'
-    QUALIFY row_number() OVER (
-        PARTITION BY {schema.COL_STEAM_APPID}
-        ORDER BY {schema.COL_TITLE}
-    ) = 1
-),
-linked_appids AS (
-    SELECT DISTINCT {schema.COL_STEAM_APPID} AS appid
-    FROM igdb WHERE {schema.COL_STEAM_APPID} IS NOT NULL
-),
-canonical AS (
-    SELECT
-        i.{schema.COL_IGDB_ID}                 AS {schema.COL_IGDB_ID},
-        i.{schema.COL_STEAM_APPID}             AS {schema.COL_STEAM_APPID},
-        i.{schema.COL_TITLE}                   AS {schema.COL_TITLE},
-        i.{schema.COL_RELEASE_DATE}            AS {schema.COL_RELEASE_DATE},
-        i.{schema.COL_SUMMARY}                 AS {schema.COL_SUMMARY},
-        i.{schema.COL_COVER_URL}               AS {schema.COL_COVER_URL},
-        i.{schema.COL_IGDB_RATING}             AS {schema.COL_IGDB_RATING},
-        i.{schema.COL_IGDB_AGGREGATED_RATING}  AS {schema.COL_IGDB_AGGREGATED_RATING},
-        s.{schema.COL_STEAM_POSITIVE_PCT}      AS {schema.COL_STEAM_POSITIVE_PCT},
-        s.{schema.COL_STEAM_REVIEW_COUNT}      AS {schema.COL_STEAM_REVIEW_COUNT},
-        i.{schema.COL_GENRES}                  AS {schema.COL_GENRES},
-        i.{schema.COL_ENGINES}                 AS {schema.COL_ENGINES},
-        i.{schema.COL_DEVELOPERS}              AS {schema.COL_DEVELOPERS},
-        i.{schema.COL_PUBLISHERS}              AS {schema.COL_PUBLISHERS},
-        i.{schema.COL_PORTING}                 AS {schema.COL_PORTING},
-        i.{schema.COL_SUPPORTING}              AS {schema.COL_SUPPORTING}
-    FROM igdb i
-    LEFT JOIN steam s ON s.{schema.COL_STEAM_APPID} = i.{schema.COL_STEAM_APPID}
-
-    UNION ALL
-
-    SELECT
-        NULL::BIGINT,
-        s.{schema.COL_STEAM_APPID},
-        s.{schema.COL_TITLE},
-        s.{schema.COL_RELEASE_DATE},
-        s.{schema.COL_SUMMARY},
-        s.{schema.COL_COVER_URL},
-        NULL::DOUBLE,
-        NULL::DOUBLE,
-        s.{schema.COL_STEAM_POSITIVE_PCT},
-        s.{schema.COL_STEAM_REVIEW_COUNT},
-        []::VARCHAR[],
-        []::VARCHAR[],
-        s.{schema.COL_DEVELOPERS},
-        s.{schema.COL_PUBLISHERS},
-        s.{schema.COL_PORTING},
-        s.{schema.COL_SUPPORTING}
-    FROM steam s
-    WHERE s.{schema.COL_STEAM_APPID} NOT IN (SELECT appid FROM linked_appids)
-)
-SELECT {", ".join(_SELECT_COLUMNS)}
-FROM canonical
-ORDER BY {schema.COL_IGDB_ID} NULLS LAST, {schema.COL_STEAM_APPID} NULLS LAST
-"""
+_READ_SQL = f"SELECT {', '.join(_SELECT_COLUMNS)} FROM read_parquet(?)"
 
 
-def _configure_remote_access(con: duckdb.DuckDBPyConnection, source: str) -> None:
-    """Enable httpfs + S3 credentials when the source is a remote URL."""
-    if not (source.startswith(("s3://", "http://", "https://"))):
+def configure_remote_access(con: duckdb.DuckDBPyConnection, source: str) -> None:
+    """Enable httpfs + S3 credentials when the source is a remote URL (R2)."""
+    if not source.startswith(("s3://", "http://", "https://")):
         return
     con.execute("INSTALL httpfs; LOAD httpfs;")
     if source.startswith("s3://"):
@@ -156,14 +65,16 @@ def _to_canonical(row: tuple[Any, ...]) -> CanonicalGame:
 
 
 def iter_canonical_games(source: str, batch_size: int = 1000) -> Iterator[CanonicalGame]:
-    """Stream deduplicated games from the parquet at `source`, constant memory."""
+    """Stream canonical games from the prepared parquet, constant memory."""
     con = duckdb.connect()
     try:
-        _configure_remote_access(con, source)
-        result = con.execute(_MERGE_SQL, [source])
+        configure_remote_access(con, source)
+        result = con.execute(_READ_SQL, [source])
         while batch := result.fetchmany(batch_size):
             for row in batch:
                 yield _to_canonical(row)
+    except (duckdb.Error, urllib.error.URLError) as exc:
+        raise RuntimeError(f"Failed to read parquet {source}: {exc}") from exc
     finally:
         con.close()
 

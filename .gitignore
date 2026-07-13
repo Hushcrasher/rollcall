@@ -7,6 +7,11 @@ __pycache__/
 # Env / secrets — never in git history
 .env
 
+# Private data — parquet source files stay OUT of the open-source repo.
+# They live in private object storage (Cloudflare R2); see DEPLOY.md.
+data/
+*.parquet
+
 # Django
 staticfiles/
 media/

@@ -139,6 +139,7 @@ Goal: legally and operationally ready for real users. Buildable pieces done TDD 
 
 ## Known follow-ups (tech debt, not blocking the POC)
 
+- [ ] **Bulk seed load**: `seed_games`' per-row upsert is built for weekly incremental refresh; a full cold load of ~392k games takes ~50 min (per-row slug queries + get_or_create for every genre/engine/company + per-game link sync). Add a bulk fast-path (cache reference rows, `bulk_create` games + links, in-Python slug collision handling) for the initial load. The `prepare_seed_parquet` join itself is fast (~2s).
 - [ ] **Company dedup / merge**: user-created companies (`source=manual`) are keyed only by exact name — near-duplicate spellings ("Virtuos" vs "Virtuos Games") can proliferate. Add a light admin merge tool (repoint `game_companies` + `contributions` to a canonical company, delete the dupe) once manual companies grow. The dormant `company_aliases` table (docs/04 §5) can back the merged names.
 - [ ] Rate limiting uses the per-process cache — add Redis for limits that hold across gunicorn workers (see DEPLOY.md).
 - [ ] `sitemap.xml` is a single sitemap — switch to a paginated sitemap index at ~400k games (see DEPLOY.md).
