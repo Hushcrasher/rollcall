@@ -1,0 +1,9 @@
+{% load i18n %}
+{% for game in games %}
+  <button type="button" class="autocomplete-option"
+          data-id="{{ game.pk }}" data-label="{{ game.title }}">
+    {{ game.title }}{% if game.release_date %} ({{ game.release_date|date:"Y" }}){% endif %}
+  </button>
+{% empty %}
+  <p class="autocomplete-empty">{% translate "No games found." %}</p>
+{% endfor %}

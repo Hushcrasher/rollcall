@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{{ game.title }} · Rollcall{% endblock %}
+
+{% block content %}
+  <article>
+    {% if game.cover_url %}
+      <img src="{{ game.cover_url }}" alt="{{ game.title }}" width="180">
+    {% endif %}
+    <h1>{{ game.title }}</h1>
+    {% if game.release_date %}<p>{{ game.release_date|date:"Y" }}</p>{% endif %}
+    {% if game.summary %}<p>{{ game.summary }}</p>{% endif %}
+
+    {% if game.genres.all %}
+      <p>{% translate "Genres" %}:
+        {% for genre in game.genres.all %}{{ genre.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>
+    {% endif %}
+    {% if game.engines.all %}
+      <p>{% translate "Engines" %}:
+        {% for engine in game.engines.all %}{{ engine.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>
+    {% endif %}
+
+    {% if company_links %}
+      <ul>
+        {% for link in company_links %}
+          <li>{{ link.get_role_display }}:
+            <a href="{% url 'games:company' link.company.slug %}">{{ link.company.name }}</a></li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  </article>
+
+  <section>
+    <h2>{% translate "Contributors" %}</h2>
+    {% for c in contributions %}
+      <div class="credit">
+        <a href="{% url 'accounts:profile' c.user.slug %}">{{ c.user.display_name }}</a>
+        — {{ c.job_title }} <em>({{ c.discipline.name }})</em>
+        {% if c.company %}@ {{ c.company.name }}{% endif %}
+        <span class="dates">
+          {{ c.start_date|date:"M Y" }} –
+          {% if c.end_date %}{{ c.end_date|date:"M Y" }}{% else %}{% translate "present" %}{% endif %}
+        </span>
+        <span class="badge">{% translate "Declared" %}</span>
+      </div>
+    {% empty %}
+      <p>{% translate "No contributors have declared credits on this game yet." %}</p>
+    {% endfor %}
+  </section>
+{% endblock %}

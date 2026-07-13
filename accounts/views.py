@@ -24,6 +24,7 @@ from accounts.export import build_personal_data_export
 from accounts.forms import EmailAuthenticationForm, SettingsForm, SignupForm
 from accounts.models import User
 from accounts.tokens import email_verification_token
+from contributions.models import Contribution
 
 __all__ = [
     "AccountDeleteView",
@@ -102,6 +103,15 @@ class ProfileView(DetailView):
         if self.request.user.is_authenticated:
             return User.objects.filter(Q(profile_public=True) | Q(pk=self.request.user.pk))
         return User.objects.filter(profile_public=True)
+
+    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+        context["contributions"] = (
+            Contribution.objects.filter(user=self.object, status=Contribution.Status.ACTIVE)
+            .select_related("game", "company", "discipline")
+            .order_by("-start_date")
+        )
+        return context
 
 
 class SettingsView(LoginRequiredMixin, UpdateView):

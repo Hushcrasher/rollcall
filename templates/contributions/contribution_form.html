@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% translate "Add a credit" %} · Rollcall{% endblock %}
+
+{% block content %}
+  <h1>{% if form.instance.pk %}{% translate "Edit credit" %}{% else %}{% translate "Add a credit" %}{% endif %}</h1>
+
+  <form method="post">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+
+    {# Game — required. Hidden field set by the autocomplete below. #}
+    <div class="autocomplete" data-hidden="{{ form.game.auto_id }}">
+      <label>{% translate "Game" %}</label>
+      {{ form.game }}
+      <input type="text" class="autocomplete-input" name="q" autocomplete="off"
+             placeholder="{% translate 'Search a game…' %}"
+             hx-get="{% url 'search:game_autocomplete' %}" hx-trigger="keyup changed delay:250ms"
+             hx-target="next .results">
+      <div class="results"></div>
+      <p class="chosen">{% if form.game.value %}{{ form.instance.game }}{% endif %}</p>
+      {{ form.game.errors }}
+    </div>
+
+    {# Company — optional employer. #}
+    <div class="autocomplete" data-hidden="{{ form.company.auto_id }}">
+      <label>{% translate "Employer company (optional)" %}</label>
+      {{ form.company }}
+      <input type="text" class="autocomplete-input" name="q" autocomplete="off"
+             placeholder="{% translate 'Search a company…' %}"
+             hx-get="{% url 'search:company_autocomplete' %}" hx-trigger="keyup changed delay:250ms"
+             hx-target="next .results">
+      <div class="results"></div>
+      <p class="chosen">{% if form.company.value %}{{ form.instance.company }}{% endif %}</p>
+      {{ form.company.errors }}
+    </div>
+
+    <p>
+      <label for="{{ form.discipline.id_for_label }}">{% translate "Discipline" %}</label>
+      {{ form.discipline }} {{ form.discipline.errors }}
+    </p>
+    <p>
+      <label for="{{ form.job_title.id_for_label }}">{% translate "Job title" %}</label>
+      {{ form.job_title }} {{ form.job_title.errors }}
+    </p>
+    <p>
+      <label for="{{ form.start_date.id_for_label }}">{{ form.start_date.label }}</label>
+      {{ form.start_date }} {{ form.start_date.errors }}
+    </p>
+    <p>
+      <label for="{{ form.end_date.id_for_label }}">{{ form.end_date.label }}</label>
+      {{ form.end_date }} {{ form.end_date.errors }}
+      <small>{% translate "Leave empty if you're still working on it." %}</small>
+    </p>
+
+    <button type="submit">{% translate "Save" %}</button>
+  </form>
+
+  <script>
+    // Autocomplete pick: clicking an option fills the hidden field + shows the label.
+    document.addEventListener("click", function (event) {
+      const option = event.target.closest(".autocomplete-option");
+      if (!option) return;
+      const wrapper = option.closest(".autocomplete");
+      document.getElementById(wrapper.dataset.hidden).value = option.dataset.id;
+      wrapper.querySelector(".chosen").textContent = option.dataset.label;
+      wrapper.querySelector(".results").innerHTML = "";
+      wrapper.querySelector(".autocomplete-input").value = "";
+    });
+  </script>
+{% endblock %}

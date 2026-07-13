@@ -80,16 +80,18 @@ Goal: the full account lifecycle, GDPR included. Built TDD (32 account tests).
 - [x] **JSON export** of personal data (identity, settings, credits, vouches, contacts) — with tests
 - [x] Verified end-to-end in the browser: signup → verification email → verified → settings → profile (no email leak)
 
-## Phase 4 — Contributions & public pages
+## Phase 4 — Contributions & public pages ✅
 
-Goal: the core loop — declare a contribution, see it on person and game pages.
+Goal: the core loop — declare a contribution, see it on person and game pages. Built TDD (27 tests); verified end-to-end in the browser.
 
-- [ ] Contribution create/edit/delete: game autocomplete (pg_trgm, htmx), optional employer company, discipline select, free job title, month/year dates (open end) — game required in POC forms
-- [ ] Multiple contributions per (person, game) allowed
-- [ ] Person page: credits list with dates (only `status='active'`)
-- [ ] Game page: contributors list (same table read the other way) + IGDB/Steam CDN cover
-- [ ] Company page: aggregation only (games from IGDB facts, contributors via contributions)
-- [ ] "Declared" badge on unconfirmed contributions (vouching itself stays out of POC)
+- [x] Contribution create/edit/delete: game autocomplete (pg_trgm, htmx, vendored locally), optional employer company (autocomplete), discipline select, free job title, month/year dates (`<input type=month>` → DATE day=01, open end) — game required in POC forms; owner-only edit/delete
+- [x] Multiple contributions per (person, game) allowed
+- [x] Person page: active credits list with dates + "present" for open end; owner Add/Edit/Delete controls
+- [x] Game page: contributors list (same table read the other way) + IGDB/Steam CDN cover + genres/engines/dev-pub; **email never leaked**
+- [x] Company page: aggregation only (games from IGDB `game_companies` facts, contributors via contributions)
+- [x] "Declared" badge on every contribution (vouching stays out of POC)
+- [x] **Email-verified gate** enforced on create (design non-negotiable #6); only `status='active'` shown anywhere
+- [x] Trigram autocomplete lives in the isolated `search` module (reused by Phase 5)
 
 ## Phase 5 — Simple search
 

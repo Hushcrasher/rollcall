@@ -14,16 +14,36 @@
     {% if profile_user.open_to_work %}
       <p class="badge">{% translate "Open to work" %}</p>
     {% endif %}
-
-    {% if profile_user.location %}
-      <p>{{ profile_user.location }}</p>
-    {% endif %}
-
-    {% if profile_user.bio %}
-      <p>{{ profile_user.bio }}</p>
-    {% endif %}
-
-    {# Credits (contributions) are rendered here in Phase 4. #}
+    {% if profile_user.location %}<p>{{ profile_user.location }}</p>{% endif %}
+    {% if profile_user.bio %}<p>{{ profile_user.bio }}</p>{% endif %}
     {# Contact button (relay, honors contactable) is added in Phase 6. #}
   </article>
+
+  <section>
+    <h2>{% translate "Credits" %}</h2>
+    {% if request.user == profile_user %}
+      <p><a href="{% url 'contributions:create' %}">{% translate "Add a credit" %}</a></p>
+    {% endif %}
+
+    {% for c in contributions %}
+      <div class="credit">
+        <a href="{% url 'games:game' c.game.slug %}">{{ c.game.title }}</a>
+        — {{ c.job_title }} <em>({{ c.discipline.name }})</em>
+        {% if c.company %}
+          @ <a href="{% url 'games:company' c.company.slug %}">{{ c.company.name }}</a>
+        {% endif %}
+        <span class="dates">
+          {{ c.start_date|date:"M Y" }} –
+          {% if c.end_date %}{{ c.end_date|date:"M Y" }}{% else %}{% translate "present" %}{% endif %}
+        </span>
+        <span class="badge">{% translate "Declared" %}</span>
+        {% if request.user == profile_user %}
+          <a href="{% url 'contributions:edit' c.pk %}">{% translate "Edit" %}</a>
+          <a href="{% url 'contributions:delete' c.pk %}">{% translate "Delete" %}</a>
+        {% endif %}
+      </div>
+    {% empty %}
+      <p>{% translate "No credits yet." %}</p>
+    {% endfor %}
+  </section>
 {% endblock %}

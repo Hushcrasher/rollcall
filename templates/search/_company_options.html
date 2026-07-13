@@ -1,0 +1,9 @@
+{% load i18n %}
+{% for company in companies %}
+  <button type="button" class="autocomplete-option"
+          data-id="{{ company.pk }}" data-label="{{ company.name }}">
+    {{ company.name }}
+  </button>
+{% empty %}
+  <p class="autocomplete-empty">{% translate "No companies found." %}</p>
+{% endfor %}

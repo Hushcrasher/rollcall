@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% translate "Delete credit" %} · Rollcall{% endblock %}
+
+{% block content %}
+  <h1>{% translate "Delete this credit?" %}</h1>
+  <p>{{ object.job_title }} — {{ object.game }}
+    {% if object.company %}({{ object.company }}){% endif %}</p>
+
+  <form method="post">
+    {% csrf_token %}
+    <button type="submit">{% translate "Delete" %}</button>
+    <a href="{% url 'accounts:profile' object.user.slug %}">{% translate "Cancel" %}</a>
+  </form>
+{% endblock %}

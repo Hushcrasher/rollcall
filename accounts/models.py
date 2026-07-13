@@ -11,6 +11,7 @@ from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.models import AbstractUser
 from django.contrib.postgres.indexes import GinIndex
 from django.db import models
+from django.urls import reverse
 from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 
@@ -135,6 +136,9 @@ class User(AbstractUser):
             slug = f"{base}-{suffix}"
             suffix += 1
         return slug
+
+    def get_absolute_url(self) -> str:
+        return reverse("accounts:profile", kwargs={"slug": self.slug})
 
     @property
     def is_email_verified(self) -> bool:
