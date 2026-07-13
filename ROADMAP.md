@@ -93,13 +93,15 @@ Goal: the core loop — declare a contribution, see it on person and game pages.
 - [x] **Email-verified gate** enforced on create (design non-negotiable #6); only `status='active'` shown anywhere
 - [x] Trigram autocomplete lives in the isolated `search` module (reused by Phase 5)
 
-## Phase 5 — Simple search
+## Phase 5 — Simple search ✅
 
-Goal: find games and people, open to all.
+Goal: find games and people, open to all. Built TDD (9 tests); verified in the browser.
 
-- [ ] Games/people search on `pg_trgm` (typo-tolerant: "hade" → "Hades"), isolated in the `search` app
-- [ ] Autocomplete endpoints (htmx) reused from Phase 4
-- [ ] No exhaustive "all people" paginated endpoint (anti-scraping posture)
+- [x] Games/people search on `pg_trgm` (typo-tolerant: "kojma" → "Hideo Kojima"), isolated in the `search` app
+- [x] `search_people` never surfaces `profile_public=False` users (anti-exposure) — verified live
+- [x] Public `/search/?q=` results page (games + public people) + header search box; **email never leaked**
+- [x] Autocomplete endpoints (htmx) shared with Phase 4's contribution form
+- [x] No exhaustive "all people" listing — a blank query returns nothing (anti-scraping posture)
 
 ## Phase 6 — Recruiter side
 

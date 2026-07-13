@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% translate "Search" %} · Rollcall{% endblock %}
+
+{% block content %}
+  <h1>{% translate "Search" %}</h1>
+
+  <form method="get" action="{% url 'search:search' %}">
+    <input type="search" name="q" value="{{ query }}"
+           placeholder="{% translate 'Search games and people…' %}" autofocus>
+    <button type="submit">{% translate "Search" %}</button>
+  </form>
+
+  {% if query %}
+    <section>
+      <h2>{% translate "People" %}</h2>
+      {% for person in people %}
+        <p><a href="{% url 'accounts:profile' person.slug %}">{{ person.display_name }}</a>
+          {% if person.open_to_work %}<span class="badge">{% translate "Open to work" %}</span>{% endif %}
+        </p>
+      {% empty %}
+        <p>{% translate "No people found." %}</p>
+      {% endfor %}
+    </section>
+
+    <section>
+      <h2>{% translate "Games" %}</h2>
+      {% for game in games %}
+        <p><a href="{% url 'games:game' game.slug %}">{{ game.title }}</a>
+          {% if game.release_date %}({{ game.release_date|date:"Y" }}){% endif %}</p>
+      {% empty %}
+        <p>{% translate "No games found." %}</p>
+      {% endfor %}
+    </section>
+  {% else %}
+    <p>{% translate "Type a game or a person's name to search." %}</p>
+  {% endif %}
+{% endblock %}
