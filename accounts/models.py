@@ -98,6 +98,13 @@ class User(AbstractUser):
     )
     bio = models.TextField(_("bio"), blank=True, default="")
     location = models.CharField(_("location"), max_length=150, blank=True, default="")
+    github_login = models.CharField(
+        _("GitHub login"),
+        max_length=39,
+        blank=True,
+        default="",
+        help_text=_("Declared GitHub handle — not verified (same trust model as a LinkedIn link)."),
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -212,3 +219,55 @@ class RecruiterApplication(models.Model):
         obj.reviewed_by = reviewer
         obj.reviewed_at = timezone.now()
         self.save(update_fields=["status", "reviewed_by", "reviewed_at", "updated_at"])
+
+
+class GitHubSnapshot(models.Model):
+    """Profile-level GitHub cache (one per user). 24h TTL via profile_fetched_at."""
+
+    class Status(models.TextChoices):
+        NEVER_FETCHED = "never_fetched", _("Never fetched")
+        OK = "ok", _("OK")
+        NOT_FOUND = "not_found", _("Not found")
+        ERROR = "error", _("Error")
+
+    objects: ClassVar[models.Manager["GitHubSnapshot"]] = models.Manager()
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="github_snapshot")
+    login = models.CharField(max_length=39, blank=True, default="")
+    avatar_url = models.URLField(max_length=500, blank=True, default="")
+    public_repos = models.PositiveIntegerField(null=True, blank=True)
+    followers = models.PositiveIntegerField(null=True, blank=True)
+    account_created_at = models.DateTimeField(null=True, blank=True)
+    profile_fetched_at = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.NEVER_FETCHED
+    )
+    last_error = models.TextField(blank=True, default="")
+
+    def __str__(self) -> str:
+        return f"github:{self.login} [{self.status}]"
+
+
+class GitHubYearlyContribution(models.Model):
+    """One row per (user, year). Past years are immutable (is_final=True)."""
+
+    objects: ClassVar[models.Manager["GitHubYearlyContribution"]] = models.Manager()
+
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="github_yearly_contributions"
+    )
+    year = models.PositiveIntegerField()
+    total_commits = models.PositiveIntegerField(default=0)
+    total_contributions = models.PositiveIntegerField(default=0)
+    private_count = models.PositiveIntegerField(default=0)
+    fetched_at = models.DateTimeField()
+    is_final = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["-year"]
+        constraints = [
+            models.UniqueConstraint(fields=["user", "year"], name="one_row_per_user_year"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.user_id} {self.year}: {self.total_commits} commits"  # ty: ignore[unresolved-attribute]
