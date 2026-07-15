@@ -191,15 +191,15 @@ def get_github_activity(user: User, client: GitHubClient | None = None) -> GitHu
     if not login:
         return None
     client = client or GitHubClient()
-    if not client.configured:
-        return None
 
     now = timezone.now()
     current_year = now.year
     snapshot = GitHubSnapshot.objects.filter(user=user).first()
     current_row = GitHubYearlyContribution.objects.filter(user=user, year=current_year).first()
 
-    if _needs_refresh(snapshot, current_row, now):
+    # An unconfigured client must never attempt network I/O, but it should
+    # still serve whatever is already cached rather than hide valid data.
+    if client.configured and _needs_refresh(snapshot, current_row, now):
         cold = snapshot is None or snapshot.status != GitHubSnapshot.Status.OK
         try:
             if cold:

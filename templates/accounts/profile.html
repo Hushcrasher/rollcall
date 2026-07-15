@@ -52,4 +52,11 @@
       <p>{% translate "No credits yet." %}</p>
     {% endfor %}
   </section>
+
+  {% if profile_user.github_login %}
+    <section hx-get="{% url 'accounts:github_activity' profile_user.slug %}"
+             hx-trigger="load" hx-swap="outerHTML">
+      <p class="muted">{% translate "Loading GitHub activity…" %}</p>
+    </section>
+  {% endif %}
 {% endblock %}

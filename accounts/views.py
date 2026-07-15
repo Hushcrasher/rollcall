@@ -1,6 +1,7 @@
 """Account views — signup, email verification, login helpers, profile,
 settings, and GDPR (deletion + export)."""
 
+import logging
 from typing import Any
 
 from django.conf import settings
@@ -10,7 +11,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q, QuerySet
-from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.http import Http404, HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse_lazy
 from django.utils import timezone
@@ -30,10 +31,13 @@ from accounts.forms import (
     SettingsForm,
     SignupForm,
 )
+from accounts.github import get_github_activity
 from accounts.http import AuthedHttpRequest
 from accounts.models import RecruiterApplication, User
 from accounts.tokens import email_verification_token
 from contributions.models import Contribution
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "AccountDeleteView",
@@ -44,6 +48,7 @@ __all__ = [
     "SignupView",
     "VerificationSentView",
     "export_personal_data",
+    "github_activity",
     "resend_verification",
     "verify_email",
 ]
@@ -186,3 +191,21 @@ def export_personal_data(request: AuthedHttpRequest) -> JsonResponse:
     )
     response["Content-Disposition"] = 'attachment; filename="rollcall-my-data.json"'
     return response
+
+
+def github_activity(request: HttpRequest, slug: str) -> HttpResponse:
+    """htmx fragment: a member's public GitHub activity. Never 500s — any
+    failure degrades to a quiet state so the profile page is unaffected."""
+    if request.user.is_authenticated:  # ty: ignore[unresolved-attribute]
+        qs = User.objects.filter(Q(profile_public=True) | Q(pk=request.user.pk))  # ty: ignore[unresolved-attribute]
+    else:
+        qs = User.objects.filter(profile_public=True)
+    profile_user = qs.filter(slug=slug).first()
+    if profile_user is None:
+        raise Http404
+    activity = None
+    try:
+        activity = get_github_activity(profile_user)
+    except Exception:  # noqa: BLE001 — the block must never break the page
+        logger.exception("GitHub activity block failed for %s", slug)
+    return render(request, "accounts/_github_block.html", {"activity": activity})

@@ -1,0 +1,42 @@
+{% load i18n %}
+{% if activity %}
+  {% if activity.status == "not_found" %}
+    <section class="github-block">
+      <h2>{% translate "Public side projects" %}</h2>
+      <p class="muted">{% translate "GitHub profile not found." %}</p>
+    </section>
+  {% elif activity.has_data %}
+    <section class="github-block">
+      <h2>{% translate "Public side projects" %}</h2>
+      <p class="muted">
+        {% translate "Open-source and side-project activity. Most games work lives in private Perforce repos under NDA — an empty block here means nothing." %}
+      </p>
+      <div class="github-head">
+        {% if activity.avatar_url %}
+          <img src="{{ activity.avatar_url }}" alt="" width="48" height="48">
+        {% endif %}
+        <ul class="github-stats">
+          <li>{{ activity.public_repos }} {% translate "public repos" %}</li>
+          {% if activity.followers is not None %}
+            <li>{{ activity.followers }} {% translate "followers" %}</li>
+          {% endif %}
+          {% if activity.account_created_at %}
+            <li>{% blocktranslate with y=activity.account_created_at|date:"Y" %}On GitHub since {{ y }}{% endblocktranslate %}</li>
+          {% endif %}
+        </ul>
+      </div>
+      <ul class="github-years">
+        {% for y in activity.years %}
+          <li><span class="year">{{ y.year }}</span> — {{ y.total_commits }} {% translate "commits" %}</li>
+        {% empty %}
+          <li>{% translate "No public commits in the last 5 years." %}</li>
+        {% endfor %}
+      </ul>
+      {% if activity.private_total %}
+        <p class="github-private">
+          {% blocktranslate with n=activity.private_total %}+{{ n }} private contributions (last 5y){% endblocktranslate %}
+        </p>
+      {% endif %}
+    </section>
+  {% endif %}
+{% endif %}
