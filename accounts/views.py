@@ -58,6 +58,13 @@ def _profile_rate(group: str, request: HttpRequest) -> str:
     return settings.PROFILE_RATELIMIT
 
 
+def _visible_users(request: HttpRequest) -> QuerySet[User]:
+    """Profiles the requester may see: public ones, plus their own."""
+    if request.user.is_authenticated:  # ty: ignore[unresolved-attribute]
+        return User.objects.filter(Q(profile_public=True) | Q(pk=request.user.pk))  # ty: ignore[unresolved-attribute]
+    return User.objects.filter(profile_public=True)
+
+
 class SignupView(FormView):
     template_name = "accounts/signup.html"
     form_class = SignupForm
@@ -112,9 +119,7 @@ class ProfileView(DetailView):
 
     def get_queryset(self) -> QuerySet[User]:
         # Honor profile_public: a non-public profile is visible only to its owner.
-        if self.request.user.is_authenticated:
-            return User.objects.filter(Q(profile_public=True) | Q(pk=self.request.user.pk))
-        return User.objects.filter(profile_public=True)
+        return _visible_users(self.request)
 
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
         context = super().get_context_data(**kwargs)
@@ -193,14 +198,11 @@ def export_personal_data(request: AuthedHttpRequest) -> JsonResponse:
     return response
 
 
+@ratelimit(key="ip", rate=_profile_rate, method="GET", block=True)
 def github_activity(request: HttpRequest, slug: str) -> HttpResponse:
     """htmx fragment: a member's public GitHub activity. Never 500s — any
     failure degrades to a quiet state so the profile page is unaffected."""
-    if request.user.is_authenticated:  # ty: ignore[unresolved-attribute]
-        qs = User.objects.filter(Q(profile_public=True) | Q(pk=request.user.pk))  # ty: ignore[unresolved-attribute]
-    else:
-        qs = User.objects.filter(profile_public=True)
-    profile_user = qs.filter(slug=slug).first()
+    profile_user = _visible_users(request).filter(slug=slug).first()
     if profile_user is None:
         raise Http404
     activity = None
