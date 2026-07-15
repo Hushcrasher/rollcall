@@ -131,6 +131,22 @@ def test_error_serves_stale_data() -> None:
     assert snap.last_error
 
 
+def test_handle_change_drops_stale_cache_for_the_old_handle() -> None:
+    user = _user(login="torvalds")
+    get_github_activity(user, FakeClient(years=[2026]))  # cache the torvalds snapshot
+    assert str(GitHubSnapshot.objects.get(user=user).login) == "torvalds"
+    # Out-of-band handle change (e.g. an admin edit) — no form-level wipe runs.
+    User.objects.filter(pk=user.pk).update(github_login="gvanrossum")
+    user.refresh_from_db()
+
+    client = FakeClient(years=[2026, 2025])
+    activity = get_github_activity(user, client)
+
+    assert activity is not None and activity.status == "ok"
+    assert str(GitHubSnapshot.objects.get(user=user).login) == "gvanrossum"  # refetched fresh
+    assert client.calls[0] == "profile"  # a real (cold) refetch happened
+
+
 def test_error_on_cold_fetch_then_recovery_does_a_full_backfill() -> None:
     user = _user()
     # First-ever fetch errors before any yearly rows are persisted.

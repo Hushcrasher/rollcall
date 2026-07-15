@@ -10,11 +10,16 @@ from typing import Any, ClassVar
 from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.models import AbstractUser
 from django.contrib.postgres.indexes import GinIndex
+from django.core.validators import RegexValidator
 from django.db import models
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
+
+# GitHub's own login rule: 1-39 chars, alnum or single internal hyphens.
+# Single source of truth — accounts/github.py's parser reuses this pattern.
+GITHUB_LOGIN_RE = r"^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$"
 
 
 class UserManager(BaseUserManager):
@@ -104,6 +109,7 @@ class User(AbstractUser):
         blank=True,
         default="",
         help_text=_("Declared GitHub handle — not verified (same trust model as a LinkedIn link)."),
+        validators=[RegexValidator(GITHUB_LOGIN_RE, _("Enter a valid GitHub username."))],
     )
 
     created_at = models.DateTimeField(auto_now_add=True)

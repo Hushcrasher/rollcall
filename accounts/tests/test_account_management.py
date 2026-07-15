@@ -50,6 +50,8 @@ def test_export_returns_json_attachment_with_identity_and_credits(
         job_title="Gameplay Dev",
         start_date=date(2021, 3, 1),
     )
+    user.github_login = "torvalds"  # ty: ignore[invalid-assignment]
+    user.save(update_fields=["github_login"])
     client.force_login(user)
 
     response = client.get(reverse("accounts:export_data"))
@@ -59,6 +61,7 @@ def test_export_returns_json_attachment_with_identity_and_credits(
     assert "attachment" in response["Content-Disposition"]
     data = response.json()
     assert data["identity"]["email"] == "me@example.com"
+    assert data["identity"]["github_login"] == "torvalds"
     assert data["contributions"][0]["job_title"] == "Gameplay Dev"
     assert data["contributions"][0]["game"] == "Some Game"
 

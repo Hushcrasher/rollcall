@@ -4,7 +4,7 @@ from django.db.models import QuerySet
 from django.utils.translation import gettext_lazy as _
 
 from .http import AuthedHttpRequest
-from .models import GitHubSnapshot, RecruiterApplication, User
+from .models import GitHubSnapshot, GitHubYearlyContribution, RecruiterApplication, User
 
 
 @admin.register(User)
@@ -86,3 +86,11 @@ class GitHubSnapshotAdmin(admin.ModelAdmin):
     list_filter = ("status",)
     search_fields = ("login", "user__email")
     readonly_fields = ("profile_fetched_at",)
+
+
+@admin.register(GitHubYearlyContribution)
+class GitHubYearlyContributionAdmin(admin.ModelAdmin):
+    list_display = ("user", "year", "total_commits", "private_count", "is_final", "fetched_at")
+    list_filter = ("is_final", "year")
+    search_fields = ("user__email",)
+    readonly_fields = ("fetched_at",)

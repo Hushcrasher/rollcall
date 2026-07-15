@@ -1,6 +1,7 @@
 """GitHub cache models — snapshot + per-year contributions."""
 
 import pytest
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.utils import timezone
 
@@ -36,3 +37,13 @@ def test_yearly_rows_are_unique_per_user_year() -> None:
 
 def test_user_github_login_defaults_blank() -> None:
     assert _user().github_login == ""
+
+
+def test_github_login_rejects_invalid_handle_at_model_level() -> None:
+    """Writes that bypass SettingsForm (admin, shell) must still be caught —
+    the login regex is enforced as a model validator, not just in the form."""
+    user = _user()
+    user.github_login = "-badstart"  # ty: ignore[invalid-assignment]  # cannot start with a hyphen
+
+    with pytest.raises(ValidationError):
+        user.full_clean()

@@ -20,15 +20,14 @@ from typing import Any
 from django.conf import settings
 from django.utils import timezone
 
-from accounts.models import GitHubSnapshot, GitHubYearlyContribution, User
+from accounts.models import GITHUB_LOGIN_RE, GitHubSnapshot, GitHubYearlyContribution, User
 
 logger = logging.getLogger(__name__)
 
 _API_BASE = "https://api.github.com"
 _TIMEOUT = 4
 
-# GitHub's own login rule: 1-39 chars, alnum or single internal hyphens.
-_LOGIN_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$")
+_LOGIN_RE = re.compile(GITHUB_LOGIN_RE)
 _SCHEME_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.-]*://")
 
 
@@ -195,6 +194,13 @@ def get_github_activity(user: User, client: GitHubClient | None = None) -> GitHu
     now = timezone.now()
     current_year = now.year
     snapshot = GitHubSnapshot.objects.filter(user=user).first()
+    if snapshot is not None and str(snapshot.login) != login:
+        # The declared handle changed out from under the cache (e.g. edited in
+        # admin, or any non-form write). Drop stale data so the new handle
+        # cold-fetches cleanly rather than serving the old account's stats.
+        GitHubYearlyContribution.objects.filter(user=user).delete()
+        snapshot.delete()
+        snapshot = None
     current_row = GitHubYearlyContribution.objects.filter(user=user, year=current_year).first()
 
     # An unconfigured client must never attempt network I/O, but it should
