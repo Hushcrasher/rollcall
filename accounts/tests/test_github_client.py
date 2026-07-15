@@ -1,6 +1,7 @@
 """GitHubClient — network isolated in _http; stubbed here (no network)."""
 
 import io
+import json
 import urllib.error
 from typing import Any
 
@@ -66,3 +67,48 @@ def test_other_http_error_maps_to_generic(monkeypatch: pytest.MonkeyPatch) -> No
 def test_unconfigured_client_never_calls_network() -> None:
     with pytest.raises(GitHubError):
         GitHubClient(token="").get_profile("torvalds")
+
+
+def test_get_contribution_years(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_http(self: GitHubClient, method: str, url: str, data: Any, headers: Any) -> Any:
+        assert method == "POST"
+        assert url.endswith("/graphql")
+        return {"data": {"user": {"contributionsCollection": {"contributionYears": [2026, 2025]}}}}
+
+    monkeypatch.setattr(GitHubClient, "_http", fake_http)
+    assert _client().get_contribution_years("torvalds") == [2026, 2025]
+
+
+def test_get_contribution_years_missing_user_raises_not_found(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        GitHubClient, "_http", lambda *a, **k: {"data": {"user": None}}
+    )
+    with pytest.raises(GitHubNotFound):
+        _client().get_contribution_years("ghost")
+
+
+def test_get_year_contributions_builds_one_year_window(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, Any] = {}
+
+    def fake_http(self: GitHubClient, method: str, url: str, data: Any, headers: Any) -> Any:
+        captured["body"] = json.loads(data.decode())
+        return {
+            "data": {
+                "user": {
+                    "contributionsCollection": {
+                        "totalCommitContributions": 200,
+                        "restrictedContributionsCount": 42,
+                        "contributionCalendar": {"totalContributions": 250},
+                    }
+                }
+            }
+        }
+
+    monkeypatch.setattr(GitHubClient, "_http", fake_http)
+    result = _client().get_year_contributions("torvalds", 2024)
+
+    assert captured["body"]["variables"]["from"] == "2024-01-01T00:00:00Z"
+    assert captured["body"]["variables"]["to"] == "2024-12-31T23:59:59Z"
+    assert result == {"total_commits": 200, "private_count": 42, "total_contributions": 250}

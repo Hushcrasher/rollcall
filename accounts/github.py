@@ -80,6 +80,41 @@ class GitHubClient:
         )
         return data if isinstance(data, dict) else {}
 
+    def get_contribution_years(self, login: str) -> list[int]:
+        query = (
+            "query($login: String!) { user(login: $login) { "
+            "contributionsCollection { contributionYears } } }"
+        )
+        user = self._graphql_user(query, {"login": login})
+        return list(user["contributionsCollection"]["contributionYears"])
+
+    def get_year_contributions(self, login: str, year: int) -> dict[str, int]:
+        query = (
+            "query($login: String!, $from: DateTime!, $to: DateTime!) { "
+            "user(login: $login) { contributionsCollection(from: $from, to: $to) { "
+            "totalCommitContributions restrictedContributionsCount "
+            "contributionCalendar { totalContributions } } } }"
+        )
+        variables = {
+            "login": login,
+            "from": f"{year}-01-01T00:00:00Z",
+            "to": f"{year}-12-31T23:59:59Z",
+        }
+        cc = self._graphql_user(query, variables)["contributionsCollection"]
+        return {
+            "total_commits": cc["totalCommitContributions"],
+            "private_count": cc["restrictedContributionsCount"],
+            "total_contributions": cc["contributionCalendar"]["totalContributions"],
+        }
+
+    def _graphql_user(self, query: str, variables: dict[str, Any]) -> dict[str, Any]:
+        body = json.dumps({"query": query, "variables": variables}).encode()
+        data = self._http("POST", f"{_API_BASE}/graphql", body, {})
+        user = ((data or {}).get("data") or {}).get("user")
+        if user is None:
+            raise GitHubNotFound(f"No GitHub user: {variables.get('login')}")
+        return user
+
     def _http(self, method: str, url: str, data: bytes | None, headers: dict[str, str]) -> Any:
         if not self.configured:
             raise GitHubError("GITHUB_TOKEN is not configured")
