@@ -145,6 +145,9 @@ PARQUET_SOURCE_URL = env("PARQUET_SOURCE_URL", default="")
 # IGDB API (via Twitch OAuth) — live fallback for games missing from the seed.
 IGDB_CLIENT_ID = env("IGDB_CLIENT_ID", default="")
 IGDB_CLIENT_SECRET = env("IGDB_CLIENT_SECRET", default="")
+# GitHub API — public "side projects" block on member profiles. Single
+# server-side classic PAT (read:user scope is enough). Never client-side.
+GITHUB_TOKEN = env("GITHUB_TOKEN", default="")
 # Optional address alerted when a scheduled seed run fails.
 SEED_ALERT_EMAIL = env("SEED_ALERT_EMAIL", default="")
 

@@ -23,6 +23,9 @@ RATELIMIT_ENABLE = False
 # IGDB creds). Tests that exercise IGDB set these explicitly.
 IGDB_CLIENT_ID = ""
 IGDB_CLIENT_SECRET = ""
+# GitHub client is always stubbed in tests; keep it unconfigured so nothing
+# can hit the network by accident.
+GITHUB_TOKEN = ""
 
 STORAGES["staticfiles"] = {  # noqa: F405
     "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
