@@ -200,7 +200,7 @@ def get_github_activity(user: User, client: GitHubClient | None = None) -> GitHu
     current_row = GitHubYearlyContribution.objects.filter(user=user, year=current_year).first()
 
     if _needs_refresh(snapshot, current_row, now):
-        cold = snapshot is None or snapshot.status == GitHubSnapshot.Status.NEVER_FETCHED
+        cold = snapshot is None or snapshot.status != GitHubSnapshot.Status.OK
         try:
             if cold:
                 _full_fetch(user, login, client, now, current_year)

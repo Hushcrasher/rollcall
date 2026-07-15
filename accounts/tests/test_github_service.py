@@ -130,3 +130,21 @@ def test_error_serves_stale_data() -> None:
     snap = GitHubSnapshot.objects.get(user=user)
     assert snap.status == GitHubSnapshot.Status.ERROR
     assert snap.last_error
+
+
+def test_error_on_cold_fetch_then_recovery_does_a_full_backfill() -> None:
+    user = _user()
+    # First-ever fetch errors before any yearly rows are persisted.
+    get_github_activity(user, FakeClient(raise_on="profile"))
+    assert not GitHubYearlyContribution.objects.filter(user=user).exists()
+    snap = GitHubSnapshot.objects.get(user=user)
+    assert snap.status == GitHubSnapshot.Status.ERROR
+    # Age past the 24h error back-off.
+    snap.profile_fetched_at = timezone.now() - timedelta(hours=25)
+    snap.save(update_fields=["profile_fetched_at"])
+    # Recovery must FULL-fetch (backfill history), not partial.
+    client = FakeClient(years=[2026, 2025, 2024])
+    activity = get_github_activity(user, client)
+    assert activity is not None and activity.status == "ok"
+    assert client.calls == ["profile", "years", "year:2026", "year:2025", "year:2024"]
+    assert GitHubYearlyContribution.objects.filter(user=user).count() == 3
