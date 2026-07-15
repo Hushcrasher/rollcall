@@ -231,8 +231,7 @@ def _needs_refresh(
         return fetched is None or (now - fetched) >= _PROFILE_TTL  # ty: ignore[unsupported-operator]
     # status OK: refresh when the current year's row is missing or stale.
     return (
-        current_row is None
-        or (now - current_row.fetched_at) >= _PROFILE_TTL  # ty: ignore[unsupported-operator]
+        current_row is None or (now - current_row.fetched_at) >= _PROFILE_TTL  # ty: ignore[unsupported-operator]
     )
 
 

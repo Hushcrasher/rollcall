@@ -117,7 +117,7 @@ year carries a 24h TTL, so a typical warm refresh is **one** GraphQL call.
 
 ```
 no github_login              → None (no block rendered)
-client not configured        → None (block hidden; never expose config state publicly)
+client not configured        → skip refresh; serve cached data if present, else None (hidden)
 no snapshot (cold)           → REST profile + years + per-year (last 5 yrs);
                                persist snapshot=ok, yearly rows, is_final = year < current
 current-year row missing or >24h old → REST profile + current year only (1 GraphQL call)

@@ -68,8 +68,11 @@ def test_private_profile_is_404_to_others() -> None:
 def test_never_leaks_email() -> None:
     user = _user()
     GitHubSnapshot.objects.create(
-        user=user, login="torvalds", public_repos=1,
-        status=GitHubSnapshot.Status.OK, profile_fetched_at=timezone.now(),
+        user=user,
+        login="torvalds",
+        public_repos=1,
+        status=GitHubSnapshot.Status.OK,
+        profile_fetched_at=timezone.now(),
     )
     # With GITHUB_TOKEN="" the client is unconfigured: no network, cached data served.
     response = Client().get(_url(user))

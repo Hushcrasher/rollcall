@@ -4,7 +4,7 @@ from django.db.models import QuerySet
 from django.utils.translation import gettext_lazy as _
 
 from .http import AuthedHttpRequest
-from .models import RecruiterApplication, User
+from .models import GitHubSnapshot, RecruiterApplication, User
 
 
 @admin.register(User)
@@ -31,6 +31,7 @@ class UserAdmin(DjangoUserAdmin):
                     "avatar",
                     "bio",
                     "location",
+                    "github_login",
                 )
             },
         ),
@@ -77,3 +78,11 @@ class RecruiterApplicationAdmin(admin.ModelAdmin):
         for application in queryset:
             application.reject(reviewer=request.user)
         self.message_user(request, _("Rejected %(n)d application(s).") % {"n": queryset.count()})
+
+
+@admin.register(GitHubSnapshot)
+class GitHubSnapshotAdmin(admin.ModelAdmin):
+    list_display = ("user", "login", "status", "public_repos", "profile_fetched_at")
+    list_filter = ("status",)
+    search_fields = ("login", "user__email")
+    readonly_fields = ("profile_fetched_at",)

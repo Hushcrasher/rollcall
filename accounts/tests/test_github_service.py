@@ -12,15 +12,14 @@ from accounts.models import GitHubSnapshot, GitHubYearlyContribution, User
 pytestmark = pytest.mark.django_db
 
 
-class FakeClient:
+class FakeClient(GitHubClient):
     """Configured stub that counts calls; no network."""
 
     def __init__(self, years: list[int] | None = None, raise_on: str | None = None) -> None:
+        super().__init__(token="tok")
         self.years = years if years is not None else [timezone.now().year, timezone.now().year - 1]
         self.raise_on = raise_on
         self.calls: list[str] = []
-
-    configured = True
 
     def get_profile(self, login: str) -> dict[str, Any]:
         self.calls.append("profile")

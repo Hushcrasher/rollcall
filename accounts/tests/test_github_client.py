@@ -3,6 +3,7 @@
 import io
 import json
 import urllib.error
+from email.message import Message
 from typing import Any
 
 import pytest
@@ -36,9 +37,10 @@ def test_get_profile_returns_mapped_dict(monkeypatch: pytest.MonkeyPatch) -> Non
 
 def _raise_http(code: int, headers: dict[str, str] | None = None) -> Any:
     def _urlopen(request: Any, timeout: float | None = None) -> Any:
-        raise urllib.error.HTTPError(
-            request.full_url, code, "err", headers or {}, io.BytesIO(b"")
-        )
+        msg = Message()
+        for key, value in (headers or {}).items():
+            msg[key] = value
+        raise urllib.error.HTTPError(request.full_url, code, "err", msg, io.BytesIO(b""))
 
     return _urlopen
 
@@ -82,9 +84,7 @@ def test_get_contribution_years(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_get_contribution_years_missing_user_raises_not_found(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(
-        GitHubClient, "_http", lambda *a, **k: {"data": {"user": None}}
-    )
+    monkeypatch.setattr(GitHubClient, "_http", lambda *a, **k: {"data": {"user": None}})
     with pytest.raises(GitHubNotFound):
         _client().get_contribution_years("ghost")
 

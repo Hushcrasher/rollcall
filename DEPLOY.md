@@ -47,6 +47,15 @@ PaaS or a VPS.
 
 Set `SENTRY_DSN`. Prod initialises Sentry with `send_default_pii=False`.
 
+## 4b. GitHub — "Public side projects" block
+
+Set `GITHUB_TOKEN` to a **classic Personal Access Token** with the `read:user`
+scope (no repo access needed). It is used server-side only for the profile
+GitHub block (REST profile + GraphQL contributions). Without it the block is
+hidden for profiles that have no cached data yet — the rest of the profile is
+unaffected. Rate limit with a token is 5,000 req/h; the cache-aside TTL means a
+warm profile view costs zero calls and a daily refresh costs one.
+
 ## 5. Seed the games catalog (after the ToS/parquet prerequisites)
 
 Two steps — a **prepare** (join the raw source files into one parquet) and a

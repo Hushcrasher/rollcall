@@ -10,9 +10,7 @@ pytestmark = pytest.mark.django_db
 
 
 def _user(**kw: str) -> User:
-    return User.objects.create_user(
-        email="f@example.com", password="x", display_name="F", **kw
-    )
+    return User.objects.create_user(email="f@example.com", password="x", display_name="F", **kw)
 
 
 def _data(**overrides: str) -> dict[str, str]:

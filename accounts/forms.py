@@ -43,7 +43,9 @@ class SettingsForm(forms.ModelForm):
     github_url = forms.CharField(
         required=False,
         label=_("GitHub profile URL"),
-        help_text=_("Optional — shown as 'Public side projects'. e.g. https://github.com/yourhandle"),
+        help_text=_(
+            "Optional — shown as 'Public side projects'. e.g. https://github.com/yourhandle"
+        ),
     )
 
     class Meta:

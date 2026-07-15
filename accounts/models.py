@@ -239,9 +239,7 @@ class GitHubSnapshot(models.Model):
     followers = models.PositiveIntegerField(null=True, blank=True)
     account_created_at = models.DateTimeField(null=True, blank=True)
     profile_fetched_at = models.DateTimeField(null=True, blank=True)
-    status = models.CharField(
-        max_length=20, choices=Status.choices, default=Status.NEVER_FETCHED
-    )
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.NEVER_FETCHED)
     last_error = models.TextField(blank=True, default="")
 
     def __str__(self) -> str:
