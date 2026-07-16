@@ -25,6 +25,7 @@
 | `config/settings/base.py` | + `django_countries` in INSTALLED_APPS (Task 1) |
 | `accounts/models.py` + new migration `accounts/0005_*` | `User.country`, relabel `location` (Task 1) |
 | `accounts/forms.py` | `country` on `SettingsForm` (Task 2) |
+| `accounts/admin.py` | `country` in the explicit Profile fieldset (Task 2) |
 | `accounts/export.py` | `country` in identity block (Task 2) |
 | `templates/accounts/profile.html` | "City · Country" line (Task 3) |
 | `games/management/commands/load_dev_fixtures.py` | deterministic countries (Task 4) |
@@ -142,12 +143,18 @@ git commit -m "feat(accounts): User.country (django-countries) + location relabe
 
 ---
 
-### Task 2: Country in settings form and GDPR export
+### Task 2: Country in settings form, admin, and GDPR export
 
 **Files:**
 - Modify: `accounts/forms.py:51-61` (`SettingsForm.Meta.fields`)
+- Modify: `accounts/admin.py:18-37` (`UserAdmin.fieldsets`, Profile block)
 - Modify: `accounts/export.py:29-39` (identity block)
 - Test: `accounts/tests/test_settings.py`, `accounts/tests/test_account_management.py`
+
+> **Added after Task 1's code review:** `UserAdmin.fieldsets` lists Profile fields
+> explicitly, so a field absent from that tuple is invisible and uneditable in
+> admin — `country` would otherwise ship as the only profile field staff can't
+> see. No system check catches this (the field is `blank=True`).
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -177,13 +184,24 @@ def test_export_includes_country(client: Client) -> None:
     assert data["identity"]["country"] == "SE"
 ```
 
+Append to `accounts/tests/test_user_model.py` — the admin fieldset guard (no
+system check catches an omitted field, so assert it):
+
+```python
+def test_country_is_editable_in_admin() -> None:
+    from accounts.admin import UserAdmin
+
+    profile_fields = UserAdmin.fieldsets[1][1]["fields"]  # ty: ignore[non-subscriptable]
+    assert "country" in profile_fields
+```
+
 - [ ] **Step 2: Run — must fail**
 
 ```bash
-uv run pytest accounts/tests/test_settings.py::test_update_country_from_settings accounts/tests/test_account_management.py::test_export_includes_country -v
+uv run pytest accounts/tests/test_settings.py::test_update_country_from_settings accounts/tests/test_account_management.py::test_export_includes_country accounts/tests/test_user_model.py::test_country_is_editable_in_admin -v
 ```
 
-Expected: FAIL (country not saved / KeyError `'country'`).
+Expected: FAIL (country not saved / KeyError `'country'` / not in fieldset).
 
 - [ ] **Step 3: Implement**
 
@@ -202,13 +220,24 @@ Expected: FAIL (country not saved / KeyError `'country'`).
         ]
 ```
 
+`accounts/admin.py` — in `UserAdmin.fieldsets`, the Profile block's `"fields"`
+tuple gains `"country"` immediately after `"location"`:
+
+```python
+                    "bio",
+                    "location",
+                    "country",
+                    "github_login",
+```
+
 `accounts/export.py` — in the `"identity"` dict, after the `"location"` line, add:
 
 ```python
             "country": str(user.country),
 ```
 
-(`str(Country)` is the ISO code, `""` when unset — JSON-safe.)
+(`str(Country)` is the ISO code, `""` when unset — JSON-safe. A raw `Country`
+object is NOT JSON-serializable, so the `str()` is load-bearing, not cosmetic.)
 
 - [ ] **Step 4: Run — must pass**
 
@@ -222,8 +251,8 @@ Expected: all PASS.
 
 ```bash
 uv run ruff check . && uv run ruff format --check . && uv run ty check && uv run pytest -q
-git add accounts/forms.py accounts/export.py accounts/tests/test_settings.py accounts/tests/test_account_management.py
-git commit -m "feat(accounts): country in settings form and GDPR export"
+git add accounts/forms.py accounts/admin.py accounts/export.py accounts/tests/test_settings.py accounts/tests/test_account_management.py accounts/tests/test_user_model.py
+git commit -m "feat(accounts): country in settings form, admin and GDPR export"
 ```
 
 ---
