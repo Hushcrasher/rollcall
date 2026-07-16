@@ -86,8 +86,20 @@ that doc (source of truth) is updated as part of this work.
   credit-level facets: "(Unreal OR Unity) × (RPG OR Roguelike) ×
   Programming" must all hold on one active contribution. Field help text
   states "any of the selected".
-- Checkbox lists render inside a scrollable `<fieldset>` (engines can be a
-  long list on the real seed) — plain CSS in the page template, no JS.
+- **Engines, genres and countries use an htmx typeahead** — type a few letters,
+  pick from a dropdown, chosen values show as removable chips; the form posts
+  the same repeated `?engines=3&engines=7` params either way, so the service
+  and tests are unaffected.
+
+  > **Amended after Task 7's review (product owner decision).** The original
+  > spec said "checkbox lists render inside a scrollable `<fieldset>`". That was
+  > wrong, and not merely at scale: countries are **249 today, in dev, forever**
+  > — measured at **34,908 bytes and 249 `<input>`s on every anonymous hit** of
+  > the empty form, with no type-ahead, no filter, and no keyboard jump. A
+  > `<legend>` is also the accessible name for every control in its fieldset, so
+  > a screen reader re-announces the help text 249 times. The codebase already
+  > has the right pattern — `search:game_autocomplete`, `search:company_autocomplete`,
+  > `_suggest.html` — htmx, no build step, established.
 - Form submits as GET → shareable URLs (`?engines=3&engines=7&countries=FR`).
 - Rename note: `engine`/`genre` request params become `engines`/`genres`.
   No deployed users, no URL back-compat needed.
@@ -147,8 +159,13 @@ Per person:
 - **Engine repartition %** across the person's distinct credited games that
   carry engine data: computed over distinct (game, engine) pairs; integer
   percentages with largest-remainder rounding so displayed shares sum to
-  exactly 100; display top 3 + "other N%". Example: "Unreal 67% · Unity 33%".
-  Omitted entirely when no credited game has engine data.
+  exactly 100; display top 3 + "other N%". Omitted entirely when no credited
+  game has engine data. **Must be rendered with a label** — "Engines on
+  credited games: Unreal 67% · Unity 33%". Unlabelled, sitting directly under
+  a career-stats line, "Unreal Engine 100%" reads as a proficiency score —
+  exactly the inference the "no numeric public score of a person"
+  non-negotiable exists to prevent. The label is what keeps it factual, and
+  it costs one string. The "other" bucket must be translatable.
 
 Never shown: email, any person-level score.
 

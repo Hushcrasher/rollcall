@@ -1772,6 +1772,53 @@ git commit -m "feat(search): recruiter search open to all — rate limit, result
 
 ---
 
+### Task 7b: Replace the checkbox lists with an htmx typeahead
+
+**Added after Task 7's review — a spec defect, decided by the product owner.**
+
+The original spec prescribed "checkbox lists in a scrollable `<fieldset>`".
+Measured on the empty form: **34,908 bytes, 249 `<input>`s**, shipped on every
+anonymous hit, with no type-ahead, no filter, no keyboard jump. Countries are
+249 in dev and in production — this is broken today, not at scale. A `<legend>`
+is also the accessible name for every control in its fieldset, so a screen
+reader re-announces the help text once per checkbox.
+
+**Product owner's decision: htmx typeahead for all three facets** (engines,
+genres, countries) — type a few letters, pick from a dropdown, chosen values
+render as removable chips.
+
+**Files:**
+- Modify: `search/forms.py` (widgets only — the fields keep their types)
+- Modify: `search/views.py` + `search/urls.py` (autocomplete endpoints)
+- Create: `templates/search/_engine_options.html`, `_genre_options.html`, `_country_options.html` (or one shared partial)
+- Modify: `templates/search/recruiter_search.html` (chips + inputs replace fieldsets)
+- Test: `search/tests/test_filter_autocomplete.py`
+
+**Reuse, do not reinvent.** The codebase already has this exact pattern:
+`search:game_autocomplete` / `search:company_autocomplete` in `search/views.py`,
+`templates/search/_game_options.html`, `_suggest.html`, and the contribution
+form's employer picker. Follow them — htmx is vendored locally
+(`static/vendor/htmx.min.js`), no build step.
+
+**The contract that must not change:** the form still posts repeated
+`?engines=3&engines=7&countries=FR` params, so `RecruiterSearchForm`'s field
+types, `clean()`, the service, and every Task 5/6 test are untouched. If a
+service test needs changing, something is wrong — stop and report.
+
+**Requirements:**
+- Selected values must survive a page reload and pagination (they're already in
+  the querystring — render chips from `form.cleaned_data`).
+- Must degrade without JS to *something* usable, or the no-JS path must be
+  explicitly accepted and documented. Decide and say which.
+- Country search matches on the translated name (`django_countries`' `countries`
+  is searchable; the active language matters — Task 5 fixed the choices to be
+  a callable for exactly this reason).
+- The endpoints are public (the search is), so they need the same IP rate limit.
+- Engines/genres autocomplete hits the DB; countries is an in-memory list.
+
+**Do NOT** change the service, the `PersonResult`/`ResultsPage` API, or the
+≥1-filter rule.
+
 ### Task 8: Landing page points to the open search
 
 **Files:**
@@ -1882,6 +1929,29 @@ with:
 | country | varchar(2) | not null, default `''` | ISO 3166-1 alpha-2 (django-countries). Person-level recruiter-search filter. |
 | bio, location, links… | | nullable | Optional profile fields, implementer's discretion. `location` is the free-text "city / region" display line. |
 ```
+
+- [ ] **Step 2b: robots.txt — the public promise page is currently `Disallow`ed**
+
+Found by Task 7's review. `config/sitemaps.py` disallows `/search/`, and the
+"For recruiters" landing page lives at `/search/for-recruiters/` — so the one
+page whose entire job is public discovery is hidden from crawlers, while
+`sitemaps.py` itself reasons that public pages are "a major acquisition
+channel". Pre-existing, but Task 8 makes it load-bearing.
+
+Add an `Allow: /search/for-recruiters/` **before** the `Disallow: /search/`
+line, and consider a static sitemap entry. Leave `/search/recruiters/` itself
+disallowed — a combinatorial filter-URL space is a crawl trap, and the rate
+limit would fight the crawler.
+
+- [ ] **Step 2c: ROADMAP follow-up — `display_name` has no btree index**
+
+Found by Task 6's review while measuring 100k users / 600k credits against the
+real 392k-game graph. Broad filters make the planner sort the whole user table
+by `display_name`, which has only a GIN trigram index (`user_display_name_trgm`).
+Adding `models.Index(fields=["display_name"])` to `User.Meta` halved a selective
+case (10.0ms → 4.9ms) in that run. Worst legal case today is 118ms, so it isn't
+urgent — record it under "Known follow-ups", don't implement it here (it's an
+`accounts` migration, outside this plan's file map).
 
 - [ ] **Step 3: Update ROADMAP.md**
 
