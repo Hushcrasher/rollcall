@@ -166,7 +166,8 @@ class PersonResult:
     matching_credits_total: int
     credits_count: int                     # all active credits
     games_count: int                       # distinct games
-    first_year: int | None
+    first_year: int                        # never None: a result has >=1 active
+                                           # credit and start_date is NOT NULL
     last_year: int | None                  # None = present (an open end exists)
     engine_shares: list[tuple[str, int]]   # [("Unreal Engine", 67), ...] top 3 + ("other", n)
 ```
