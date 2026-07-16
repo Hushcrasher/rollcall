@@ -60,6 +60,12 @@ LAST_NAMES: list[str] = [
     "Iyer", "Fontaine", "Weber", "Costa", "Andersson", "Petrov",
 ]  # fmt: skip
 
+COUNTRY_CODES: list[str] = [
+    "US", "FR", "GB", "CA", "DE", "SE", "JP", "PL", "ES", "BR", "AU", "NL",
+]  # fmt: skip
+
+CITIES: list[str] = ["Lyon", "Montreal", "Berlin", "Tokyo", ""]  # "" = city not given
+
 JOB_TITLES: dict[str, list[str]] = {
     "Programming": ["Gameplay Programmer", "Engine Programmer", "Tools Programmer"],
     "Design": ["Game Designer", "Level Designer", "Narrative Designer"],
@@ -193,6 +199,11 @@ class Command(BaseCommand):
                     "open_to_work": rng.random() < 0.3,
                     "contactable": rng.random() < 0.9,
                     "profile_public": rng.random() < 0.95,
+                    # Drawn independently of each other: mismatched pairs like
+                    # "Tokyo · Brazil" are intentional — they exercise all four
+                    # location_display branches (both/city/country/neither).
+                    "country": rng.choice(COUNTRY_CODES) if rng.random() < 0.8 else "",
+                    "location": rng.choice(CITIES),
                     "bio": "Game industry professional. (Dev fixture account.)",
                 },
             )
