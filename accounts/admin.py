@@ -31,6 +31,7 @@ class UserAdmin(DjangoUserAdmin):
                     "avatar",
                     "bio",
                     "location",
+                    "country",
                     "github_login",
                 )
             },

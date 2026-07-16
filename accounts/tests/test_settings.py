@@ -52,3 +52,23 @@ def test_toggle_visibility_booleans(client: Client, user: User) -> None:
     assert user.profile_public is False
     assert user.contactable is False
     assert user.open_to_work is True
+
+
+def test_update_country_from_settings(client: Client, user: User) -> None:
+    client.force_login(user)
+    client.post(
+        reverse("accounts:settings"),
+        {"display_name": "Me", "country": "FR", "location": "Lyon"},
+    )
+    user.refresh_from_db()
+    assert user.country.code == "FR"  # ty: ignore[unresolved-attribute]
+    assert user.location == "Lyon"
+
+
+def test_country_can_be_cleared(client: Client, user: User) -> None:
+    user.country = "SE"  # ty: ignore[invalid-assignment]
+    user.save(update_fields=["country"])
+    client.force_login(user)
+    client.post(reverse("accounts:settings"), {"display_name": "Me", "country": ""})
+    user.refresh_from_db()
+    assert not user.country

@@ -66,6 +66,15 @@ def test_export_returns_json_attachment_with_identity_and_credits(
     assert data["contributions"][0]["game"] == "Some Game"
 
 
+def test_export_includes_country(client: Client) -> None:
+    user = User.objects.create_user(
+        email="me@example.com", password="x", display_name="Me", country="SE"
+    )
+    client.force_login(user)
+    data = client.get(reverse("accounts:export_data")).json()
+    assert data["identity"]["country"] == "SE"
+
+
 # --- Deletion ---------------------------------------------------------------
 
 

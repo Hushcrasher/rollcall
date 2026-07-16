@@ -33,6 +33,7 @@ def build_personal_data_export(user: User) -> dict[str, Any]:
             "role": user.role,
             "bio": user.bio,
             "location": user.location,
+            "country": str(user.country),
             "github_login": user.github_login,
             "created_at": _iso(user.created_at),
             "email_verified_at": _iso(user.email_verified_at),

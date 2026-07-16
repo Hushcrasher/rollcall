@@ -50,10 +50,14 @@ class SettingsForm(forms.ModelForm):
 
     class Meta:
         model = User
+        # A field with a `default` (e.g. country) keeps its old value when its
+        # key is omitted from POST; only an explicit empty value clears it —
+        # unlike the checkboxes, which an omitted key turns off.
         fields = [
             "display_name",
             "bio",
             "location",
+            "country",
             "avatar",
             "profile_public",
             "contactable",
