@@ -375,42 +375,88 @@ git commit -m "feat(accounts): profile shows city and country via location_displ
 - Modify: `games/management/commands/load_dev_fixtures.py:51-61` (constants) and `:184-203` (`_create_users`)
 - Test: `games/tests/test_dev_fixtures.py`
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **Step 1: Write the failing tests**
 
-Append to `games/tests/test_dev_fixtures.py` (match existing imports; it already calls the command):
+> **Amended after Task 4's first code review.** The original plan's single test
+> (`assert with_country.exists()`) is a change-detector that cannot fail when
+> the thing this file actually guarantees — *draw ordering* — breaks. Aim the
+> tests at the hard invariant instead. Three tests, each hitting a distinct
+> target:
 
 ```python
-def test_fixtures_assign_countries() -> None:
-    call_command("load_dev_fixtures", games=5, users=10, contributions=5)
-    with_country = User.objects.filter(email__startswith="devuser").exclude(country="")
-    assert with_country.exists()
+def test_create_users_rng_consumption_is_independent_of_existing_rows() -> None:
+    """THE invariant of this file: a draw must not depend on DB state. If one
+    moves inside `if created:`, a re-run consumes a different number of values
+    and every later draw shifts — silently changing "deterministic" data.
+    Asserted directly on the rng state, not inferred from downstream row
+    counts (which catch it only incidentally, via drift)."""
+    command = Command()
+    first = random.Random(42)
+    command._create_users(first, 10)  # rows created
+    expected_state = first.getstate()
+
+    second = random.Random(42)
+    command._create_users(second, 10)  # rows already exist
+    assert second.getstate() == expected_state
+
+
+@pytest.mark.parametrize("code", COUNTRY_CODES)
+def test_country_codes_constant_is_valid_iso(code: str) -> None:
+    """CountryField validation only runs via full_clean()/forms — get_or_create
+    persists a bogus code silently, and an invalid code is truthy with an empty
+    .name. Catches the plausible mistake: "UK" instead of the ISO "GB"."""
+    assert Country(code).name
+
+
+def test_fixture_country_proportion_is_roughly_intended() -> None:
+    """~80% of devusers get a country. A range, not a literal, so the test
+    isn't glued to one seed's exact roll count."""
+    call_command("load_dev_fixtures", games=5, users=40, contributions=5)
+    devusers = User.objects.filter(email__startswith="devuser")
+    fraction = devusers.exclude(country="").count() / devusers.count()
+    assert 0.65 <= fraction <= 0.95
 ```
 
-(Add `from accounts.models import User` and `from django.core.management import call_command` to imports if missing.)
+Imports needed: `random`, `pytest`, `Country` from `django_countries.fields`,
+`User`, `call_command`, and `COUNTRY_CODES` + `Command` from the fixtures module.
+
+**Do NOT add** a pinned-seed-sequence test (hardcoding the exact `(country,
+location)` pairs seed 42 produces). It reads like a determinism guard but is a
+golden snapshot: it passes under the `if created:` mutation (verified twice,
+independently), and its only real failure mode is "someone added an rng draw
+earlier" — whose only remedy is re-pasting new literals. A test whose fix is
+always a rubber stamp trains maintainers to rubber-stamp it.
 
 - [ ] **Step 2: Run — must fail**
 
 ```bash
-uv run pytest games/tests/test_dev_fixtures.py -v -k countries
+uv run pytest games/tests/test_dev_fixtures.py -v
 ```
 
-Expected: FAIL (no user has a country).
+Expected: FAIL — `COUNTRY_CODES` doesn't exist yet (ImportError).
 
 - [ ] **Step 3: Implement**
 
-In `load_dev_fixtures.py`, add a constant after `LAST_NAMES`:
+In `load_dev_fixtures.py`, add two constants after `LAST_NAMES` — every other
+vocabulary in this file is a module constant with `# fmt: skip`, and the test
+imports them rather than duplicating the literals:
 
 ```python
 COUNTRY_CODES: list[str] = [
     "US", "FR", "GB", "CA", "DE", "SE", "JP", "PL", "ES", "BR", "AU", "NL",
 ]  # fmt: skip
+
+CITIES: list[str] = ["Lyon", "Montreal", "Berlin", "Tokyo", ""]  # "" = city not given
 ```
 
 In `_create_users`, inside the `defaults` dict (draws must stay unconditional for rng determinism — the dict literal guarantees that), add after `"profile_public"`:
 
 ```python
+                    # Drawn independently of each other: mismatched pairs like
+                    # "Tokyo · Brazil" are intentional — they exercise all four
+                    # location_display branches (both/city/country/neither).
                     "country": rng.choice(COUNTRY_CODES) if rng.random() < 0.8 else "",
-                    "location": rng.choice(["Lyon", "Montreal", "Berlin", "Tokyo", ""]),
+                    "location": rng.choice(CITIES),
 ```
 
 - [ ] **Step 4: Run — must pass (including the existing idempotency test)**
