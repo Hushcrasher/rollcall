@@ -16,6 +16,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
+from django_countries.fields import CountryField
 
 # GitHub's own login rule: 1-39 chars, alnum or single internal hyphens.
 # Single source of truth — accounts/github.py's parser reuses this pattern.
@@ -102,7 +103,13 @@ class User(AbstractUser):
         help_text=_("Stored in the S3 bucket (object key). Deleted on account deletion."),
     )
     bio = models.TextField(_("bio"), blank=True, default="")
-    location = models.CharField(_("location"), max_length=150, blank=True, default="")
+    location = models.CharField(_("city / region"), max_length=150, blank=True, default="")
+    country = CountryField(
+        _("country"),
+        blank=True,
+        default="",
+        help_text=_("Predefined list — powers the people-search country filter."),
+    )
     github_login = models.CharField(
         _("GitHub login"),
         max_length=39,

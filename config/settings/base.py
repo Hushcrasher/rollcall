@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     "django.contrib.postgres",  # pg_trgm search features
     # Third-party
     "django_htmx",
+    "django_countries",
     # Rollcall apps (see docs/02-ARCHITECTURE.md §2.3)
     "accounts",
     "games",

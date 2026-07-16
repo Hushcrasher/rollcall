@@ -2,6 +2,7 @@
 
 import pytest
 from django.contrib.auth import get_user_model
+from django_countries.fields import Country
 
 from accounts.models import User
 
@@ -31,3 +32,15 @@ def test_slug_generated_from_display_name_with_collision_suffix() -> None:
     second = User.objects.create_user(email="b@example.com", password="x", display_name="Jane Doe")
     assert first.slug == "jane-doe"
     assert second.slug == "jane-doe-2"
+
+
+@pytest.mark.django_db
+def test_country_is_optional_and_stores_iso_code() -> None:
+    user = User.objects.create_user(email="c@example.com", password="x", display_name="C")
+    assert not user.country  # blank by default
+
+    user.country = Country("FR")  # ty: ignore[invalid-assignment]
+    user.save(update_fields=["country"])
+    user.refresh_from_db()
+    assert user.country.code == "FR"  # ty: ignore[unresolved-attribute]
+    assert user.country.name == "France"
