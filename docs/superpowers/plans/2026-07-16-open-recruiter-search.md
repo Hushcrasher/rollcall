@@ -486,12 +486,18 @@ git commit -m "feat(fixtures): deterministic countries and cities on dev users"
 Create `search/tests/test_recruiter_form.py`:
 
 ```python
-"""Recruiter search form — every field optional, but at least ONE filter is
-required (anti-scraping: no filterless "all people" listing,
-docs/02-ARCHITECTURE.md §5)."""
+"""Recruiter search form — every field optional, but at least ONE is required,
+so the open search has no filterless "list everyone" submit.
+
+That rule is a UX guard, not an anti-scraping boundary — `?min_rating=1`
+matches nearly everyone and is perfectly legal. The rate limit is the real
+mitigation (docs/02-ARCHITECTURE.md §5). Don't let these tests grow a claim
+the rule can't back."""
 
 import pytest
+from django.utils import translation
 
+from contributions.models import Discipline
 from games.models import Engine, Genre
 from search.forms import RecruiterSearchForm
 
@@ -508,12 +514,43 @@ def test_page_param_alone_is_still_zero_filters() -> None:
     assert not RecruiterSearchForm({"page": "2"}).is_valid()
 
 
-def test_open_to_work_alone_is_enough() -> None:
-    assert RecruiterSearchForm({"open_to_work": "on"}).is_valid()
+def test_each_filter_alone_satisfies_the_rule(django_db_setup: None) -> None:
+    """Every field must count as a filter on its own. Parametrized in spirit
+    over all 7 — dropping any one from clean()'s any([...]) must fail HERE.
+    (Task 5's review mutation-tested this: with only the plan's original
+    tests, 4 of the 7 entries could be deleted with the suite still green.)"""
+    engine = Engine.objects.create(name="Unreal Engine")
+    genre = Genre.objects.create(name="RPG")
+    discipline = Discipline.objects.first()
+    for data in (
+        {"discipline": str(discipline.pk)},
+        {"engines": [str(engine.pk)]},
+        {"genres": [str(genre.pk)]},
+        {"countries": ["FR"]},
+        {"min_rating": "70"},
+        {"year_from": "2015"},
+        {"open_to_work": "on"},
+    ):
+        assert RecruiterSearchForm(data).is_valid(), f"{data} should be enough"
 
 
-def test_min_rating_zero_counts_as_a_filter() -> None:
-    assert RecruiterSearchForm({"min_rating": "0"}).is_valid()
+def test_min_rating_zero_is_rejected() -> None:
+    """0 reads as "I don't care" but would mean "must have rating data" —
+    blank is how you say you don't care (min_value=1)."""
+    assert not RecruiterSearchForm({"min_rating": "0"}).is_valid()
+
+
+def test_field_error_does_not_also_demand_a_filter() -> None:
+    form = RecruiterSearchForm({"min_rating": "200"})
+    assert not form.is_valid()
+    assert "Pick at least one filter." not in form.non_field_errors()
+
+
+def test_country_choices_follow_the_active_language() -> None:
+    """Passing `countries` directly would freeze the names at import."""
+    with translation.override("fr"):
+        choices = dict(RecruiterSearchForm().fields["countries"].choices)
+        assert choices["DE"] == "Allemagne"
 
 
 def test_engines_and_genres_are_multi_select() -> None:
@@ -549,9 +586,15 @@ Replace the whole `search/forms.py` with:
 
 ```python
 """Recruiter search filters (docs/01-DESIGN.md §3.6). Every field optional,
-but at least one filter is required — the search is open to everyone, and a
-filterless submit would be an exhaustive people listing (anti-scraping,
-docs/02-ARCHITECTURE.md §5)."""
+but at least one is required, so the open search has no filterless "list
+everyone" submit.
+
+That rule is a UX guard, NOT an anti-scraping boundary: `?min_rating=1` is a
+legal filter that matches nearly everyone, and no rule can tell "no-op" from
+"merely broad". The real mitigations are the view's IP rate limit
+(`SEARCH_RATELIMIT`), pagination, and `profile_public` — see
+docs/02-ARCHITECTURE.md §5, which already concedes public pages can't be fully
+protected."""
 
 from typing import Any
 
@@ -561,6 +604,13 @@ from django_countries import countries
 
 from contributions.models import Discipline
 from games.models import Engine, Genre
+
+
+def _country_choices() -> list[tuple[str, str]]:
+    """A callable, so Django rebuilds the list per access. Passing `countries`
+    directly freezes the translated names at import (it is Iterable, and
+    normalize_choices checks Iterable before callable)."""
+    return list(countries)
 
 
 class RecruiterSearchForm(forms.Form):
@@ -582,14 +632,16 @@ class RecruiterSearchForm(forms.Form):
         help_text=_("Matches games in any of the selected."),
     )
     countries = forms.MultipleChoiceField(
-        choices=countries,
+        choices=_country_choices,
         required=False,
         label=_("Countries"),
         widget=forms.CheckboxSelectMultiple,
         help_text=_("Where the person is — any of the selected."),
     )
+    # min 1, not 0: "0" reads as "I don't care about rating" but means "must
+    # HAVE rating data" — leave the field blank to not filter on rating.
     min_rating = forms.IntegerField(
-        required=False, min_value=0, max_value=100, label=_("Min. rating (%)")
+        required=False, min_value=1, max_value=100, label=_("Min. rating (%)")
     )
     year_from = forms.IntegerField(
         required=False, min_value=1970, max_value=2100, label=_("Worked since (year)")
@@ -598,14 +650,21 @@ class RecruiterSearchForm(forms.Form):
 
     def clean(self) -> dict[str, Any]:
         cleaned = super().clean()
+        if self.errors:
+            # A field-level error already told the user what's wrong; adding
+            # "pick a filter" on top would tell them to do what they just did.
+            return cleaned
+        # Every field on this form is a filter — add new ones here. Kept
+        # explicit on purpose: a generic loop over self.fields fails OPEN the
+        # moment a non-filter field (say, `sort`) is added.
         has_filter = any(
             [
                 cleaned.get("discipline"),
                 cleaned.get("engines"),
                 cleaned.get("genres"),
                 cleaned.get("countries"),
-                cleaned.get("min_rating") is not None,
-                cleaned.get("year_from") is not None,
+                cleaned.get("min_rating"),
+                cleaned.get("year_from"),
                 cleaned.get("open_to_work"),
             ]
         )
@@ -614,7 +673,21 @@ class RecruiterSearchForm(forms.Form):
         return cleaned
 ```
 
-Note: `choices=countries` — django-countries' `countries` object is a valid lazy choices iterable. If `ty` complains, wrap: `choices=list(countries)`.
+Note the `is not None` checks are gone: with `min_value=1` on `min_rating` and
+`min_value=1970` on `year_from`, no valid value of either is falsy, so plain
+truthiness is now correct and uniform.
+
+> **Amended after Task 5's code review — the original note here was wrong.**
+> It said `choices=countries` is "a valid lazy choices iterable" and suggested
+> `choices=list(countries)` if `ty` complains. Both halves are wrong: Django's
+> `normalize_choices` matches `Iterable` before `callable`, and `Countries` is
+> both — so it already does the `list()` eagerly, at import, freezing the
+> translated names in `LANGUAGE_CODE`. Verified: with `fr` active the field
+> still renders "Germany", not "Allemagne". `list()` **is** the bug.
+> Pass a non-iterable callable instead (`choices=_country_choices`), which
+> yields a `CallableChoiceIterator` re-evaluated per access. This also avoids
+> the class-body name shadowing where the field `countries = ...` binds over
+> the imported `countries`.
 
 - [ ] **Step 4: Run — must pass**
 

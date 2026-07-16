@@ -23,10 +23,23 @@ that doc (source of truth) is updated as part of this work.
 
 ## Non-negotiables that shape this design
 
-- **Anti-scraping posture survives** (docs/02-ARCHITECTURE.md §5: no
-  exhaustive "all people" listing). A submit with zero filters returns no
-  results and shows a "pick at least one filter" form error. The view gets the
-  same IP rate limit as the public search page (`SEARCH_RATELIMIT`).
+- **Anti-scraping mitigations** (docs/02-ARCHITECTURE.md §5: no exhaustive
+  "all people" listing — and note §5 already concedes *"public pages can't be
+  fully protected — accept and mitigate"*). Two distinct things, deliberately
+  not conflated:
+  - The **IP rate limit** (`SEARCH_RATELIMIT`, same as the public search page)
+    plus pagination and `profile_public` are the **actual** mitigation.
+  - The **≥1-filter form rule** is a **UX guard**, not a security boundary: it
+    stops the accidental/lazy filterless submit. It **cannot** stop a
+    determined enumerator, and we do not claim it does. Verified during Task
+    5's review: `?min_rating=0` and `?year_from=1970` both pass the rule and
+    return the *full* listing. That is not a bug to patch — any range filter
+    at its extreme is a no-op, `?min_rating=1` is equally wide, and there is
+    no principled line between "no-op" and "merely broad". Chasing one would
+    be whack-a-mole against an undefinable boundary.
+
+  Do not write a docstring, comment, or doc claiming the filter rule prevents
+  enumeration. It doesn't. The rate limit is the answer to that question.
 - **Emails never rendered** — unchanged; contact stays relay-only.
 - **No numeric public score of the person.** Career stats and engine
   repartition are factual descriptions of credited games, not a rating of the
@@ -65,7 +78,7 @@ that doc (source of truth) is updated as part of this work.
 | `engines` | ModelMultipleChoiceField, checkbox list | credit's game | game has **any** of the selected |
 | `genres` | ModelMultipleChoiceField, checkbox list | credit's game | game has **any** of the selected |
 | `countries` | MultipleChoiceField over django-countries, checkbox list | **person** | person's country is any of the selected |
-| `min_rating` | IntegerField 0–100 | credit's game | unchanged (Steam positive % OR IGDB rating) |
+| `min_rating` | IntegerField **1**–100 | credit's game | Steam positive % OR IGDB rating. **1, not 0**: `0` reads as "I don't care about rating" but behaves as "must *have* rating data" — silently dropping people whose games carry neither score. Leaving the field blank is how you say "I don't care". Side effect: every valid value is truthy. |
 | `year_from` | IntegerField | credit | unchanged (`start_date__year__gte`) |
 | `open_to_work` | BooleanField | person | unchanged |
 
@@ -80,7 +93,21 @@ that doc (source of truth) is updated as part of this work.
   No deployed users, no URL back-compat needed.
 - `clean()` rule: if every field is empty/False, raise a form-level
   ValidationError ("Pick at least one filter."). `open_to_work=True` alone
-  counts as a filter.
+  counts as a filter. This is the UX guard described in the non-negotiables —
+  **not** a security boundary; don't document it as one.
+  - The check enumerates every field **explicitly**. Keep it that way: a
+    generic loop over `self.fields` fails **open** the moment a non-filter
+    field is added (a `sort` field would make `?sort=name` alone "a filter"),
+    whereas a forgotten field in the explicit list fails **closed** — merely
+    annoying. For a security-adjacent rule, prefer the failure that locks over
+    the one that leaks. A parametrized test pins every field individually.
+- The country choice list must be passed as a **callable**, not the
+  `django_countries.countries` iterable directly. Django's `normalize_choices`
+  matches `Iterable` before `callable`, and `Countries` is both — so passing
+  it directly materialises the *translated* names once, at import, freezing
+  every country in `LANGUAGE_CODE` forever (verified: with `fr` active, the
+  field still renders "Germany", not "Allemagne"). A non-iterable callable
+  yields a `CallableChoiceIterator` that re-evaluates per access.
 
 ## 3. Country on the worker side
 
