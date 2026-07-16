@@ -5,39 +5,118 @@
 
 {% block extra_head %}
 <style>
-  .checkbox-scroll { max-height: 11rem; overflow-y: auto; border: 1px solid GrayText; padding: .35rem .6rem; }
-  .checkbox-scroll ul { list-style: none; margin: 0; padding: 0; }
-  .checkbox-scroll legend { font-weight: bold; }
+  .filter { margin: .6rem 0; }
+  .filter > label { font-weight: bold; display: block; }
+  .filter .helptext { margin: 0 0 .3rem; }
+  .chips { list-style: none; margin: 0 0 .3rem; padding: 0; display: flex; flex-wrap: wrap; gap: .3rem; }
+  .chips:empty { display: none; }
+  .chip {
+    display: inline-flex; align-items: center; gap: .3rem;
+    border: 1px solid GrayText; border-radius: 1rem; padding: .1rem .3rem .1rem .6rem;
+  }
+  .chip-remove {
+    background: none; border: none; cursor: pointer; color: inherit;
+    font: inherit; line-height: 1; padding: .1rem .3rem; border-radius: 50%;
+  }
+  .chip-remove:hover { background: Highlight; color: HighlightText; }
+  .autocomplete-empty { padding: .35rem .6rem; margin: 0; }
+  /* Shown only when the <noscript> block below un-hides it. */
+  .noscript-note { display: none; }
   .person-card { border: 1px solid GrayText; padding: .6rem .8rem; margin: .6rem 0; }
   .person-card h3 { margin: 0 0 .2rem; }
   .person-card ul { margin: .3rem 0; }
   .pagination { margin: 1rem 0; }
 </style>
+{% comment %}
+  No-JS is an ACCEPTED limitation for these three facets, not a graceful
+  degradation — the typeahead is htmx, and htmx is JavaScript. Rather than leave
+  a dead search box and inert remove buttons on the page, hide them and say so.
+  Everything else still works: discipline, rating, year and open-to-work are
+  plain controls, already-selected chips still render (they come from the
+  querystring, server-side), and a hand-written ?countries=FR is still applied.
+
+  In <head>, so this is spec-valid: <noscript> may contain <style> here.
+{% endcomment %}
+<noscript>
+  <style>
+    .js-only { display: none; }
+    .noscript-note { display: block; }
+  </style>
+</noscript>
 {% endblock %}
 
 {% block content %}
   <h1>{% translate "Find people by what they've worked on" %}</h1>
 
+  {% comment %}
+    Empty and permanently so: it exists only to own the typeahead search boxes
+    (via their `form` attribute) so their `q` value stays out of the search
+    form's querystring. Must be a sibling — forms cannot nest.
+  {% endcomment %}
+  <form id="typeahead-scratch" hidden></form>
+
+  <p class="noscript-note">
+    {% translate "The engine, genre and country filters need JavaScript. Without it you can still filter by discipline, rating, year and open-to-work." %}
+  </p>
+
   <form method="get">
     {{ form.non_field_errors }}
     <p>{{ form.discipline.errors }}{{ form.discipline.label_tag }} {{ form.discipline }}</p>
-    <fieldset class="checkbox-scroll">
-      <legend>{{ form.engines.label }} <span class="muted">— {{ form.engines.help_text }}</span></legend>
-      {{ form.engines.errors }}{{ form.engines }}
-    </fieldset>
-    <fieldset class="checkbox-scroll">
-      <legend>{{ form.genres.label }} <span class="muted">— {{ form.genres.help_text }}</span></legend>
-      {{ form.genres.errors }}{{ form.genres }}
-    </fieldset>
-    <fieldset class="checkbox-scroll">
-      <legend>{{ form.countries.label }} <span class="muted">— {{ form.countries.help_text }}</span></legend>
-      {{ form.countries.errors }}{{ form.countries }}
-    </fieldset>
+    {% comment %}
+      A <label for> per facet, NOT a <fieldset><legend>: a legend joins the
+      accessible name of every control inside it, which is what made the old
+      list announce its help text once per checkbox. Here the label names the
+      one search box, and `aria-describedby` (which Django points at
+      `id_<field>_helptext`) attaches the help text once.
+    {% endcomment %}
+    {% for field in form.typeahead_fields %}
+      <div class="filter">
+        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+        <p class="helptext muted" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</p>
+        {{ field.errors }}{{ field }}
+      </div>
+    {% endfor %}
     <p>{{ form.min_rating.errors }}{{ form.min_rating.label_tag }} {{ form.min_rating }}</p>
     <p>{{ form.year_from.errors }}{{ form.year_from.label_tag }} {{ form.year_from }}</p>
     <p>{{ form.open_to_work.errors }}<label>{{ form.open_to_work }} {{ form.open_to_work.label }}</label></p>
     <button type="submit">{% translate "Search" %}</button>
   </form>
+
+  <script>
+    // Chips for the engines / genres / countries typeahead. Each chip carries the
+    // hidden input that actually posts the value, so adding and removing chips IS
+    // adding and removing `?engines=3` params — there is no separate state to sync.
+    (function () {
+      function addChip(widget, value, label) {
+        const chips = widget.querySelector("[data-chips]");
+        // Picking the same option twice must not post the value twice.
+        if (chips.querySelector('input[value="' + CSS.escape(value) + '"]')) return;
+        const template = widget.querySelector("[data-chip-template]");
+        const chip = template.content.firstElementChild.cloneNode(true);
+        chip.querySelector("input").value = value;
+        chip.querySelector(".chip-label").textContent = label;
+        chip.querySelector(".chip-remove").setAttribute(
+          "aria-label", widget.dataset.removeLabel.replace("%s", label)
+        );
+        chips.appendChild(chip);
+      }
+
+      document.addEventListener("click", function (event) {
+        const option = event.target.closest(".typeahead .autocomplete-option");
+        if (option) {
+          const widget = option.closest(".typeahead");
+          addChip(widget, option.dataset.id, option.dataset.label);
+          widget.querySelector(".results").innerHTML = "";
+          const input = widget.querySelector(".autocomplete-input");
+          input.value = "";
+          input.focus();  // keep picking without reaching for the mouse
+          return;
+        }
+        const remove = event.target.closest(".typeahead .chip-remove");
+        if (remove) remove.closest(".chip").remove();
+      });
+    })();
+  </script>
 
   {% if searched %}
     <section>

@@ -1,0 +1,12 @@
+{% load i18n %}
+{% comment %}
+  Shared by the engines / genres / countries typeahead endpoints. `.autocomplete-option`
+  and its dropdown styling come from base.html, same as the game and company pickers.
+{% endcomment %}
+{% for value, label in options %}
+  <button type="button" class="autocomplete-option" data-id="{{ value }}" data-label="{{ label }}">
+    {{ label }}
+  </button>
+{% empty %}
+  <p class="autocomplete-empty">{% translate "No matches." %}</p>
+{% endfor %}

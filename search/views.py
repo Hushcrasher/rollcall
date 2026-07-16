@@ -11,11 +11,12 @@ from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
 from django.utils.decorators import method_decorator
 from django.views.generic import TemplateView
+from django_countries import countries
 from django_ratelimit.decorators import ratelimit
 
 from accounts.models import User
 from games.igdb import IGDBClient
-from games.models import Game
+from games.models import Engine, Game, Genre
 from search.forms import RecruiterSearchForm
 from search.services import recruiter_search, search_companies, search_games, search_people
 
@@ -117,3 +118,54 @@ def company_autocomplete(request: HttpRequest) -> HttpResponse:
         "search/_company_options.html",
         {"companies": search_companies(query), "query": query},
     )
+
+
+# --- Recruiter-filter typeahead ---------------------------------------------
+#
+# These three back the engines/genres/countries filters on the *public*
+# recruiter search, so unlike the pickers above (which sit behind a login on the
+# credit form) they carry the same IP rate limit as the search pages.
+
+_FILTER_OPTIONS_SHOWN = 10
+
+
+def _reference_options(model: type[Engine] | type[Genre], query: str) -> list[tuple[Any, str]]:
+    """Name lookup over a small reference table (Engine/Genre).
+
+    A plain icontains, not `search/services.py`'s trigram matching: these are
+    closed vocabularies the user is picking *from*, so a typo should show no
+    match rather than guess one — and typing less shows more.
+    """
+    stripped = query.strip()
+    if not stripped:
+        return []
+    rows = model.objects.filter(name__icontains=stripped)[:_FILTER_OPTIONS_SHOWN]
+    return [(row.pk, row.name) for row in rows]
+
+
+@ratelimit(key="ip", rate=_search_rate, method="GET", block=True)
+def engine_autocomplete(request: HttpRequest) -> HttpResponse:
+    options = _reference_options(Engine, request.GET.get("q", ""))
+    return render(request, "search/_filter_options.html", {"options": options})
+
+
+@ratelimit(key="ip", rate=_search_rate, method="GET", block=True)
+def genre_autocomplete(request: HttpRequest) -> HttpResponse:
+    options = _reference_options(Genre, request.GET.get("q", ""))
+    return render(request, "search/_filter_options.html", {"options": options})
+
+
+@ratelimit(key="ip", rate=_search_rate, method="GET", block=True)
+def country_autocomplete(request: HttpRequest) -> HttpResponse:
+    """Matches the country name *as translated into the active language* —
+    "allem" finds Allemagne under `fr`. django-countries keeps the list in
+    memory, so this touches no database.
+    """
+    stripped = request.GET.get("q", "").strip()
+    options: list[tuple[Any, str]] = []
+    if stripped:
+        needle = stripped.casefold()
+        options = [(code, str(name)) for code, name in countries if needle in str(name).casefold()][
+            :_FILTER_OPTIONS_SHOWN
+        ]
+    return render(request, "search/_filter_options.html", {"options": options})

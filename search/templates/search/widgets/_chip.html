@@ -1,0 +1,15 @@
+{% load i18n %}
+{% comment %}
+  One selected value. The hidden input is what actually posts the repeated
+  `?engines=3&engines=7` param — the chip around it is just its visible face.
+
+  Rendered server-side for values already in the querystring, and cloned by the
+  page's script (from the <template> in typeahead_select.html) for values picked
+  since. One definition, so the two can't drift.
+{% endcomment %}
+<li class="chip">
+  <input type="hidden" name="{{ name }}" value="{{ value }}">
+  <span class="chip-label">{{ label }}</span>
+  <button type="button" class="chip-remove js-only"
+          aria-label="{% blocktranslate %}Remove {{ label }}{% endblocktranslate %}">&times;</button>
+</li>

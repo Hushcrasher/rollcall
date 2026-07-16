@@ -1,0 +1,37 @@
+{% load i18n %}
+{% comment %}
+  Typeahead multi-select. Sends one hidden input per *selected* value instead of
+  one checkbox per available choice — the whole point (a 249-country checkbox
+  list was ~39kB on every anonymous hit of the empty form).
+
+  `data-remove-label` carries the SAME msgid as the chip's own aria-label — the
+  `label='%s'` trick renders the pattern rather than a name, so the script can
+  fill in a label without a second, JS-only translation string to keep in sync.
+{% endcomment %}
+<div class="autocomplete typeahead" data-typeahead data-name="{{ widget.name }}"
+     data-remove-label="{% blocktranslate with label='%s' %}Remove {{ label }}{% endblocktranslate %}">
+
+  <ul class="chips" data-chips>
+    {% for value, label in widget.chips %}
+      {% include "search/widgets/_chip.html" with name=widget.name value=value label=label %}
+    {% endfor %}
+  </ul>
+
+  <input type="text" class="autocomplete-input js-only" name="q" autocomplete="off"
+         placeholder="{{ widget.placeholder }}"
+         {% comment %}
+           Named `q` for htmx, but owned by the empty <form id="typeahead-scratch">
+           in the page — so typing here never adds `?q=` to the search's own
+           querystring, or to the pagination links built from it.
+         {% endcomment %}
+         form="typeahead-scratch"
+         hx-get="{{ widget.url }}" hx-trigger="keyup changed delay:250ms"
+         hx-target="next .results"
+         {% include "django/forms/widgets/attrs.html" %}>
+
+  <div class="results js-only"></div>
+
+  <template data-chip-template>
+    {% include "search/widgets/_chip.html" with name=widget.name value="" label="" %}
+  </template>
+</div>

@@ -12,6 +12,7 @@ protected."""
 from typing import Any
 
 from django import forms
+from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 from django_countries import countries
 
@@ -26,6 +27,57 @@ def _country_choices() -> list[tuple[str, str]]:
     return list(countries)
 
 
+class TypeaheadSelectMultiple(forms.SelectMultiple):
+    """Renders only the *selected* options — a hidden input plus a chip each —
+    next to an htmx-backed search box.
+
+    Subclasses SelectMultiple purely for its `value_from_datadict` (which reads
+    `data.getlist(name)`), so the field still receives, and still posts, the
+    repeated `?engines=3&engines=7` params a checkbox list would.
+    """
+
+    template_name = "search/widgets/typeahead_select.html"
+
+    def __init__(self, *, url_name: str, placeholder: Any, attrs: Any = None) -> None:
+        super().__init__(attrs)
+        self.url_name = url_name
+        self.placeholder = placeholder
+
+    def get_context(self, name: str, value: Any, attrs: Any) -> dict[str, Any]:
+        # Deliberately does NOT call super().get_context(): Select.get_context()
+        # runs self.optgroups(), which materialises *every* choice — the 249
+        # <input>s this widget exists to not send.
+        return {
+            "widget": {
+                "name": name,
+                "attrs": self.build_attrs(self.attrs, attrs),
+                "chips": self._chips(value),
+                "url": reverse(self.url_name),
+                "placeholder": self.placeholder,
+            }
+        }
+
+    def _chips(self, value: Any) -> list[tuple[str, Any]]:
+        """(value, label) for each selected value, in querystring order.
+
+        The label is looked up in `self.choices`, never derived from the raw
+        value: a value with no matching choice renders no chip, so junk in the
+        querystring can't reach the page. That matters for countries —
+        `Country("ZZ")` is truthy but its `.name` is `""`, so a
+        `Country(code).name` lookup would render a blank, nameless chip.
+
+        Iterating `self.choices` per render is also what keeps country names
+        translated: the choices are a callable, so this re-evaluates them in the
+        active language rather than reusing names frozen at import.
+        """
+        labels = {str(choice): label for choice, label in self.choices}
+        return [(v, labels[v]) for v in map(str, value or []) if v in labels]
+
+
+def _is_typeahead(field: forms.Field) -> bool:
+    return isinstance(field.widget, TypeaheadSelectMultiple)
+
+
 class RecruiterSearchForm(forms.Form):
     discipline = forms.ModelChoiceField(
         queryset=Discipline.objects.all(), required=False, label=_("Discipline")
@@ -34,21 +86,27 @@ class RecruiterSearchForm(forms.Form):
         queryset=Engine.objects.all(),
         required=False,
         label=_("Engines"),
-        widget=forms.CheckboxSelectMultiple,
+        widget=TypeaheadSelectMultiple(
+            url_name="search:engine_autocomplete", placeholder=_("Search engines…")
+        ),
         help_text=_("Matches games using any of the selected."),
     )
     genres = forms.ModelMultipleChoiceField(
         queryset=Genre.objects.all(),
         required=False,
         label=_("Genres"),
-        widget=forms.CheckboxSelectMultiple,
+        widget=TypeaheadSelectMultiple(
+            url_name="search:genre_autocomplete", placeholder=_("Search genres…")
+        ),
         help_text=_("Matches games in any of the selected."),
     )
     countries = forms.MultipleChoiceField(
         choices=_country_choices,
         required=False,
         label=_("Countries"),
-        widget=forms.CheckboxSelectMultiple,
+        widget=TypeaheadSelectMultiple(
+            url_name="search:country_autocomplete", placeholder=_("Search countries…")
+        ),
         help_text=_("Where the person is — any of the selected."),
     )
     # min 1, not 0: "0" reads as "I don't care about rating" but means "must
@@ -60,6 +118,15 @@ class RecruiterSearchForm(forms.Form):
         required=False, min_value=1970, max_value=2100, label=_("Worked since (year)")
     )
     open_to_work = forms.BooleanField(required=False, label=_("Open to work only"))
+
+    def typeahead_fields(self) -> list[forms.BoundField]:
+        """The facets rendered as chips + a search box, in display order.
+
+        Here rather than hardcoded in the template so the three stay in step
+        with the widgets above — they are the fields using
+        `TypeaheadSelectMultiple`, and the template's markup assumes it.
+        """
+        return [self[name] for name, field in self.fields.items() if _is_typeahead(field)]
 
     def clean(self) -> dict[str, Any]:
         cleaned = super().clean()
