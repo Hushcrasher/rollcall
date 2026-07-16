@@ -2,8 +2,13 @@
 §2.3), so Postgres pg_trgm can later be swapped for a dedicated engine without
 touching callers.
 
-Combines trigram similarity (typo tolerance: "hade" → "Hades") with a
-case-insensitive contains (prefix matches for autocomplete).
+Two unrelated kinds of search live here:
+
+- Text lookup (`search_games` / `search_companies` / `search_people`): trigram
+  similarity for typo tolerance ("hade" → "Hades"), OR a case-insensitive
+  contains for autocomplete prefixes.
+- `recruiter_search`: no text matching at all — a structured filter over the
+  properties of the games people are credited on, assembled into result cards.
 """
 
 from collections import defaultdict
@@ -101,12 +106,15 @@ class ResultsPage:
         return self.page_number < self.num_pages
 
     @property
-    def previous_page_number(self) -> int:
-        return self.page_number - 1
+    def previous_page_number(self) -> int | None:
+        # None, not page_number - 1: an unguarded 0 fed back through get_page()
+        # lands on the LAST page, so a "Previous" link on page 1 would jump to
+        # the end. Templates render None as empty and treat it falsy.
+        return self.page_number - 1 if self.has_previous else None
 
     @property
-    def next_page_number(self) -> int:
-        return self.page_number + 1
+    def next_page_number(self) -> int | None:
+        return self.page_number + 1 if self.has_next else None
 
 
 def recruiter_search(
@@ -118,7 +126,7 @@ def recruiter_search(
     min_rating: float | None = None,
     open_to_work: bool | None = None,
     year_from: int | None = None,
-    page: int = 1,
+    page: int | str | None = 1,  # raw GET value: get_page() coerces junk to 1
 ) -> ResultsPage:
     """The product promise (docs/01-DESIGN.md §3.6, docs/04 §8): public people
     filtered by properties of the games they worked on, crossed with their
@@ -196,6 +204,10 @@ def _assemble_results(users: list[User], credits: QuerySet[Contribution]) -> lis
     page_credits = (
         credits.filter(user_id__in=user_ids)
         .select_related("game", "discipline")
+        # A person's matching credits are unbounded (a veteran has hundreds) and
+        # we keep 3. summary is the one text blob among them — dropping it also
+        # keeps it out of the DISTINCT comparison below.
+        .defer("game__summary")
         .order_by("-start_date", "-id")  # -id: stable order for same-month credits
         .distinct()
     )

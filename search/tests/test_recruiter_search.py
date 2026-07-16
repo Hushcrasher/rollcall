@@ -176,8 +176,7 @@ def test_filters_by_country(disciplines: dict[str, Discipline]) -> None:
     _credit(nowhere, game, disciplines["Design"])
 
     assert _users(countries=["FR"]) == [french]
-    assert _users(countries=["FR", "SE"]) == [french, swedish]
-    assert nowhere not in _users(countries=["FR", "SE"])
+    assert _users(countries=["FR", "SE"]) == [french, swedish]  # `nowhere` excluded
 
 
 def test_filters_by_minimum_rating_on_steam(disciplines: dict[str, Discipline]) -> None:
@@ -254,11 +253,8 @@ def test_never_returns_private_or_inactive(disciplines: dict[str, Discipline]) -
     inactive = _make_person("in@example.com", "Inactive")
     _credit(inactive, game, disciplines["Design"], status=Contribution.Status.REMOVED)
 
-    results = _users(discipline_id=disciplines["Design"].pk)
-
-    assert private not in results
-    assert inactive not in results
-    assert results == []
+    # Both people would match the discipline; neither may surface.
+    assert _users(discipline_id=disciplines["Design"].pk) == []
 
 
 def test_a_person_appears_once_despite_multiple_matching_credits(
@@ -290,12 +286,25 @@ def test_no_filters_returns_all_matching_public_people(
 
 
 def test_credits_without_a_game_are_not_searchable(disciplines: dict[str, Discipline]) -> None:
-    """A company-only credit carries no game properties to search on."""
+    """A company-only credit carries no game properties to search on — but it
+    is still part of the career, so the stats count it. That asymmetry is
+    deliberate: search cuts on game properties, the card summarises a career."""
     company = Company.objects.create(name="Studio")
-    person = _make_person("p@example.com", "Company Only")
-    _credit(person, None, disciplines["Design"], company=company)
+    game = Game.objects.create(title="G", source=Game.Source.MANUAL)
 
-    assert _users(discipline_id=disciplines["Design"].pk) == []
+    company_only = _make_person("c@example.com", "Company Only")
+    _credit(company_only, None, disciplines["Design"], company=company)
+
+    both = _make_person("b@example.com", "Has A Game Credit")
+    _credit(both, game, disciplines["Design"])
+    _credit(both, None, disciplines["Design"], company=company)
+
+    results = recruiter_search(discipline_id=disciplines["Design"].pk).results
+
+    assert [r.user for r in results] == [both]  # company_only has nothing to match on
+    assert results[0].matching_credits_total == 1  # only the game credit matched
+    assert results[0].credits_count == 2  # ...but both count as career credits
+    assert results[0].games_count == 1
 
 
 # ---------------------------------------------------------------- cards
@@ -357,6 +366,24 @@ def test_matching_credits_are_capped_with_total(disciplines: dict[str, Disciplin
     # Most recent first, and it is the newest ones that are kept.
     starts = [c.start_date for c in result.matching_credits]
     assert starts == [date(2014, 1, 1), date(2013, 1, 1), date(2012, 1, 1)]
+
+
+def test_matching_credits_order_is_stable_for_same_month_credits(
+    disciplines: dict[str, Discipline],
+) -> None:
+    """Dates are month precision, so ties are common — and the tie decides
+    WHICH 3 credits the card shows. Without the -id secondary key, Postgres
+    order is unspecified."""
+    same_day = date(2020, 1, 1)
+    person = _make_person("p@example.com", "Tied")
+    for i in range(5):
+        game = Game.objects.create(title=f"G{i}", source=Game.Source.MANUAL)
+        _credit(person, game, disciplines["Design"], start_date=same_day)
+
+    result = _single_result(discipline_id=disciplines["Design"].pk)
+    ids = [c.pk for c in result.matching_credits]
+
+    assert ids == sorted(ids, reverse=True)  # newest-inserted first, deterministically
 
 
 def test_years_active_with_open_end_is_present(disciplines: dict[str, Discipline]) -> None:
@@ -535,7 +562,7 @@ def test_percentage_shares_always_sum_to_100(counts: dict[str, int]) -> None:
 
 
 def test_percentage_shares_ranks_descending() -> None:
-    shares = _percentage_shares({"small": 1, "big": 6, "mid": 3}, top=3)
+    shares = _percentage_shares({"small": 1, "big": 6, "mid": 3})
     assert shares == [("big", 60), ("mid", 30), ("small", 10)]
 
 
@@ -563,8 +590,6 @@ def test_results_are_paginated_and_ordered_by_display_name(
     assert [r.user.display_name for r in second.results][0] == "Person 20"
     assert first.has_next and not first.has_previous
     assert second.has_previous and not second.has_next
-    assert first.next_page_number == 2
-    assert second.previous_page_number == 1
 
 
 def test_rating_is_a_filter_never_a_sort(disciplines: dict[str, Discipline]) -> None:
@@ -580,15 +605,53 @@ def test_rating_is_a_filter_never_a_sort(disciplines: dict[str, Discipline]) -> 
     assert _users(min_rating=70) == [adam, zoe]  # alphabetical, not 99% first
 
 
-def test_out_of_range_page_clamps(disciplines: dict[str, Discipline]) -> None:
+def test_out_of_range_page_clamps_to_the_last_page(
+    disciplines: dict[str, Discipline],
+) -> None:
+    """get_page() clamps high/zero/negative to the LAST page (not the first) —
+    build two pages so the assertion can tell the two rules apart."""
     game = Game.objects.create(title="G", source=Game.Source.MANUAL)
-    person = _make_person("p@example.com", "Only One")
-    _credit(person, game, disciplines["Design"])
+    for i in range(RESULTS_PER_PAGE + 5):
+        _credit(_make_person(f"u{i}@example.com", f"Person {i:02d}"), game, disciplines["Design"])
 
-    page = recruiter_search(discipline_id=disciplines["Design"].pk, page=99)
+    for page in (99, 0, -1):
+        assert recruiter_search(discipline_id=disciplines["Design"].pk, page=page).page_number == 2
 
-    assert page.page_number == 1
-    assert [r.user for r in page.results] == [person]
+
+def test_junk_page_param_does_not_explode(disciplines: dict[str, Discipline]) -> None:
+    """The view hands the raw GET value straight through — ?page=abc must not
+    500 on a public page."""
+    game = Game.objects.create(title="G", source=Game.Source.MANUAL)
+    _credit(_make_person("p@example.com", "Only One"), game, disciplines["Design"])
+
+    assert recruiter_search(discipline_id=disciplines["Design"].pk, page="abc").page_number == 1
+    assert recruiter_search(discipline_id=disciplines["Design"].pk, page=None).page_number == 1
+
+
+def test_page_links_are_none_at_the_boundaries(disciplines: dict[str, Discipline]) -> None:
+    """previous_page_number must be None on page 1, not 0 — get_page(0) clamps
+    to the LAST page, so an unguarded link would jump to the end."""
+    game = Game.objects.create(title="G", source=Game.Source.MANUAL)
+    for i in range(RESULTS_PER_PAGE + 5):
+        _credit(_make_person(f"u{i}@example.com", f"Person {i:02d}"), game, disciplines["Design"])
+
+    first = recruiter_search(discipline_id=disciplines["Design"].pk, page=1)
+    last = recruiter_search(discipline_id=disciplines["Design"].pk, page=2)
+
+    assert first.previous_page_number is None
+    assert first.next_page_number == 2
+    assert last.previous_page_number == 1
+    assert last.next_page_number is None
+
+
+def test_single_page_has_no_links_at_all(disciplines: dict[str, Discipline]) -> None:
+    game = Game.objects.create(title="G", source=Game.Source.MANUAL)
+    _credit(_make_person("p@example.com", "Only One"), game, disciplines["Design"])
+
+    only = recruiter_search(discipline_id=disciplines["Design"].pk)
+
+    assert only.previous_page_number is None
+    assert only.next_page_number is None
 
 
 def test_empty_result_page_is_empty(disciplines: dict[str, Discipline]) -> None:
@@ -629,3 +692,25 @@ def test_assembly_does_not_grow_queries_with_the_number_of_people(
         page = recruiter_search(engine_ids=[unreal.pk])
         assert len(page.results) == 5
         read(page)
+
+
+def test_game_summary_is_not_fetched_for_matching_credits(
+    disciplines: dict[str, Discipline], django_assert_num_queries: Any
+) -> None:
+    """Cards show title/job/dates, never the summary blob — and a person's
+    matching credits are unbounded, so we defer it. If a card ever needs
+    summary, drop the defer rather than paying a query per credit here."""
+    unreal = Engine.objects.create(name="Unreal Engine")
+    game = Game.objects.create(
+        title="UE Game", source=Game.Source.MANUAL, summary="A very long marketing blurb."
+    )
+    GameEngine.objects.create(game=game, engine=unreal)
+    _credit(_make_person("p@example.com", "Person"), game, disciplines["Design"])
+
+    credit = _single_result(engine_ids=[unreal.pk]).matching_credits[0]
+
+    with django_assert_num_queries(1):  # deferred: touching it costs a round-trip
+        assert credit.game is not None  # select_related loaded it — free
+        # ty resolves FK descriptors to the Field, not the related model — the
+        # same accommodation accounts/github.py:189 makes.
+        assert credit.game.summary == "A very long marketing blurb."  # ty: ignore[unresolved-attribute]

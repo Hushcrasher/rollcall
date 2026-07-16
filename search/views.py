@@ -83,6 +83,9 @@ class RecruiterSearchView(RecruiterRequiredMixin, TemplateView):
                 min_rating=cleaned.get("min_rating"),
                 year_from=cleaned.get("year_from"),
                 open_to_work=cleaned.get("open_to_work") or None,
+                # Raw string, uncoerced: get_page() turns junk into page 1.
+                # int() here would 500 on ?page=abc — on a public page.
+                page=self.request.GET.get("page"),
             )
             context["searched"] = True
         return context
