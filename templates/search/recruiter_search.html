@@ -1,30 +1,106 @@
 {% extends "base.html" %}
 {% load i18n %}
 
-{% block title %}{% translate "Recruiter search" %} · Rollcall{% endblock %}
+{% block title %}{% translate "Find people" %} · Rollcall{% endblock %}
+
+{% block extra_head %}
+<style>
+  .checkbox-scroll { max-height: 11rem; overflow-y: auto; border: 1px solid GrayText; padding: .35rem .6rem; }
+  .checkbox-scroll ul { list-style: none; margin: 0; padding: 0; }
+  .checkbox-scroll legend { font-weight: bold; }
+  .person-card { border: 1px solid GrayText; padding: .6rem .8rem; margin: .6rem 0; }
+  .person-card h3 { margin: 0 0 .2rem; }
+  .person-card ul { margin: .3rem 0; }
+  .muted { opacity: .7; }
+  .pagination { margin: 1rem 0; }
+</style>
+{% endblock %}
 
 {% block content %}
   <h1>{% translate "Find people by what they've worked on" %}</h1>
 
   <form method="get">
-    {{ form.as_p }}
+    {{ form.non_field_errors }}
+    <p>{{ form.discipline.errors }}{{ form.discipline.label_tag }} {{ form.discipline }}</p>
+    <fieldset class="checkbox-scroll">
+      <legend>{{ form.engines.label }} <span class="muted">— {{ form.engines.help_text }}</span></legend>
+      {{ form.engines.errors }}{{ form.engines }}
+    </fieldset>
+    <fieldset class="checkbox-scroll">
+      <legend>{{ form.genres.label }} <span class="muted">— {{ form.genres.help_text }}</span></legend>
+      {{ form.genres.errors }}{{ form.genres }}
+    </fieldset>
+    <fieldset class="checkbox-scroll">
+      <legend>{{ form.countries.label }} <span class="muted">— {{ form.countries.help_text }}</span></legend>
+      {{ form.countries.errors }}{{ form.countries }}
+    </fieldset>
+    <p>{{ form.min_rating.errors }}{{ form.min_rating.label_tag }} {{ form.min_rating }}</p>
+    <p>{{ form.year_from.errors }}{{ form.year_from.label_tag }} {{ form.year_from }}</p>
+    <p>{{ form.open_to_work.errors }}<label>{{ form.open_to_work }} {{ form.open_to_work.label }}</label></p>
     <button type="submit">{% translate "Search" %}</button>
   </form>
 
   {% if searched %}
     <section>
-      <h2>{% translate "Results" %}</h2>
+      <h2>{% blocktranslate count counter=results_page.total %}{{ counter }} result{% plural %}{{ counter }} results{% endblocktranslate %}</h2>
+
       {% for r in results_page.results %}
-        <p>
-          <a href="{% url 'accounts:profile' r.user.slug %}">{{ r.user.display_name }}</a>
-          {% if r.user.open_to_work %}<span class="badge">{% translate "Open to work" %}</span>{% endif %}
-          {% if r.user.contactable %}
-            — <a href="{% url 'contact:contact' r.user.slug %}">{% translate "Contact" %}</a>
+        <article class="person-card">
+          <h3>
+            <a href="{% url 'accounts:profile' r.user.slug %}">{{ r.user.display_name }}</a>
+            {% if r.user.open_to_work %}<span class="badge">{% translate "Open to work" %}</span>{% endif %}
+            {% if r.user.contactable %}
+              — <a href="{% url 'contact:contact' r.user.slug %}">{% translate "Contact" %}</a>
+            {% endif %}
+          </h3>
+
+          {% if r.user.location_display %}
+            <p class="muted">{{ r.user.location_display }}</p>
           {% endif %}
-        </p>
+
+          <ul>
+            {% for c in r.matching_credits %}
+              <li>
+                <a href="{% url 'games:game' c.game.slug %}">{{ c.game.title }}</a>
+                — {{ c.job_title }} <em>({{ c.discipline.name }})</em>
+                <span class="dates">{{ c.start_date|date:"Y" }}–{% if c.end_date %}{{ c.end_date|date:"Y" }}{% else %}{% translate "present" %}{% endif %}</span>
+              </li>
+            {% endfor %}
+          </ul>
+          {% if r.more_credits_count %}
+            <p class="muted">{% blocktranslate count counter=r.more_credits_count %}+{{ counter }} more matching credit{% plural %}+{{ counter }} more matching credits{% endblocktranslate %}</p>
+          {% endif %}
+
+          {# One source line: the " · " separators are content, so template indentation must not land inside them. #}
+          <p class="muted">{% blocktranslate count counter=r.credits_count %}{{ counter }} credit{% plural %}{{ counter }} credits{% endblocktranslate %} · {% blocktranslate count counter=r.games_count %}{{ counter }} game{% plural %}{{ counter }} games{% endblocktranslate %} · {{ r.first_year }}–{% if r.last_year %}{{ r.last_year }}{% else %}{% translate "present" %}{% endif %}</p>
+
+          {% if r.engine_shares %}
+            <p class="muted">{% for name, pct in r.engine_shares %}{{ name }} {{ pct }}%{% if not forloop.last %} · {% endif %}{% endfor %}</p>
+          {% endif %}
+        </article>
       {% empty %}
         <p>{% translate "No people match these filters." %}</p>
       {% endfor %}
+
+      {% if results_page.num_pages > 1 %}
+        {% comment %}
+          {% templatetag openblock %} querystring {% templatetag closeblock %} is built
+          in (Django 5.1+; this project is on 6.0): it keeps every current GET param,
+          repeated values included, and overrides only `page`.
+          NOT a {% templatetag openbrace %}# … #{% templatetag closebrace %} comment:
+          that form is single-line only, so a multi-line one is not lexed as a comment —
+          its text leaks into the HTML and the tags inside it still execute.
+        {% endcomment %}
+        <nav class="pagination">
+          {% if results_page.has_previous %}
+            <a href="{% querystring page=results_page.previous_page_number %}">{% translate "Previous" %}</a>
+          {% endif %}
+          <span>{% blocktranslate with page=results_page.page_number pages=results_page.num_pages %}Page {{ page }} of {{ pages }}{% endblocktranslate %}</span>
+          {% if results_page.has_next %}
+            <a href="{% querystring page=results_page.next_page_number %}">{% translate "Next" %}</a>
+          {% endif %}
+        </nav>
+      {% endif %}
     </section>
   {% endif %}
 {% endblock %}

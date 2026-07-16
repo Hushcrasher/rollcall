@@ -7,12 +7,9 @@ query returns nothing (anti-scraping posture, docs/02-ARCHITECTURE.md §5).
 from typing import Any
 
 from django.conf import settings
-from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import HttpRequest, HttpResponse
-from django.shortcuts import redirect, render
+from django.shortcuts import render
 from django.utils.decorators import method_decorator
-from django.utils.translation import gettext as _
 from django.views.generic import TemplateView
 from django_ratelimit.decorators import ratelimit
 
@@ -53,20 +50,13 @@ class RecruitersLandingView(TemplateView):
         return context
 
 
-class RecruiterRequiredMixin(LoginRequiredMixin):
-    """Recruiter-only. Non-recruiters are funnelled to the application page."""
+@method_decorator(ratelimit(key="ip", rate=_search_rate, method="GET", block=True), name="get")
+class RecruiterSearchView(TemplateView):
+    """Open to everyone — the platform is free, and showing workers that the
+    recruiter-side tool exists is part of the promise (spec 2026-07-16).
+    Anti-scraping: the IP rate limit above, pagination, and `profile_public`.
+    The form's >=1-filter rule is a UX guard only, not a boundary."""
 
-    request: Any
-
-    def dispatch(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
-        user = self.request.user
-        if user.is_authenticated and not user.is_recruiter:
-            messages.info(request, _("A recruiter account is required — apply below."))
-            return redirect("accounts:recruiter_apply")
-        return super().dispatch(request, *args, **kwargs)
-
-
-class RecruiterSearchView(RecruiterRequiredMixin, TemplateView):
     template_name = "search/recruiter_search.html"
 
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
