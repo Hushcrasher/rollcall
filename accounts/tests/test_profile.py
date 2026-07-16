@@ -52,3 +52,25 @@ def test_open_to_work_badge_shown_when_set(client: Client) -> None:
     )
     response = client.get(_profile_url(user))
     assert b"Open to work" in response.content
+
+
+@pytest.mark.parametrize(
+    ("location", "country", "expected"),
+    [("Lyon", "FR", "Lyon · France"), ("", "FR", "France")],
+)
+def test_profile_shows_city_and_country(
+    client: Client, location: str, country: str, expected: str
+) -> None:
+    """The guard consults location_display, so a country-only user keeps the line.
+
+    The four join branches are the model's concern (see test_location_display).
+    """
+    user = User.objects.create_user(
+        email=f"loc-{location or 'nocity'}@example.com",
+        password="x",
+        display_name=f"Located {location or 'nocity'}",
+        location=location,
+        country=country,
+    )
+    response = client.get(reverse("accounts:profile", kwargs={"slug": user.slug}))
+    assert expected in response.content.decode()

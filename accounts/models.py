@@ -16,6 +16,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import pgettext
 from django_countries.fields import CountryField
 
 # GitHub's own login rule: 1-39 chars, alnum or single internal hyphens.
@@ -168,6 +169,14 @@ class User(AbstractUser):
     @property
     def is_recruiter(self) -> bool:
         return self.role == self.Role.RECRUITER or bool(self.is_superuser)
+
+    @property
+    def location_display(self) -> str:
+        """ "City · Country" for the profile and the search cards — omitting
+        either part when unset. Guards on `country.name`, not `country`: an
+        invalid stored code is truthy but renders empty."""
+        separator = pgettext("between city and country", " · ")
+        return separator.join(part for part in (self.location, self.country.name) if part)
 
 
 class RecruiterApplication(models.Model):

@@ -44,3 +44,18 @@ def test_country_is_optional_and_stores_iso_code() -> None:
     user.refresh_from_db()
     assert user.country.code == "FR"  # ty: ignore[unresolved-attribute]
     assert user.country.name == "France"
+
+
+@pytest.mark.parametrize(
+    ("location", "country", "expected"),
+    [
+        ("Lyon", "FR", "Lyon · France"),
+        ("Lyon", "", "Lyon"),
+        ("", "FR", "France"),
+        ("", "", ""),
+        ("Lyon", "ZZ", "Lyon"),  # invalid code: truthy, but renders nothing
+    ],
+)
+def test_location_display(location: str, country: str, expected: str) -> None:
+    user = User(display_name="X", location=location, country=country)
+    assert user.location_display == expected
