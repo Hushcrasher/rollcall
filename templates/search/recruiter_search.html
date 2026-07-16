@@ -11,7 +11,6 @@
   .person-card { border: 1px solid GrayText; padding: .6rem .8rem; margin: .6rem 0; }
   .person-card h3 { margin: 0 0 .2rem; }
   .person-card ul { margin: .3rem 0; }
-  .muted { opacity: .7; }
   .pagination { margin: 1rem 0; }
 </style>
 {% endblock %}
@@ -74,8 +73,13 @@
           {# One source line: the " · " separators are content, so template indentation must not land inside them. #}
           <p class="muted">{% blocktranslate count counter=r.credits_count %}{{ counter }} credit{% plural %}{{ counter }} credits{% endblocktranslate %} · {% blocktranslate count counter=r.games_count %}{{ counter }} game{% plural %}{{ counter }} games{% endblocktranslate %} · {{ r.first_year }}–{% if r.last_year %}{{ r.last_year }}{% else %}{% translate "present" %}{% endif %}</p>
 
+          {% comment %}
+            Labelled, and not optional: unlabelled percentages sitting under a career
+            stats line read as a proficiency score for the person. These describe the
+            person's credited GAMES — the label is what keeps that factual.
+          {% endcomment %}
           {% if r.engine_shares %}
-            <p class="muted">{% for name, pct in r.engine_shares %}{{ name }} {{ pct }}%{% if not forloop.last %} · {% endif %}{% endfor %}</p>
+            <p class="muted">{% translate "Engines on credited games" %}: {% for name, pct in r.engine_shares %}{{ name }} {{ pct }}%{% if not forloop.last %} · {% endif %}{% endfor %}</p>
           {% endif %}
         </article>
       {% empty %}
@@ -84,14 +88,14 @@
 
       {% if results_page.num_pages > 1 %}
         {% comment %}
-          {% templatetag openblock %} querystring {% templatetag closeblock %} is built
-          in (Django 5.1+; this project is on 6.0): it keeps every current GET param,
-          repeated values included, and overrides only `page`.
-          NOT a {% templatetag openbrace %}# … #{% templatetag closebrace %} comment:
-          that form is single-line only, so a multi-line one is not lexed as a comment —
-          its text leaks into the HTML and the tags inside it still execute.
+          {% querystring %} is built in (Django 5.1+; this project is on 6.0): it keeps
+          every current GET param, repeated values included, and overrides only `page`.
+
+          This block is {% comment %}, not {# … #}: that form is single-line only, so a
+          multi-line one is not lexed as a comment — its text leaks into the HTML and
+          the tags inside it still execute.
         {% endcomment %}
-        <nav class="pagination">
+        <nav class="pagination" aria-label="{% translate 'Pagination' %}">
           {% if results_page.has_previous %}
             <a href="{% querystring page=results_page.previous_page_number %}">{% translate "Previous" %}</a>
           {% endif %}

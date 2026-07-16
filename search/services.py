@@ -19,6 +19,8 @@ from typing import Any
 from django.contrib.postgres.search import TrigramSimilarity
 from django.core.paginator import Paginator
 from django.db.models import Count, Max, Min, Q, QuerySet
+from django.utils.functional import Promise
+from django.utils.translation import gettext_lazy as _
 
 from accounts.models import User
 from contributions.models import Contribution
@@ -29,6 +31,11 @@ _SIMILARITY_THRESHOLD = 0.15
 RESULTS_PER_PAGE = 20
 MATCHING_CREDITS_SHOWN = 3
 ENGINE_SHARES_SHOWN = 3
+
+# Engine names are plain DB strings; the "other" bucket is a lazily-translated
+# proxy. Templates render either transparently — this alias keeps the annotation
+# honest rather than claiming every name is a `str`.
+type EngineShareName = str | Promise
 
 
 def search_games(query: str, limit: int = 10) -> QuerySet[Game]:
@@ -83,7 +90,7 @@ class PersonResult:
     # and start_date is NOT NULL — so there is always a first year.
     first_year: int
     last_year: int | None  # None = an open end exists, i.e. "present"
-    engine_shares: list[tuple[str, int]]  # [("Unreal Engine", 67), ..., ("other", 5)]
+    engine_shares: list[tuple[EngineShareName, int]]  # [("Unreal Engine", 67), ..., ("other", 5)]
 
     @property
     def more_credits_count(self) -> int:
@@ -274,12 +281,15 @@ def _assemble_results(users: list[User], credits: QuerySet[Contribution]) -> lis
 
 def _percentage_shares(
     counts: dict[str, int], top: int = ENGINE_SHARES_SHOWN
-) -> list[tuple[str, int]]:
+) -> list[tuple[EngineShareName, int]]:
     """Integer percentages, ranked descending, capped at `top` entries + an
     "other" bucket. Largest-remainder rounding, so a non-empty result sums to
     exactly 100 — a displayed repartition that adds up to 99 looks broken.
     Empty `counts` (no engine data) yields [], not a bucket of zeroes; shares
-    rounding down to 0 are dropped rather than shown as "0%"."""
+    rounding down to 0 are dropped rather than shown as "0%".
+
+    Engine names come from the DB and are shown as-is; only the "other" bucket
+    is ours to translate, so only it is lazy."""
     total = sum(counts.values())
     if not total:
         return []
@@ -294,8 +304,11 @@ def _percentage_shares(
     ranked = sorted(floors.items(), key=lambda item: (-item[1], item[0]))
     if len(ranked) <= top:
         return [(name, pct) for name, pct in ranked if pct > 0]
-    head = [(name, pct) for name, pct in ranked[:top] if pct > 0]
-    other = sum(pct for _, pct in ranked[top:])
+    head: list[tuple[EngineShareName, int]] = [(name, pct) for name, pct in ranked[:top] if pct > 0]
+    other = sum(pct for _name, pct in ranked[top:])
     if other > 0:
-        head.append(("other", other))
+        # Lazy, not gettext(): resolved when the template renders it, under the
+        # request's active locale. Raw "other" shipped as literal English in
+        # every locale, mid-list among real engine names.
+        head.append((_("other"), other))
     return head

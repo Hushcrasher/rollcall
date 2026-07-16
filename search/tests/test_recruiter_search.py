@@ -10,6 +10,7 @@ from datetime import date
 from typing import Any
 
 import pytest
+from django.utils.functional import Promise
 
 from accounts.models import User
 from contributions.models import Contribution, Discipline
@@ -564,6 +565,26 @@ def test_percentage_shares_always_sum_to_100(counts: dict[str, int]) -> None:
 def test_percentage_shares_ranks_descending() -> None:
     shares = _percentage_shares({"small": 1, "big": 6, "mid": 3})
     assert shares == [("big", 60), ("mid", 30), ("small", 10)]
+
+
+def test_other_bucket_is_translatable() -> None:
+    """The "other" bucket is ours, not a DB engine name, so it must not ship as
+    literal English in every locale. Pinned as a lazy proxy rather than by
+    asserting a translated string: a `str` here would still pass an == "other"
+    check, which is exactly how the raw string survived review."""
+    shares = _percentage_shares({f"e{i}": 1 for i in range(7)})
+    name, _pct = shares[-1]
+
+    assert name == "other"  # still reads as "other" under the default locale
+    assert isinstance(name, Promise), f"{name!r} is a raw str — untranslatable"
+
+
+def test_engine_names_from_the_db_are_not_translated() -> None:
+    """The flip side: real engine names are data and pass through verbatim."""
+    shares = _percentage_shares({"Unreal Engine": 1})
+
+    assert shares == [("Unreal Engine", 100)]
+    assert not isinstance(shares[0][0], Promise)
 
 
 # ---------------------------------------------------------------- pagination

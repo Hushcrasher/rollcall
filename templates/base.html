@@ -22,6 +22,9 @@
     .igdb-trigger:hover, .suggest-item:hover { background: Highlight; color: HighlightText; }
     .igdb-trigger { border-top: 1px solid GrayText; font-style: italic; }
     .suggest-item small { opacity: .6; }
+    /* Used by profile.html, _github_block.html and the search cards — global,
+       so it isn't only styled on whichever page happens to define it. */
+    .muted { opacity: .7; }
   </style>
   {% block extra_head %}{% endblock %}
 </head>

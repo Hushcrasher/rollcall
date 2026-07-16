@@ -110,6 +110,9 @@ def test_result_card_shows_credit_location_and_stats(client: Client) -> None:
     # a `{% blocktranslate count %}` that silently lost its {% plural %} branch
     # would print "1 credits" and still satisfy a loose `"1 credit" in content`.
     assert "1 credit · 1 game · 2020–2021" in content
+    # An unguarded {% if r.more_credits_count %} renders "+0 more" on every
+    # card that has <=3 credits — i.e. on most of them.
+    assert "+0 more" not in content
 
 
 def test_card_renders_present_and_engine_shares_and_never_none(client: Client) -> None:
@@ -132,9 +135,13 @@ def test_card_renders_present_and_engine_shares_and_never_none(client: Client) -
 
     assert "2020–present" in content  # career years, open end
     assert "2022–present" in content  # the ongoing credit's own dates
-    assert "Unreal Engine 100%" in content
     assert "2 credits · 2 games" in content
     assert "None" not in content
+    # The label is load-bearing, not decoration: bare "Unreal Engine 100%" under
+    # a career-stats line reads as a proficiency score for the person, which the
+    # "no numeric public score" non-negotiable exists to prevent. The words are
+    # what make the number factual — about games, not about the person.
+    assert "Engines on credited games: Unreal Engine 100%" in content
 
 
 def test_more_credits_count_is_shown_beyond_three(client: Client) -> None:
@@ -193,6 +200,9 @@ def test_pagination_preserves_filters(client: Client) -> None:
     # A `{# … #}` comment spanning >1 line is not lexed as a comment: its text
     # leaks into the HTML and the tags inside it execute. Use {% comment %}.
     assert "{#" not in content
+    # base.html already emits two unlabelled <nav>s; without this the page has
+    # three identical "navigation" landmarks for screen readers.
+    assert '<nav class="pagination" aria-label="Pagination">' in content
 
     page2 = client.get(url, {"discipline": design.pk, "page": "2"}).content.decode()
     assert "Person 20" in page2
