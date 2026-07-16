@@ -514,14 +514,16 @@ def test_page_param_alone_is_still_zero_filters() -> None:
     assert not RecruiterSearchForm({"page": "2"}).is_valid()
 
 
-def test_each_filter_alone_satisfies_the_rule(django_db_setup: None) -> None:
-    """Every field must count as a filter on its own. Parametrized in spirit
-    over all 7 — dropping any one from clean()'s any([...]) must fail HERE.
-    (Task 5's review mutation-tested this: with only the plan's original
-    tests, 4 of the 7 entries could be deleted with the suite still green.)"""
+def test_each_filter_alone_satisfies_the_rule() -> None:
+    """Every field must count as a filter on its own — dropping any one from
+    clean()'s any([...]) must fail HERE. (Task 5's review mutation-tested this:
+    with only the plan's original tests, 4 of the 7 entries could be deleted
+    with the suite still green.)"""
     engine = Engine.objects.create(name="Unreal Engine")
     genre = Genre.objects.create(name="RPG")
-    discipline = Discipline.objects.first()
+    # .get(), not .first(): seeded by contributions/0002, and .first() returns
+    # Optional so .pk is an unchecked access.
+    discipline = Discipline.objects.get(name="Design")
     for data in (
         {"discipline": str(discipline.pk)},
         {"engines": [str(engine.pk)]},
@@ -534,10 +536,18 @@ def test_each_filter_alone_satisfies_the_rule(django_db_setup: None) -> None:
         assert RecruiterSearchForm(data).is_valid(), f"{data} should be enough"
 
 
-def test_min_rating_zero_is_rejected() -> None:
+def test_min_rating_zero_is_rejected_by_the_field() -> None:
     """0 reads as "I don't care" but would mean "must have rating data" —
-    blank is how you say you don't care (min_value=1)."""
-    assert not RecruiterSearchForm({"min_rating": "0"}).is_valid()
+    blank is how you say you don't care (min_value=1).
+
+    Asserts *why* it's rejected, not just that it is: with min_value=0 the form
+    would still be invalid — 0 is falsy, so the zero-filter rule would catch it
+    — which is the right answer for the wrong reason and pins nothing.
+    """
+    form = RecruiterSearchForm({"min_rating": "0"})
+    assert not form.is_valid()
+    assert "min_rating" in form.errors
+    assert "Pick at least one filter." not in form.non_field_errors()
 
 
 def test_field_error_does_not_also_demand_a_filter() -> None:
@@ -1675,22 +1685,28 @@ uv run pytest search -q
 
 Expected: all PASS.
 
-- [ ] **Step 5b: Make `search/forms.py`'s docstring true**
+- [ ] **Step 5b: Confirm `search/forms.py`'s docstring became true**
 
-Its opening docstring already states — in the present tense — that *"the real
+Its opening docstring states — in the present tense — that *"the real
 mitigations are the view's IP rate limit (`SEARCH_RATELIMIT`), pagination, and
-`profile_public`"*. When Task 5 shipped it, only `profile_public` existed; the
-Task 5 implementer flagged this rather than ship it silently, and it was left
-deliberately because **this task** is what makes it true. Verify all three, and
-do not close this task until they hold:
+`profile_public`"*. When Task 5 shipped it, only `profile_public` existed. The
+Task 5 implementer flagged that rather than ship it silently; it was left
+standing because **this task** is what makes it true.
 
-- [ ] the `ratelimit` decorator is on `RecruiterSearchView` (not just `SearchView`)
-- [ ] the view paginates (`RESULTS_PER_PAGE`, via `recruiter_search(page=…)`)
-- [ ] `profile_public` still filters first in the service
+No new checklist: the claim is pinned by tests this task already writes —
+`test_rate_limited` (Step 1) and `test_pagination_preserves_filters` (Step 1),
+plus `test_never_returns_private_or_inactive` in Task 6 for `profile_public`.
+Those three passing IS the verification, and unlike a prose checkbox they
+cannot go stale or be forgotten. If they pass, the docstring is true.
 
-If this task is ever split or deferred, the docstring must be reworded in the
-same commit — a present-tense claim about absent code is exactly the defect
-this plan has now caught three times.
+If this task is ever split or deferred so that the rate limit and pagination
+don't land together, reword the docstring in that same commit — a present-tense
+claim about absent code is the defect this plan has now caught three times.
+
+> Why a test and not a checklist: the `engines[0]` bridge from Task 5 is forced
+> to resolution by the *compiler* (this task changes `recruiter_search`'s
+> signature, so the old call site cannot compile). The docstring has no such
+> forcing function — only a test gives it one.
 
 - [ ] **Step 6: Gate + commit**
 
