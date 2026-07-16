@@ -1084,15 +1084,62 @@ def test_results_are_paginated_and_ordered_by_display_name(
     assert second.has_previous and not second.has_next
 
 
-def test_out_of_range_page_clamps(disciplines: dict[str, Discipline]) -> None:
+def test_out_of_range_page_clamps_to_the_last_page(
+    disciplines: dict[str, Discipline],
+) -> None:
+    """get_page() clamps high/zero/negative to the LAST page (not the first) —
+    build two pages so the assertion can tell the two rules apart."""
     game = Game.objects.create(title="G", source=Game.Source.MANUAL)
-    person = _make_person("p@example.com", "Only One")
-    _credit(person, game, disciplines["Design"])
+    for i in range(RESULTS_PER_PAGE + 5):
+        _credit(_make_person(f"u{i}@example.com", f"Person {i:02d}"), game,
+                disciplines["Design"])
 
-    page = recruiter_search(discipline_id=disciplines["Design"].pk, page=99)
+    assert recruiter_search(discipline_id=disciplines["Design"].pk, page=99).page_number == 2
 
-    assert page.page_number == 1
-    assert [r.user for r in page.results] == [person]
+
+def test_junk_page_param_does_not_explode(disciplines: dict[str, Discipline]) -> None:
+    """The view hands the raw GET value straight through — ?page=abc must not
+    500 on a public page."""
+    game = Game.objects.create(title="G", source=Game.Source.MANUAL)
+    _credit(_make_person("p@example.com", "Only One"), game, disciplines["Design"])
+
+    assert recruiter_search(discipline_id=disciplines["Design"].pk, page="abc").page_number == 1
+    assert recruiter_search(discipline_id=disciplines["Design"].pk, page=None).page_number == 1
+
+
+def test_page_links_are_none_at_the_boundaries(disciplines: dict[str, Discipline]) -> None:
+    """previous_page_number must be None on page 1, not 0 — get_page(0) clamps
+    to the LAST page, so an unguarded link would jump to the end."""
+    game = Game.objects.create(title="G", source=Game.Source.MANUAL)
+    for i in range(RESULTS_PER_PAGE + 5):
+        _credit(_make_person(f"u{i}@example.com", f"Person {i:02d}"), game,
+                disciplines["Design"])
+
+    first = recruiter_search(discipline_id=disciplines["Design"].pk, page=1)
+    last = recruiter_search(discipline_id=disciplines["Design"].pk, page=2)
+
+    assert first.previous_page_number is None
+    assert first.next_page_number == 2
+    assert last.previous_page_number == 1
+    assert last.next_page_number is None
+
+
+def test_matching_credits_order_is_stable_for_same_month_credits(
+    disciplines: dict[str, Discipline],
+) -> None:
+    """Dates are month precision, so ties are common — and the tie decides
+    WHICH 3 credits the card shows. Without the -id secondary key, Postgres
+    order is unspecified."""
+    same_day = date(2020, 1, 1)
+    person = _make_person("p@example.com", "Tied")
+    for i in range(5):
+        game = Game.objects.create(title=f"G{i}", source=Game.Source.MANUAL)
+        _credit(person, game, disciplines["Design"], start_date=same_day)
+
+    result = _single_result(discipline_id=disciplines["Design"].pk)
+    ids = [c.pk for c in result.matching_credits]
+
+    assert ids == sorted(ids, reverse=True)  # newest-inserted first, deterministically
 ```
 
 - [ ] **Step 2: Run — must fail**
@@ -1167,12 +1214,15 @@ class ResultsPage:
         return self.page_number < self.num_pages
 
     @property
-    def previous_page_number(self) -> int:
-        return self.page_number - 1
+    def previous_page_number(self) -> int | None:
+        # None, not page_number - 1: an unguarded 0 fed back through get_page()
+        # lands on the LAST page, so a "Previous" link on page 1 would jump to
+        # the end. Templates render None as empty and treat it falsy.
+        return self.page_number - 1 if self.has_previous else None
 
     @property
-    def next_page_number(self) -> int:
-        return self.page_number + 1
+    def next_page_number(self) -> int | None:
+        return self.page_number + 1 if self.has_next else None
 
 
 def recruiter_search(
@@ -1184,7 +1234,7 @@ def recruiter_search(
     min_rating: float | None = None,
     open_to_work: bool | None = None,
     year_from: int | None = None,
-    page: int = 1,
+    page: int | str | None = 1,  # raw GET value: get_page() coerces junk to 1
 ) -> ResultsPage:
     """The product promise (docs/01-DESIGN.md §3.6, docs/04 §8): public people
     filtered by properties of the games they worked on, crossed with their
@@ -1546,15 +1596,8 @@ class RecruiterSearchView(TemplateView):
         context = super().get_context_data(**kwargs)
         form = RecruiterSearchForm(self.request.GET or None)
         context["form"] = form
-        params = self.request.GET.copy()
-        params.pop("page", None)
-        context["base_qs"] = params.urlencode()
         if self.request.GET and form.is_valid():
             cleaned = form.cleaned_data
-            try:
-                page = int(self.request.GET.get("page", "1"))
-            except ValueError:
-                page = 1
             context["results_page"] = recruiter_search(
                 discipline_id=cleaned["discipline"].pk if cleaned.get("discipline") else None,
                 engine_ids=[engine.pk for engine in cleaned.get("engines") or []],
@@ -1563,11 +1606,20 @@ class RecruiterSearchView(TemplateView):
                 min_rating=cleaned.get("min_rating"),
                 year_from=cleaned.get("year_from"),
                 open_to_work=cleaned.get("open_to_work") or None,
-                page=page,
+                # Raw string, uncoerced: get_page() turns junk into page 1.
+                # int() here would 500 on ?page=abc — on a public page.
+                page=self.request.GET.get("page"),
             )
             context["searched"] = True
         return context
 ```
+
+> **Amended after Task 6's review.** The original plan wrapped `int(...)` in a
+> `try/except ValueError` — but the `int()` was never needed: `get_page()`
+> already coerces `'abc'`/`None` to page 1. The plan also hand-rolled a
+> `base_qs` context var to preserve filters across pages; this project runs
+> **Django 6.0**, where `{% querystring page=... %}` is built in and does it
+> correctly. Both are deleted.
 
 - [ ] **Step 4: Rewrite the template**
 
@@ -1662,13 +1714,15 @@ Replace `templates/search/recruiter_search.html` entirely with:
       {% endfor %}
 
       {% if results_page.num_pages > 1 %}
+        {# {% querystring %} is Django 5.1+ (this project is on 6.0): it keeps
+           every current GET param and overrides only `page`. #}
         <nav class="pagination">
           {% if results_page.has_previous %}
-            <a href="?{{ base_qs }}&amp;page={{ results_page.previous_page_number }}">{% translate "Previous" %}</a>
+            <a href="{% querystring page=results_page.previous_page_number %}">{% translate "Previous" %}</a>
           {% endif %}
           <span>{% blocktranslate with page=results_page.page_number pages=results_page.num_pages %}Page {{ page }} of {{ pages }}{% endblocktranslate %}</span>
           {% if results_page.has_next %}
-            <a href="?{{ base_qs }}&amp;page={{ results_page.next_page_number }}">{% translate "Next" %}</a>
+            <a href="{% querystring page=results_page.next_page_number %}">{% translate "Next" %}</a>
           {% endif %}
         </nav>
       {% endif %}

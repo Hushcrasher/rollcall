@@ -172,9 +172,24 @@ class PersonResult:
     engine_shares: list[tuple[str, int]]   # [("Unreal Engine", 67), ...] top 3 + ("other", n)
 ```
 
-Chosen over annotated querysets because annotations are invisible to `ty`
-(the codebase already fights that) and engine repartition needs a grouped
-side-query anyway.
+Chosen over annotated querysets because *queryset* annotations are invisible
+to `ty` (the codebase already fights that), and engine repartition needs a
+grouped side-query anyway.
+
+`ResultsPage` is hand-rolled rather than exposing Django's `Page` because
+`Page.object_list` is `list[User]` while the service returns
+`list[PersonResult]` — `Page` cannot carry that without lying, and a frozen
+dataclass keeps Django types out of the service's public signature. Note this
+is **not** a `ty` limitation: `Paginator`/`Page` are plain classes and `ty`
+resolves their methods fine. (An earlier draft claimed otherwise; corrected
+after Task 6's review, since a wrong rationale gets cited for things it
+doesn't cover.)
+
+`previous_page_number`/`next_page_number` return `int | None`, not a bare
+`page_number ± 1`: `get_page(0)` clamps to the **last** page, so an unguarded
+"Previous" link on page 1 would jump the user to the end. `page` is typed
+`int | str | None` and passed the raw GET value — `get_page()` coerces junk to
+page 1, whereas an `int()` in the view would 500 on `?page=abc`.
 
 Query plan (bounded by page size):
 
