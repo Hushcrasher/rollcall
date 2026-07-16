@@ -1675,6 +1675,23 @@ uv run pytest search -q
 
 Expected: all PASS.
 
+- [ ] **Step 5b: Make `search/forms.py`'s docstring true**
+
+Its opening docstring already states — in the present tense — that *"the real
+mitigations are the view's IP rate limit (`SEARCH_RATELIMIT`), pagination, and
+`profile_public`"*. When Task 5 shipped it, only `profile_public` existed; the
+Task 5 implementer flagged this rather than ship it silently, and it was left
+deliberately because **this task** is what makes it true. Verify all three, and
+do not close this task until they hold:
+
+- [ ] the `ratelimit` decorator is on `RecruiterSearchView` (not just `SearchView`)
+- [ ] the view paginates (`RESULTS_PER_PAGE`, via `recruiter_search(page=…)`)
+- [ ] `profile_public` still filters first in the service
+
+If this task is ever split or deferred, the docstring must be reworded in the
+same commit — a present-tense claim about absent code is exactly the defect
+this plan has now caught three times.
+
 - [ ] **Step 6: Gate + commit**
 
 ```bash
