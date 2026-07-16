@@ -74,10 +74,6 @@ class TypeaheadSelectMultiple(forms.SelectMultiple):
         return [(v, labels[v]) for v in map(str, value or []) if v in labels]
 
 
-def _is_typeahead(field: forms.Field) -> bool:
-    return isinstance(field.widget, TypeaheadSelectMultiple)
-
-
 class RecruiterSearchForm(forms.Form):
     discipline = forms.ModelChoiceField(
         queryset=Discipline.objects.all(), required=False, label=_("Discipline")
@@ -120,13 +116,17 @@ class RecruiterSearchForm(forms.Form):
     open_to_work = forms.BooleanField(required=False, label=_("Open to work only"))
 
     def typeahead_fields(self) -> list[forms.BoundField]:
-        """The facets rendered as chips + a search box, in display order.
+        """The facets the template renders as chips + a search box.
 
-        Here rather than hardcoded in the template so the three stay in step
-        with the widgets above — they are the fields using
-        `TypeaheadSelectMultiple`, and the template's markup assumes it.
+        Enumerated, for the same reason `clean()` is: deriving this by sniffing
+        for `TypeaheadSelectMultiple` widgets fails **silently** — swap a widget
+        back and the field doesn't render wrong, it stops rendering at all, so a
+        filter vanishes from the page with every test still green (found by
+        mutation-testing exactly that). Listed here, the same swap renders the
+        checkbox list and the payload guard in `test_filter_autocomplete.py`
+        fails loudly.
         """
-        return [self[name] for name, field in self.fields.items() if _is_typeahead(field)]
+        return [self["engines"], self["genres"], self["countries"]]
 
     def clean(self) -> dict[str, Any]:
         cleaned = super().clean()
