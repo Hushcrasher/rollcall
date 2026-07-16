@@ -27,7 +27,8 @@
 | `accounts/forms.py` | `country` on `SettingsForm` (Task 2) |
 | `accounts/admin.py` | `country` in the explicit Profile fieldset (Task 2) |
 | `accounts/export.py` | `country` in identity block (Task 2) |
-| `templates/accounts/profile.html` | "City · Country" line (Task 3) |
+| `accounts/models.py` | `User.location_display` property (Task 3) |
+| `templates/accounts/profile.html` | renders `location_display` (Task 3) |
 | `games/management/commands/load_dev_fixtures.py` | deterministic countries (Task 4) |
 | `search/forms.py` | multi engines/genres, countries, ≥1-filter `clean()` (Task 5) |
 | `search/tests/test_recruiter_form.py` | NEW — form rules (Task 5) |
@@ -260,12 +261,48 @@ git commit -m "feat(accounts): country in settings form, admin and GDPR export"
 ### Task 3: Profile displays "City · Country"
 
 **Files:**
+- Modify: `accounts/models.py` (add `User.location_display` property)
 - Modify: `templates/accounts/profile.html:17`
-- Test: `accounts/tests/test_profile.py`
+- Test: `accounts/tests/test_user_model.py` (property), `accounts/tests/test_profile.py` (rendering)
 
-- [ ] **Step 1: Write the failing test**
+> **Amended after Task 3's first code review.** The original plan inlined the
+> join in the template — and prescribed the *same* markup again in Task 7's
+> result cards, so the duplication was scheduled, not hypothetical. One property
+> fixes four defects at once:
+> 1. the copy-paste Task 7 would have inherited;
+> 2. an untranslated `·` sitting inside translatable content (a locale may want
+>    a comma — the separator belongs in `pgettext`);
+> 3. a **real latent bug**: `bool(Country("ZZ"))` is `True` while `.name` is
+>    `""`, so guarding on `country` rather than `country.name` renders a
+>    dangling "Lyon · " for any invalid stored code (verified empirically —
+>    reachable only by a raw `.update()`/bulk write that skips validation, which
+>    is exactly what a seed or fixture does);
+> 4. a 181-char template line with three nested inline `{% if %}` — the only
+>    such line in all 31 templates.
 
-Append to `accounts/tests/test_profile.py` (match its existing fixture for a public user; create inline if none fits):
+- [ ] **Step 1: Write the failing tests**
+
+The four branches are a pure string-join concern — test them on the property
+(fast, no DB roundtrip, no HTML parsing), and leave ONE template test proving
+the line reaches the page. Append to `accounts/tests/test_user_model.py`:
+
+```python
+@pytest.mark.parametrize(
+    ("location", "country", "expected"),
+    [
+        ("Lyon", "FR", "Lyon · France"),
+        ("Lyon", "", "Lyon"),
+        ("", "FR", "France"),
+        ("", "", ""),
+        ("Lyon", "ZZ", "Lyon"),  # invalid code: truthy, but renders nothing
+    ],
+)
+def test_location_display(location: str, country: str, expected: str) -> None:
+    user = User(display_name="X", location=location, country=country)
+    assert user.location_display == expected
+```
+
+Append to `accounts/tests/test_profile.py`:
 
 ```python
 def test_profile_shows_city_and_country(client: Client) -> None:
@@ -277,22 +314,34 @@ def test_profile_shows_city_and_country(client: Client) -> None:
         country="FR",
     )
     response = client.get(reverse("accounts:profile", kwargs={"slug": user.slug}))
-    content = response.content.decode()
-    assert "Lyon" in content
-    assert "France" in content
+    assert "Lyon · France" in response.content.decode()
 ```
 
 - [ ] **Step 2: Run — must fail**
 
 ```bash
-uv run pytest accounts/tests/test_profile.py -v -k country
+uv run pytest accounts/tests/test_user_model.py accounts/tests/test_profile.py -v -k "location_display or city_and_country"
 ```
 
-Expected: FAIL ("France" not in content).
+Expected: FAIL (`AttributeError: 'User' object has no attribute 'location_display'`).
 
 - [ ] **Step 3: Implement**
 
-In `templates/accounts/profile.html`, replace line 17:
+In `accounts/models.py`, import `pgettext` alongside the existing
+`gettext_lazy as _`, and add the property next to the existing
+`is_email_verified` / `is_recruiter` properties:
+
+```python
+    @property
+    def location_display(self) -> str:
+        """"City · Country" for the profile and the search cards — omitting
+        either part when unset. Guards on `country.name`, not `country`: an
+        invalid stored code is truthy but renders empty."""
+        separator = pgettext("between city and country", " · ")
+        return separator.join(part for part in (self.location, self.country.name) if part)
+```
+
+Then in `templates/accounts/profile.html`, replace line 17:
 
 ```html
     {% if profile_user.location %}<p>{{ profile_user.location }}</p>{% endif %}
@@ -301,9 +350,7 @@ In `templates/accounts/profile.html`, replace line 17:
 with:
 
 ```html
-    {% if profile_user.location or profile_user.country %}
-      <p>{{ profile_user.location }}{% if profile_user.location and profile_user.country %} · {% endif %}{% if profile_user.country %}{{ profile_user.country.name }}{% endif %}</p>
-    {% endif %}
+    {% if profile_user.location_display %}<p>{{ profile_user.location_display }}</p>{% endif %}
 ```
 
 - [ ] **Step 4: Run — must pass**
@@ -316,8 +363,8 @@ uv run pytest accounts/tests/test_profile.py -v
 
 ```bash
 uv run ruff check . && uv run ruff format --check . && uv run ty check && uv run pytest -q
-git add templates/accounts/profile.html accounts/tests/test_profile.py
-git commit -m "feat(accounts): profile shows city and country"
+git add accounts/models.py templates/accounts/profile.html accounts/tests/test_user_model.py accounts/tests/test_profile.py
+git commit -m "feat(accounts): profile shows city and country via location_display"
 ```
 
 ---
@@ -1454,8 +1501,8 @@ Replace `templates/search/recruiter_search.html` entirely with:
             {% endif %}
           </h3>
 
-          {% if r.user.location or r.user.country %}
-            <p class="muted">{{ r.user.location }}{% if r.user.location and r.user.country %} · {% endif %}{% if r.user.country %}{{ r.user.country.name }}{% endif %}</p>
+          {% if r.user.location_display %}
+            <p class="muted">{{ r.user.location_display }}</p>
           {% endif %}
 
           <ul>

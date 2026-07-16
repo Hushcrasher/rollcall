@@ -92,7 +92,10 @@ that doc (source of truth) is updated as part of this work.
 - Existing `location` CharField is **kept**, relabelled **"City / region"**
   (verbose name + settings-form label). No parsing of existing free text into
   countries: nothing is deployed, and dev fixtures are regenerated.
-- Profile page displays "City, Country" (either part optional).
+- Profile page displays "City · Country" (either part optional). The join lives
+  in ONE place — a `User.location_display` property — because the search result
+  cards (§4) render the same line; the separator is translatable (`pgettext`),
+  since a locale may prefer a comma.
 - `SettingsForm` gains `country`; `load_dev_fixtures` assigns deterministic
   countries to fake profiles; GDPR export (`accounts/export.py`) gains
   `country` in the identity block.
@@ -106,7 +109,8 @@ Per person:
 
 - Display name (profile link) · open-to-work badge · relay contact link
   (existing behavior).
-- **Location**: "City · Country" (whichever parts exist).
+- **Location**: `user.location_display` — "City · Country" (whichever parts
+  exist), the same property the profile page uses.
 - **Matching credits — the "why"** (up to 3, then "+N more"): game title
   (linked) — job title (discipline), start–end dates. These are exactly the
   active credits that satisfied the credit-level filters.
@@ -170,7 +174,7 @@ links preserve all GET params except `page`.
 | `accounts/models.py` | `country` field, `location` relabel (+ migration) |
 | `accounts/forms.py` | `country` on `SettingsForm` |
 | `accounts/export.py` | `country` in identity |
-| `templates/accounts/profile.html` | "City, Country" display |
+| `templates/accounts/profile.html` | renders `user.location_display` |
 | `games/management/commands/load_dev_fixtures.py` | deterministic countries |
 | `pyproject.toml` | django-countries |
 | `docs/01-DESIGN.md` §3.6, `docs/04-DATABASE-SCHEMA.md` §1, `ROADMAP.md` | record the behavior change |
@@ -191,7 +195,8 @@ links preserve all GET params except `page`.
   games, min/max years, open end → present); engine shares sum to 100, top-3
   + other, absent when no engine data; ordering by display_name; pagination
   page size + param preservation.
-- **Accounts**: settings form saves country; profile renders "City, Country";
+- **Accounts**: settings form saves country; profile renders "City · Country"
+  via `location_display` (all four combinations, incl. an invalid stored code);
   export contains country; fixtures stay deterministic/idempotent.
 
 ## Out of scope
