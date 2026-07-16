@@ -6,14 +6,24 @@ Combines trigram similarity (typo tolerance: "hade" → "Hades") with a
 case-insensitive contains (prefix matches for autocomplete).
 """
 
+from collections import defaultdict
+from collections.abc import Sequence
+from dataclasses import dataclass
+from typing import Any
+
 from django.contrib.postgres.search import TrigramSimilarity
-from django.db.models import Q, QuerySet
+from django.core.paginator import Paginator
+from django.db.models import Count, Max, Min, Q, QuerySet
 
 from accounts.models import User
 from contributions.models import Contribution
 from games.models import Company, Game
 
 _SIMILARITY_THRESHOLD = 0.15
+
+RESULTS_PER_PAGE = 20
+MATCHING_CREDITS_SHOWN = 3
+ENGINE_SHARES_SHOWN = 3
 
 
 def search_games(query: str, limit: int = 10) -> QuerySet[Game]:
@@ -52,20 +62,102 @@ def search_people(query: str, limit: int = 20) -> QuerySet[User]:
     )
 
 
+@dataclass(frozen=True)
+class PersonResult:
+    """One fully-assembled recruiter-search result card (spec
+    docs/superpowers/specs/2026-07-16-open-recruiter-search-design.md §4).
+    Career stats are career-wide (all active credits), deliberately not
+    filter-scoped; matching_credits are the filter-satisfying ones."""
+
+    user: User
+    matching_credits: list[Contribution]  # capped at MATCHING_CREDITS_SHOWN, recent first
+    matching_credits_total: int
+    credits_count: int
+    games_count: int
+    # Not `int | None`: a result exists only because it has >=1 active credit,
+    # and start_date is NOT NULL — so there is always a first year.
+    first_year: int
+    last_year: int | None  # None = an open end exists, i.e. "present"
+    engine_shares: list[tuple[str, int]]  # [("Unreal Engine", 67), ..., ("other", 5)]
+
+    @property
+    def more_credits_count(self) -> int:
+        return self.matching_credits_total - len(self.matching_credits)
+
+
+@dataclass(frozen=True)
+class ResultsPage:
+    results: list[PersonResult]
+    total: int
+    page_number: int
+    num_pages: int
+
+    @property
+    def has_previous(self) -> bool:
+        return self.page_number > 1
+
+    @property
+    def has_next(self) -> bool:
+        return self.page_number < self.num_pages
+
+    @property
+    def previous_page_number(self) -> int:
+        return self.page_number - 1
+
+    @property
+    def next_page_number(self) -> int:
+        return self.page_number + 1
+
+
 def recruiter_search(
     *,
     discipline_id: int | None = None,
-    engine_id: int | None = None,
-    genre_id: int | None = None,
+    engine_ids: Sequence[int] = (),
+    genre_ids: Sequence[int] = (),
+    countries: Sequence[str] = (),
     min_rating: float | None = None,
     open_to_work: bool | None = None,
     year_from: int | None = None,
-) -> QuerySet[User]:
+    page: int = 1,
+) -> ResultsPage:
     """The product promise (docs/01-DESIGN.md §3.6, docs/04 §8): public people
     filtered by properties of the games they worked on, crossed with their
-    discipline. Every filter applies to the SAME active contribution, so
-    "Unreal × Programming" means one credit is both. Rating is a filter,
-    never a sort — results order by display_name."""
+    discipline. Credit-level filters apply to the SAME active contribution
+    ("Unreal × Programming" means one credit is both); multi-value facets are
+    OR within the facet, AND across facets; `countries` filters the person.
+    Rating is a filter, never a sort — results order by display_name."""
+    credits = _matching_credits(
+        discipline_id=discipline_id,
+        engine_ids=engine_ids,
+        genre_ids=genre_ids,
+        countries=countries,
+        min_rating=min_rating,
+        open_to_work=open_to_work,
+        year_from=year_from,
+    )
+    users = User.objects.filter(id__in=credits.values("user_id")).order_by("display_name")
+    paginator = Paginator(users, RESULTS_PER_PAGE)
+    page_obj = paginator.get_page(page)
+    return ResultsPage(
+        results=_assemble_results(list(page_obj.object_list), credits),
+        total=paginator.count,
+        page_number=page_obj.number,
+        num_pages=paginator.num_pages,
+    )
+
+
+def _matching_credits(
+    *,
+    discipline_id: int | None,
+    engine_ids: Sequence[int],
+    genre_ids: Sequence[int],
+    countries: Sequence[str],
+    min_rating: float | None,
+    open_to_work: bool | None,
+    year_from: int | None,
+) -> QuerySet[Contribution]:
+    # profile_public filter FIRST: private profiles are invisible to search,
+    # everywhere, unconditionally (docs/01-DESIGN.md §3.4).
     credits = Contribution.objects.filter(
         status=Contribution.Status.ACTIVE,
         game__isnull=False,
@@ -73,10 +165,12 @@ def recruiter_search(
     )
     if discipline_id is not None:
         credits = credits.filter(discipline_id=discipline_id)
-    if engine_id is not None:
-        credits = credits.filter(game__engines__id=engine_id)
-    if genre_id is not None:
-        credits = credits.filter(game__genres__id=genre_id)
+    if engine_ids:
+        credits = credits.filter(game__engines__in=list(engine_ids))
+    if genre_ids:
+        credits = credits.filter(game__genres__in=list(genre_ids))
+    if countries:
+        credits = credits.filter(user__country__in=list(countries))
     if min_rating is not None:
         credits = credits.filter(
             Q(game__steam_positive_pct__gte=min_rating) | Q(game__igdb_rating__gte=min_rating)
@@ -85,6 +179,111 @@ def recruiter_search(
         credits = credits.filter(start_date__year__gte=year_from)
     if open_to_work:
         credits = credits.filter(user__open_to_work=True)
+    return credits
 
-    user_ids = credits.values_list("user_id", flat=True).distinct()
-    return User.objects.filter(id__in=user_ids).order_by("display_name")
+
+def _assemble_results(users: list[User], credits: QuerySet[Contribution]) -> list[PersonResult]:
+    """Assemble the page's cards in Python: three side-queries scoped to the
+    page's users, so cost is bounded by page size rather than by result count."""
+    if not users:
+        return []
+    user_ids = [user.pk for user in users]
+
+    # The credits that satisfied the filters, for the page's users only.
+    # An `__in` filter over an M2M (a game tagged with two selected engines)
+    # yields one joined row per match → distinct, or the credit shows twice.
+    by_user: dict[int, list[Contribution]] = defaultdict(list)
+    page_credits = (
+        credits.filter(user_id__in=user_ids)
+        .select_related("game", "discipline")
+        .order_by("-start_date", "-id")  # -id: stable order for same-month credits
+        .distinct()
+    )
+    for credit in page_credits:
+        by_user[credit.user_id].append(credit)
+
+    # Career-wide aggregates: ALL active credits, not just the matching ones.
+    # Row values are Any — .values().annotate() rows are opaque to ty.
+    stats: dict[int, dict[str, Any]] = {
+        row["user_id"]: row
+        for row in Contribution.objects.filter(
+            status=Contribution.Status.ACTIVE, user_id__in=user_ids
+        )
+        .values("user_id")
+        .annotate(
+            credits_count=Count("id"),
+            games_count=Count("game", distinct=True),
+            first_start=Min("start_date"),
+            last_end=Max("end_date"),
+            open_count=Count("id", filter=Q(end_date__isnull=True)),
+        )
+    }
+
+    # Engine repartition over distinct (game, engine) pairs, career-wide: three
+    # credits on one Unreal game are one Unreal game, not three.
+    engine_counts: dict[int, dict[str, int]] = defaultdict(dict)
+    pairs = (
+        Contribution.objects.filter(
+            status=Contribution.Status.ACTIVE,
+            user_id__in=user_ids,
+            game__engines__isnull=False,
+        )
+        .values_list("user_id", "game_id", "game__engines__name")
+        .distinct()
+    )
+    for user_id, _game_id, engine_name in pairs:
+        counts = engine_counts[user_id]
+        counts[engine_name] = counts.get(engine_name, 0) + 1
+
+    results: list[PersonResult] = []
+    for user in users:
+        # Indexed, not .get(): `users` came from the active-credit queryset, so
+        # every one of them has a stats row. A miss is a bug, not a blank card.
+        row = stats[user.pk]
+        matching = by_user.get(user.pk, [])
+        # open_count > 0 is what "present" means. Max(end_date) can't answer it:
+        # SQL MAX ignores NULLs, so an ongoing credit is invisible to it.
+        still_active = row["open_count"] > 0
+        results.append(
+            PersonResult(
+                user=user,
+                matching_credits=matching[:MATCHING_CREDITS_SHOWN],
+                matching_credits_total=len(matching),
+                credits_count=row["credits_count"],
+                games_count=row["games_count"],
+                first_year=row["first_start"].year,
+                # Not still_active ⇒ every credit has an end_date ⇒ last_end is set.
+                last_year=None if still_active else row["last_end"].year,
+                engine_shares=_percentage_shares(engine_counts.get(user.pk, {})),
+            )
+        )
+    return results
+
+
+def _percentage_shares(
+    counts: dict[str, int], top: int = ENGINE_SHARES_SHOWN
+) -> list[tuple[str, int]]:
+    """Integer percentages, ranked descending, capped at `top` entries + an
+    "other" bucket. Largest-remainder rounding, so a non-empty result sums to
+    exactly 100 — a displayed repartition that adds up to 99 looks broken.
+    Empty `counts` (no engine data) yields [], not a bucket of zeroes; shares
+    rounding down to 0 are dropped rather than shown as "0%"."""
+    total = sum(counts.values())
+    if not total:
+        return []
+    exact = {name: count * 100 / total for name, count in counts.items()}
+    floors = {name: int(value) for name, value in exact.items()}
+    remainder = 100 - sum(floors.values())
+    # floors - exact == -fraction, so ascending == biggest fraction first; the
+    # name breaks ties so equal shares don't reorder between requests.
+    by_fraction = sorted(exact, key=lambda name: (floors[name] - exact[name], name))
+    for name in by_fraction[:remainder]:
+        floors[name] += 1
+    ranked = sorted(floors.items(), key=lambda item: (-item[1], item[0]))
+    if len(ranked) <= top:
+        return [(name, pct) for name, pct in ranked if pct > 0]
+    head = [(name, pct) for name, pct in ranked[:top] if pct > 0]
+    other = sum(pct for _, pct in ranked[top:])
+    if other > 0:
+        head.append(("other", other))
+    return head

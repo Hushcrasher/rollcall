@@ -14,12 +14,12 @@
   {% if searched %}
     <section>
       <h2>{% translate "Results" %}</h2>
-      {% for person in results %}
+      {% for r in results_page.results %}
         <p>
-          <a href="{% url 'accounts:profile' person.slug %}">{{ person.display_name }}</a>
-          {% if person.open_to_work %}<span class="badge">{% translate "Open to work" %}</span>{% endif %}
-          {% if person.contactable %}
-            — <a href="{% url 'contact:contact' person.slug %}">{% translate "Contact" %}</a>
+          <a href="{% url 'accounts:profile' r.user.slug %}">{{ r.user.display_name }}</a>
+          {% if r.user.open_to_work %}<span class="badge">{% translate "Open to work" %}</span>{% endif %}
+          {% if r.user.contactable %}
+            — <a href="{% url 'contact:contact' r.user.slug %}">{% translate "Contact" %}</a>
           {% endif %}
         </p>
       {% empty %}

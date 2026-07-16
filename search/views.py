@@ -75,14 +75,11 @@ class RecruiterSearchView(RecruiterRequiredMixin, TemplateView):
         context["form"] = form
         if self.request.GET and form.is_valid():
             cleaned = form.cleaned_data
-            # TODO(Task 6): truncates to one engine/genre — the service is
-            # still single-value.
-            engines = list(cleaned.get("engines") or [])
-            genres = list(cleaned.get("genres") or [])
-            context["results"] = recruiter_search(
+            context["results_page"] = recruiter_search(
                 discipline_id=cleaned["discipline"].pk if cleaned.get("discipline") else None,
-                engine_id=engines[0].pk if engines else None,
-                genre_id=genres[0].pk if genres else None,
+                engine_ids=[engine.pk for engine in cleaned.get("engines") or []],
+                genre_ids=[genre.pk for genre in cleaned.get("genres") or []],
+                countries=list(cleaned.get("countries") or []),
                 min_rating=cleaned.get("min_rating"),
                 year_from=cleaned.get("year_from"),
                 open_to_work=cleaned.get("open_to_work") or None,
