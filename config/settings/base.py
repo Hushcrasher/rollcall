@@ -157,8 +157,22 @@ SEED_ALERT_EMAIL = env("SEED_ALERT_EMAIL", default="")
 # Max relay messages one sender may send per rolling 24h (anti-spam, §3.6).
 CONTACT_RATE_LIMIT_PER_DAY = env.int("CONTACT_RATE_LIMIT_PER_DAY", default=20)
 
+# --- Caching ----------------------------------------------------------------
+# Explicit only to raise MAX_ENTRIES: LocMemCache defaults to 300 entries and
+# culls every 3rd key once past it, which silently evicts *live* rate-limit
+# counters — one key per client IP, so ~300 distinct visitors is enough. That
+# resets the limit docs/01-DESIGN.md §3.6 names as the real anti-scraping
+# mitigation, to zero, under ordinary traffic. Still per-process; Redis is the
+# fix (ROADMAP).
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "OPTIONS": {"MAX_ENTRIES": 50_000},
+    }
+}
+
 # --- Rate limiting (anti-scraping on public pages) --------------------------
-# Per-IP limits; tune via env. NB: the default cache is per-process — add a
-# shared cache (Redis) in prod for limits that hold across workers.
+# Per-IP limits; tune via env. NB: counters live in CACHES["default"], which is
+# per-process — add Redis in prod for limits that hold across workers.
 PROFILE_RATELIMIT = env("PROFILE_RATELIMIT", default="120/m")
 SEARCH_RATELIMIT = env("SEARCH_RATELIMIT", default="60/m")

@@ -118,13 +118,14 @@ class RecruiterSearchForm(forms.Form):
     def typeahead_fields(self) -> list[forms.BoundField]:
         """The facets the template renders as chips + a search box.
 
-        Enumerated, for the same reason `clean()` is: deriving this by sniffing
-        for `TypeaheadSelectMultiple` widgets fails **silently** — swap a widget
-        back and the field doesn't render wrong, it stops rendering at all, so a
-        filter vanishes from the page with every test still green (found by
-        mutation-testing exactly that). Listed here, the same swap renders the
-        checkbox list and the payload guard in `test_filter_autocomplete.py`
-        fails loudly.
+        Enumerated, for the same reason `clean()` is: sniffing for
+        `TypeaheadSelectMultiple` widgets instead would blind the guard aimed at
+        exactly this. Swap a widget back and the sniffed list silently drops the
+        field, so `test_empty_form_does_not_ship_a_choice_per_country` sees a
+        small payload and passes (mutation-tested both ways). Sibling chip tests
+        do fail, so the swap isn't invisible — but the guard that names the
+        regression goes quiet. Listed here, the same swap renders the checkbox
+        list and that guard fails loudly.
         """
         return [self["engines"], self["genres"], self["countries"]]
 

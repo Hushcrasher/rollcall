@@ -174,6 +174,33 @@ def test_rate_limited(client: Client, settings: Any) -> None:
     assert client.get(url).status_code == 403
 
 
+def test_rate_limit_holds_while_other_ips_fill_the_cache(client: Client, settings: Any) -> None:
+    """A blocked IP stays blocked while ordinary traffic flows.
+
+    Rate-limit counters are one cache key per client IP, and LocMemCache culls
+    keys once past `MAX_ENTRIES` — at the 300-entry default, ~300 other visitors
+    evict a live counter and the limit resets to zero. Silent, and it needs no
+    attacker: 300 distinct IPs is a normal day. `docs/01-DESIGN.md` §3.6 names
+    this limit as the real anti-scraping mitigation, so "it holds under traffic"
+    is the invariant, not "the decorator is applied".
+
+    The other IPs are written straight to the cache: eviction pressure is key
+    count, and 1k real requests would cost seconds for the same pressure.
+    """
+    settings.RATELIMIT_ENABLE = True
+    settings.SEARCH_RATELIMIT = "1/m"
+    cache.clear()
+
+    url = reverse("search:recruiter_search")
+    assert client.get(url, REMOTE_ADDR="10.0.0.1").status_code == 200
+    assert client.get(url, REMOTE_ADDR="10.0.0.1").status_code == 403
+
+    for i in range(1_000):
+        cache.set(f"rlbucket:10.1.{i // 256}.{i % 256}", 1, 60)
+
+    assert client.get(url, REMOTE_ADDR="10.0.0.1").status_code == 403
+
+
 def test_pagination_preserves_filters(client: Client) -> None:
     design = Discipline.objects.get(name="Design")
     game = Game.objects.create(title="G", source=Game.Source.MANUAL)

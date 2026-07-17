@@ -90,8 +90,12 @@ python manage.py seed_games
 
 - **Rehearse one database restore** from a Railway backup — do it once, for real.
 - Review the legal pages (`/terms/`, `/privacy/`) with counsel.
-- Rate limiting uses the default per-process cache. For limits that hold across
-  gunicorn workers, add a shared cache (Redis) and point `CACHES` at it.
+- Rate limiting uses a per-process in-memory cache (`CACHES` in
+  `config/settings/base.py`). Two consequences: each gunicorn worker counts
+  separately, and once the cache exceeds `MAX_ENTRIES` it culls keys —
+  including live counters, so a limit **silently stops holding** rather than
+  merely weakening. `MAX_ENTRIES` is set to 50k to buy headroom; a shared cache
+  (Redis) pointed at by `CACHES` is the real fix.
 - For ~400k games, switch `sitemap.xml` to a paginated sitemap index.
 
 ## Fallback if the schedule slips
