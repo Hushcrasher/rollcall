@@ -32,3 +32,8 @@ def test_landing_shows_real_counts(client: Client) -> None:
 def test_landing_links_to_apply(client: Client) -> None:
     response = client.get(reverse("search:recruiters_landing"))
     assert reverse("accounts:recruiter_apply").encode() in response.content
+
+
+def test_landing_links_to_the_open_search(client: Client) -> None:
+    response = client.get(reverse("search:recruiters_landing"))
+    assert reverse("search:recruiter_search").encode() in response.content

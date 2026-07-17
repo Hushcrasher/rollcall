@@ -17,6 +17,10 @@
     <li>{% blocktranslate count counter=games %}{{ counter }} game{% plural %}{{ counter }} games{% endblocktranslate %}</li>
   </ul>
 
-  <p>{% blocktranslate %}Recruiter accounts are reviewed manually.{% endblocktranslate %}</p>
-  <p><a href="{% url 'accounts:recruiter_apply' %}">{% translate "Apply for a recruiter account" %}</a></p>
+  <p><a href="{% url 'search:recruiter_search' %}">{% translate "Search people now" %}</a>
+  — {% translate "free and open to everyone while the platform grows." %}</p>
+
+  <p class="muted">{% blocktranslate %}Recruiter? You can also introduce yourself with a
+  manually-reviewed recruiter account.{% endblocktranslate %}
+  <a href="{% url 'accounts:recruiter_apply' %}">{% translate "Apply" %}</a></p>
 {% endblock %}
