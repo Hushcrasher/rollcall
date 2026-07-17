@@ -30,7 +30,8 @@ Extends Django's user (custom user model, email as username — **decide at proj
 | contactable | boolean | not null, default **true** | Relay contact allowed. Email itself is never exposed regardless. |
 | open_to_work | boolean | not null, default **false** | Badge + recruiter filter. Independent from `contactable`. |
 | avatar | varchar | nullable | Key in the S3 bucket. |
-| bio, location, links… | | nullable | Optional profile fields, implementer's discretion. |
+| country | varchar(2) | not null, default `''` | ISO 3166-1 alpha-2 (django-countries `CountryField`). Blank = not given. Person-level recruiter-search filter (§3.6); shown on the profile as "City · Country". |
+| bio, location, links… | | nullable | Optional profile fields, implementer's discretion. `location` is the free-text **"city / region"** display line (it is *not* nullable in practice: `blank=True, default=''`). |
 
 Indexes: GIN `gin_trgm_ops` on `display_name` (people search). Unique on `email`, `slug`.
 

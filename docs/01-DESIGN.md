@@ -83,12 +83,16 @@ Designed now so the schema doesn't need surgery later:
 
 Rationale for inclusion: candidate motivation depends on believing the recruiter side exists. The POC must test the full two-sided loop. The search itself became cheap thanks to the local seed (SQL joins, no external services).
 
-- **Recruiter account with manual validation** ("do things that don't scale"): mini application form (name, company, work email, LinkedIn link) → admin approves one by one. Each validation doubles as a user interview. `role` field on user: `member`/`recruiter`/`admin`; application has `pending`/`approved`/`rejected` status.
-- **Recruiter search filters:** discipline × game engine × game genre × game rating (Steam positive % — available natively from the Hushcrasher data — and IGDB ratings for non-Steam games) × dates/years of experience × `open_to_work`. Results sorted by criteria relevance only (no trust score yet). Rating is a filter among others, **never a default sort** (penalizes talented people on failed games).
+- **Search open to everyone** (changed 2026-07-16, spec `docs/superpowers/specs/2026-07-16-open-recruiter-search-design.md`): the platform is 100% free for now, so the search is not gated — anonymous visitors included. Showing workers that the recruiter-side tool exists is part of the promise, and gating hid it from exactly the people whose motivation depends on believing it exists.
+  - **Anti-scraping mitigations are the IP rate limit** (same `SEARCH_RATELIMIT` as the public search), **pagination, and `profile_public`** — see docs/02-ARCHITECTURE.md §5, which already concedes public pages can't be fully protected: accept and mitigate.
+  - The form's **≥1-filter rule is a UX guard, not a security boundary.** It stops the accidental filterless submit; it does **not** prevent enumeration and must not be documented as if it did. `?min_rating=1` is a perfectly legal filter that matches nearly everyone — any range filter at its extreme is a no-op, and there is no principled line between "no-op" and "merely broad".
+- **Recruiter account (dormant)**: the manual-validation application flow (mini form: name, company, work email, LinkedIn link → admin approves one by one; `role` field on user: `member`/`recruiter`/`admin`; application `pending`/`approved`/`rejected`) stays in place and working, but **no longer gates anything**. Kept cheap to re-arm if paid recruiter accounts return.
+- **Recruiter search filters:** discipline × game engines (multi, OR within) × game genres (multi, OR within) × person's country (multi) × game rating (Steam positive % — available natively from the Hushcrasher data — and IGDB ratings for non-Steam games) × dates/years of experience × `open_to_work`. The **credit-level** facets cross within a **SINGLE** contribution ("Unreal × Programming" means one credit is both); country and `open_to_work` are person-level. Rating filters on 1–100 (blank, not 0, is how you say "I don't care" — 0 would mean "must *have* rating data"). Engines/genres/countries are picked through an htmx typeahead (chips), not exhaustive checkbox lists. Results ordered by display name; rating is a filter among others, **never a default sort** (penalizes talented people on failed games).
+- **Result cards** show the matching credits (up to 3, then "+N more"), the person's "City · Country", career stats over *all* their active credits (credits · distinct games · years active, open end = "present"), and engine repartition % across credited games carrying engine data — rendered under an explicit "Engines on credited games" label, so it reads as a fact about the games rather than a proficiency score. All factual: **no person-level score**, and no email, ever.
 - ⚠️ **2D/3D filter caveat:** IGDB has no direct 2D/3D field (only player perspectives/keywords). Treat as best-effort or defer; do not block on it.
 - "Knows Unreal" is **not** inferred as a skill. The recruiter filters on two true facts crossed: "worked on an Unreal game" × "discipline = Programming". No self-declared skills in POC.
 - **Contact via relay form** (mandatory corollary of search): if `contactable`, a "Contact" button sends the message to the person's email without exposing it. Reply-To = recruiter's address, so replies happen directly off-platform by the person's active choice. Rate limiting per sender stored in DB (doubles as abuse traceability).
-- **Public "For recruiters" page** carrying the promise to candidates. Honest copy about network size — no inflated counters, no fake profiles.
+- **Public "For recruiters" page** carrying the promise to candidates. Honest copy about network size — no inflated counters, no fake profiles. Primary CTA is "Search people now" → the open search (2026-07-16); the apply link stays as a low-key secondary mention. Footer-linked sitewide, and `Allow`ed in robots.txt despite the blanket `/search/` disallow — discovery is its whole job (the filter search itself stays disallowed: a combinatorial URL space is a crawl trap).
 - Out of POC, firm: payment, automated recruiter verification, internal messaging with threads.
 
 ### 3.7 GDPR & legal (shapes the schema)
@@ -109,8 +113,8 @@ Rationale for inclusion: candidate motivation depends on believing the recruiter
 - Contributions: game + optional company + discipline + free job title + month/year dates (open end), multiples allowed
 - Person page (credits with dates); game page (contributors) — same table read both ways
 - Simple search (games, people), open to all
-- Recruiter search with filters (discipline, engine, genre, rating, dates, open_to_work) — behind manually-approved recruiter accounts
-- Recruiter application form + manual validation (Django admin is enough)
+- Recruiter search with filters (discipline, engines, genres, country, rating, dates, open_to_work) — **open to all** since 2026-07-16 (§3.6)
+- Recruiter application form + manual validation (Django admin is enough) — dormant since 2026-07-16: still works, gates nothing
 - Contact relay form (honors `contactable`)
 - Public "For recruiters" page
 - Account deletion (cascade + anonymization) + JSON export
@@ -125,7 +129,7 @@ Vouching/confirmations · company claim · manual game creation · internal mess
 
 ### Success metric (two-sided)
 1. Industry people, not individually solicited, create an account and declare ≥1 complete contribution.
-2. A few real recruiters apply, get approved, run searches, and send contact requests.
+2. A few real recruiters find the search, run searches, and send contact requests. (Reworded 2026-07-16: the old metric was "apply, get approved, run searches" — the apply/approve step is dormant since the search opened to all, so it can no longer be the signal. Sending a contact request still requires an account, which is the point where a recruiter becomes visible to us.)
 
 ### Fallback if the schedule slips
 Ship "For recruiters" page + contact relay first; advanced filters a few weeks later. The promise stays credible.
