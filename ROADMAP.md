@@ -12,7 +12,7 @@
 
 These do not block Phases 0–1, but **must be resolved before coding the seed** (Phase 2):
 
-- [ ] ⚠️ Written confirmation that IGDB/Twitch ToS cover this use (Hushcrasher-backed public product) — same check for Steam-derived data
+- [~] ⚠️ ToS clearance: **IGDB/Twitch confirmed 2026-08-04** (product owner) — they cover this use (Hushcrasher-backed public product). Steam-derived data still to confirm separately.
 - [ ] ⚠️ Parquet audit: `igdb_id` / `steam_appid` present; Steam↔IGDB mapping available (else dedup prep is the first data task)
 - [~] ⚠️ Accounts opened (chosen stack overrides docs' Scalingo/Scaleway defaults): **Railway** (PaaS — account created), **Cloudflare R2** (storage — bucket TODO), **Brevo** (account created; DNS/domain auth deferred to Phase 7), **Sentry** (TODO). None needed before Phase 7. GDPR: Railway + R2 are US → pick EU regions + sign DPAs.
 
