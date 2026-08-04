@@ -106,7 +106,7 @@ def verify_email(request: HttpRequest, uidb64: str, token: str) -> HttpResponse:
             user.email_verified_at = timezone.now()
             user.save(update_fields=["email_verified_at"])
         messages.success(request, _("Your email is verified — you can now add credits."))
-        return redirect("accounts:account")
+        return redirect("accounts:my_profile")
     messages.error(request, _("This verification link is invalid or has expired."))
     return render(request, "accounts/verify_email_invalid.html")
 
@@ -146,6 +146,7 @@ class ProfileView(DetailView):
         preview = is_self and self.request.GET.get("preview") == "member"
         context["is_owner"] = is_self and not preview
         context["preview"] = preview
+        context["is_visitor"] = user.is_authenticated and not is_self
         # profile_public=False hides the member everywhere but is invisible to
         # them, since _visible_users exempts the owner. Shown in the preview too.
         context["private_notice"] = is_self and not self.object.profile_public

@@ -34,6 +34,16 @@ def test_valid_link_verifies_the_email(client: Client) -> None:
     assert response.status_code == 302
 
 
+def test_valid_link_redirects_to_the_profile(client: Client) -> None:
+    """The success message says "you can now add credits" — the profile is
+    where that happens, not the account page."""
+    user = User.objects.create_user(email="a@example.com", password="x", display_name="A")
+
+    response = client.get(_verify_url(user))
+
+    assert response["Location"] == reverse("accounts:my_profile")
+
+
 def test_invalid_token_does_not_verify(client: Client) -> None:
     user = User.objects.create_user(email="a@example.com", password="x", display_name="A")
 

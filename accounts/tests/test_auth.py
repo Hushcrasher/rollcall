@@ -33,6 +33,13 @@ def test_login_with_email_and_password(client: Client, user: User) -> None:
     assert response.wsgi_request.user.is_authenticated
 
 
+def test_login_redirects_to_own_profile(client: Client, user: User) -> None:
+    response = client.post(
+        reverse("accounts:login"), {"username": user.email, "password": PASSWORD}
+    )
+    assert response["Location"] == reverse("accounts:my_profile")
+
+
 def test_logout(client: Client, user: User) -> None:
     client.force_login(user)
     response = client.post(reverse("accounts:logout"))

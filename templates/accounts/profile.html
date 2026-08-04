@@ -41,14 +41,14 @@
     {% if profile_user.contactable %}
       {% if preview %}
         <p><span class="muted">{% translate "Contact" %}</span></p>
-      {% elif user.is_authenticated and user != profile_user %}
+      {% elif is_visitor %}
         <p><a href="{% url 'contact:contact' profile_user.slug %}">{% translate "Contact" %}</a></p>
       {% endif %}
     {% endif %}
 
     {% if preview %}
       <p><span class="muted">{% translate "Report this profile" %}</span></p>
-    {% elif user.is_authenticated and user != profile_user %}
+    {% elif is_visitor %}
       <p><a href="{% url 'contact:report' %}?type=user&amp;id={{ profile_user.pk }}">{% translate "Report this profile" %}</a></p>
     {% endif %}
   </article>

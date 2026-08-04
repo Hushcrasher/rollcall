@@ -1,11 +1,15 @@
 """'View as member' — the owner previews their own profile as a logged-in
 member sees it (docs/superpowers/specs/2026-08-04-profile-account-split-design.md)."""
 
+from datetime import date
+
 import pytest
 from django.test import Client
 from django.urls import reverse
 
 from accounts.models import User
+from contributions.models import Contribution, Discipline
+from games.models import Game
 
 pytestmark = pytest.mark.django_db
 
@@ -34,6 +38,26 @@ def test_preview_hides_every_owner_control(client: Client, user: User) -> None:
     assert b"View as member" not in body
     assert b"Add a credit" not in body
     assert b"Back to my profile" in body
+
+
+def test_preview_hides_credit_edit_and_delete_links(client: Client, user: User) -> None:
+    """A regression reverting the credit-row guards to `user == profile_user`
+    (still true in preview) would leak Edit/Delete links to the owner's own
+    preview of the member view."""
+    game = Game.objects.create(title="Celeste", source=Game.Source.MANUAL)
+    contribution = Contribution.objects.create(
+        user=user,
+        game=game,
+        discipline=Discipline.objects.get(name="Design"),
+        job_title="Level Designer",
+        start_date=date(2018, 1, 1),
+    )
+    client.force_login(user)
+
+    body = client.get(user.get_absolute_url() + "?preview=member").content.decode()
+
+    assert reverse("contributions:edit", kwargs={"pk": contribution.pk}) not in body
+    assert reverse("contributions:delete", kwargs={"pk": contribution.pk}) not in body
 
 
 def test_preview_renders_contact_inert(client: Client, user: User) -> None:
