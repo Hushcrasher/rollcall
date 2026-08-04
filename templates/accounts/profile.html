@@ -4,6 +4,13 @@
 {% block title %}{{ profile_user.display_name }} · Rollcall{% endblock %}
 
 {% block content %}
+  {% if private_notice %}
+    <p class="notice">
+      {% translate "Your profile is private: nobody else can see this page, and you don't appear in any search." %}
+      <a href="{% url 'accounts:profile_edit' %}">{% translate "Change this" %}</a>
+    </p>
+  {% endif %}
+
   {% if preview %}
     <p class="preview-bar">
       {% translate "Preview — what a logged-in member sees." %}

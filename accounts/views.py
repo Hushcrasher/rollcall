@@ -146,6 +146,9 @@ class ProfileView(DetailView):
         preview = is_self and self.request.GET.get("preview") == "member"
         context["is_owner"] = is_self and not preview
         context["preview"] = preview
+        # profile_public=False hides the member everywhere but is invisible to
+        # them, since _visible_users exempts the owner. Shown in the preview too.
+        context["private_notice"] = is_self and not self.object.profile_public
         return context
 
 
