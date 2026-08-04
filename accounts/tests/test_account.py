@@ -1,8 +1,11 @@
-"""Account page — edit profile + the three visibility booleans (docs/01-DESIGN.md §3.4)."""
+"""Account page — email verification, data export, deletion. Nothing else:
+the profile fields live on /profile/edit/ (docs/superpowers/specs/
+2026-08-04-profile-account-split-design.md)."""
 
 import pytest
 from django.test import Client
 from django.urls import reverse
+from django.utils import timezone
 
 from accounts.models import User
 
@@ -19,56 +22,35 @@ def test_account_requires_login(client: Client) -> None:
     assert response.status_code == 302  # redirected to login
 
 
-def test_account_exposes_the_contactable_toggle(client: Client, user: User) -> None:
-    """The contactable toggle must be easy to find (ease of exit, no dark pattern)."""
+def test_account_offers_export_and_deletion(client: Client, user: User) -> None:
     client.force_login(user)
     response = client.get(reverse("accounts:account"))
     assert response.status_code == 200
-    assert b"contactable" in response.content
+    body = response.content.decode()
+    assert reverse("accounts:export_data") in body
+    assert reverse("accounts:account_delete") in body
 
 
-def test_update_profile_fields(client: Client, user: User) -> None:
+def test_account_warns_an_unverified_email(client: Client, user: User) -> None:
+    assert user.email_verified_at is None
     client.force_login(user)
-    client.post(
-        reverse("accounts:account"),
-        {"display_name": "Renamed", "bio": "Gameplay dev", "location": "Lyon"},
-    )
-    user.refresh_from_db()
-    assert user.display_name == "Renamed"
-    assert user.bio == "Gameplay dev"
+    response = client.get(reverse("accounts:account"))
+    assert b"not verified yet" in response.content
 
 
-def test_toggle_visibility_booleans(client: Client, user: User) -> None:
-    assert user.profile_public is True and user.open_to_work is False
+def test_verified_email_gets_no_warning(client: Client, user: User) -> None:
+    user.email_verified_at = timezone.now()
+    user.save(update_fields=["email_verified_at"])
     client.force_login(user)
-
-    # Unchecked checkboxes aren't submitted → they become False; open_to_work on.
-    client.post(
-        reverse("accounts:account"),
-        {"display_name": "Me", "open_to_work": "on"},
-    )
-
-    user.refresh_from_db()
-    assert user.profile_public is False
-    assert user.contactable is False
-    assert user.open_to_work is True
+    response = client.get(reverse("accounts:account"))
+    assert b"not verified yet" not in response.content
 
 
-def test_update_country(client: Client, user: User) -> None:
+def test_account_carries_no_profile_form(client: Client, user: User) -> None:
+    """The profile fields moved out — the page must not edit them any more.
+    Asserted on the field names, not on <form>: base.html carries a logout form
+    on every page."""
     client.force_login(user)
-    client.post(
-        reverse("accounts:account"),
-        {"display_name": "Me", "country": "FR", "location": "Lyon"},
-    )
-    user.refresh_from_db()
-    assert user.country.code == "FR"  # ty: ignore[unresolved-attribute]
-    assert user.location == "Lyon"
-
-
-def test_country_can_be_cleared(client: Client, user: User) -> None:
-    user.country = "SE"  # ty: ignore[invalid-assignment]
-    user.save(update_fields=["country"])
-    client.force_login(user)
-    client.post(reverse("accounts:account"), {"display_name": "Me", "country": ""})
-    user.refresh_from_db()
-    assert not user.country
+    body = client.get(reverse("accounts:account")).content
+    for field in (b"display_name", b"contactable", b"profile_public", b"github_url", b"avatar"):
+        assert field not in body

@@ -62,6 +62,7 @@ urlpatterns: list[URLPattern | URLResolver] = [
     path("u/<slug:slug>/github/", views.github_activity, name="github_activity"),
     # Own profile — slugless, so settings and templates can link without a slug.
     path("profile/", views.my_profile_redirect, name="my_profile"),
+    path("profile/edit/", views.ProfileEditView.as_view(), name="profile_edit"),
     # Public profile — kept last so it never shadows the fixed routes above.
     path("u/<slug:slug>/", views.ProfileView.as_view(), name="profile"),
 ]

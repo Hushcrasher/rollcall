@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% translate "Edit my profile" %} · Rollcall{% endblock %}
+
+{% block content %}
+  <h1>{% translate "Edit my profile" %}</h1>
+
+  <form method="post" enctype="multipart/form-data" novalidate>
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">{% translate "Save" %}</button>
+  </form>
+
+  <p><a href="{% url 'accounts:my_profile' %}">{% translate "Back to my profile" %}</a></p>
+{% endblock %}

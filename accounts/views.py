@@ -27,8 +27,8 @@ from accounts.emails import send_verification_email
 from accounts.export import build_personal_data_export
 from accounts.forms import (
     EmailAuthenticationForm,
+    ProfileForm,
     RecruiterApplicationForm,
-    SettingsForm,
     SignupForm,
 )
 from accounts.github import get_github_activity
@@ -43,6 +43,7 @@ __all__ = [
     "AccountDeleteView",
     "AccountView",
     "EmailAuthenticationForm",
+    "ProfileEditView",
     "ProfileView",
     "RecruiterApplyView",
     "SignupView",
@@ -140,17 +141,30 @@ class ProfileView(DetailView):
         return context
 
 
-class AccountView(LoginRequiredMixin, UpdateView):
-    form_class = SettingsForm
-    template_name = "accounts/account.html"
-    success_url = reverse_lazy("accounts:account")
+class ProfileEditView(LoginRequiredMixin, UpdateView):
+    """The profile fields. Slugless: the object is always the requester, so a
+    slug in the URL could only ever disagree with it."""
+
+    form_class = ProfileForm
+    template_name = "accounts/profile_edit.html"
 
     def get_object(self, queryset: QuerySet[User] | None = None) -> User:
         return self.request.user
 
-    def form_valid(self, form: SettingsForm) -> HttpResponse:
-        messages.success(self.request, _("Your settings were saved."))
+    def get_success_url(self) -> str:
+        # Land on the profile so the member sees the result of the edit.
+        return str(self.object.get_absolute_url())
+
+    def form_valid(self, form: ProfileForm) -> HttpResponse:
+        messages.success(self.request, _("Your profile was saved."))
         return super().form_valid(form)
+
+
+class AccountView(LoginRequiredMixin, TemplateView):
+    """Email verification, data export, account deletion. The profile fields
+    moved to ProfileEditView."""
+
+    template_name = "accounts/account.html"
 
 
 class AccountDeleteView(LoginRequiredMixin, TemplateView):

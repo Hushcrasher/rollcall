@@ -36,8 +36,8 @@ class RecruiterApplicationForm(forms.ModelForm):
         fields = ["full_name", "company_name", "work_email", "linkedin_url", "message"]
 
 
-class SettingsForm(forms.ModelForm):
-    """Profile + the three visibility booleans (docs/01-DESIGN.md §3.4),
+class ProfileForm(forms.ModelForm):
+    """The profile fields + the three visibility booleans (docs/01-DESIGN.md §3.4),
     plus an optional GitHub handle (stored parsed as a login)."""
 
     github_url = forms.CharField(
