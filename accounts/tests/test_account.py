@@ -1,4 +1,4 @@
-"""Settings — edit profile + the three visibility booleans (docs/01-DESIGN.md §3.4)."""
+"""Account page — edit profile + the three visibility booleans (docs/01-DESIGN.md §3.4)."""
 
 import pytest
 from django.test import Client
@@ -14,15 +14,15 @@ def user() -> User:
     return User.objects.create_user(email="me@example.com", password="x", display_name="Me")
 
 
-def test_settings_requires_login(client: Client) -> None:
-    response = client.get(reverse("accounts:settings"))
+def test_account_requires_login(client: Client) -> None:
+    response = client.get(reverse("accounts:account"))
     assert response.status_code == 302  # redirected to login
 
 
-def test_settings_exposes_the_contactable_toggle(client: Client, user: User) -> None:
+def test_account_exposes_the_contactable_toggle(client: Client, user: User) -> None:
     """The contactable toggle must be easy to find (ease of exit, no dark pattern)."""
     client.force_login(user)
-    response = client.get(reverse("accounts:settings"))
+    response = client.get(reverse("accounts:account"))
     assert response.status_code == 200
     assert b"contactable" in response.content
 
@@ -30,7 +30,7 @@ def test_settings_exposes_the_contactable_toggle(client: Client, user: User) -> 
 def test_update_profile_fields(client: Client, user: User) -> None:
     client.force_login(user)
     client.post(
-        reverse("accounts:settings"),
+        reverse("accounts:account"),
         {"display_name": "Renamed", "bio": "Gameplay dev", "location": "Lyon"},
     )
     user.refresh_from_db()
@@ -44,7 +44,7 @@ def test_toggle_visibility_booleans(client: Client, user: User) -> None:
 
     # Unchecked checkboxes aren't submitted → they become False; open_to_work on.
     client.post(
-        reverse("accounts:settings"),
+        reverse("accounts:account"),
         {"display_name": "Me", "open_to_work": "on"},
     )
 
@@ -54,10 +54,10 @@ def test_toggle_visibility_booleans(client: Client, user: User) -> None:
     assert user.open_to_work is True
 
 
-def test_update_country_from_settings(client: Client, user: User) -> None:
+def test_update_country(client: Client, user: User) -> None:
     client.force_login(user)
     client.post(
-        reverse("accounts:settings"),
+        reverse("accounts:account"),
         {"display_name": "Me", "country": "FR", "location": "Lyon"},
     )
     user.refresh_from_db()
@@ -69,6 +69,6 @@ def test_country_can_be_cleared(client: Client, user: User) -> None:
     user.country = "SE"  # ty: ignore[invalid-assignment]
     user.save(update_fields=["country"])
     client.force_login(user)
-    client.post(reverse("accounts:settings"), {"display_name": "Me", "country": ""})
+    client.post(reverse("accounts:account"), {"display_name": "Me", "country": ""})
     user.refresh_from_db()
     assert not user.country

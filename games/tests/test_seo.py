@@ -19,7 +19,8 @@ def test_robots_txt_allows_indexing_and_points_to_sitemap(client: Client) -> Non
     body = response.content
     assert b"Sitemap:" in body
     assert b"Disallow: /admin/" in body
-    assert b"Disallow: /settings/" in body
+    assert b"Disallow: /account/" in body
+    assert b"Disallow: /profile/" in body
 
 
 def test_robots_txt_opens_the_promise_page_but_not_the_filter_search(client: Client) -> None:

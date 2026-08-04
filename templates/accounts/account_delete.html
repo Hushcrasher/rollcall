@@ -16,6 +16,6 @@
   <form method="post">
     {% csrf_token %}
     <button type="submit">{% translate "Permanently delete my account" %}</button>
-    <a href="{% url 'accounts:settings' %}">{% translate "Cancel" %}</a>
+    <a href="{% url 'accounts:account' %}">{% translate "Cancel" %}</a>
   </form>
 {% endblock %}

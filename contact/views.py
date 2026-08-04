@@ -87,7 +87,7 @@ class ReportView(LoginRequiredMixin, CreateView):
     model = Report
     form_class = ReportForm
     template_name = "contact/report_form.html"
-    success_url = reverse_lazy("accounts:settings")
+    success_url = reverse_lazy("accounts:account")
 
     def get_initial(self) -> dict[str, Any]:
         initial = super().get_initial()

@@ -55,10 +55,10 @@ urlpatterns: list[URLPattern | URLResolver] = [
     ),
     # Recruiter application (approved manually in the admin)
     path("recruiters/apply/", views.RecruiterApplyView.as_view(), name="recruiter_apply"),
-    # Settings + GDPR (deletion, export)
-    path("settings/", views.SettingsView.as_view(), name="settings"),
-    path("settings/delete/", views.AccountDeleteView.as_view(), name="account_delete"),
-    path("settings/export/", views.export_personal_data, name="export_data"),
+    # Account + GDPR (deletion, export)
+    path("account/", views.AccountView.as_view(), name="account"),
+    path("account/delete/", views.AccountDeleteView.as_view(), name="account_delete"),
+    path("account/export/", views.export_personal_data, name="export_data"),
     path("u/<slug:slug>/github/", views.github_activity, name="github_activity"),
     # Own profile — slugless, so settings and templates can link without a slug.
     path("profile/", views.my_profile_redirect, name="my_profile"),

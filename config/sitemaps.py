@@ -13,7 +13,7 @@ from django.urls import reverse
 from accounts.models import User
 from games.models import Company, Game
 
-_DISALLOW = ["/admin/", "/settings/", "/credits/", "/contact/", "/report/", "/search/"]
+_DISALLOW = ["/admin/", "/account/", "/profile/", "/credits/", "/contact/", "/report/", "/search/"]
 
 # Carved out of the blanket `/search/` disallow below. `/search/for-recruiters/`
 # is the public promise page — footer-linked sitewide, honest counts, and the CTA

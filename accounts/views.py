@@ -1,5 +1,5 @@
 """Account views — signup, email verification, login helpers, profile,
-settings, and GDPR (deletion + export)."""
+account, and GDPR (deletion + export)."""
 
 import logging
 from typing import Any
@@ -41,10 +41,10 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "AccountDeleteView",
+    "AccountView",
     "EmailAuthenticationForm",
     "ProfileView",
     "RecruiterApplyView",
-    "SettingsView",
     "SignupView",
     "VerificationSentView",
     "export_personal_data",
@@ -105,7 +105,7 @@ def verify_email(request: HttpRequest, uidb64: str, token: str) -> HttpResponse:
             user.email_verified_at = timezone.now()
             user.save(update_fields=["email_verified_at"])
         messages.success(request, _("Your email is verified — you can now add credits."))
-        return redirect("accounts:settings")
+        return redirect("accounts:account")
     messages.error(request, _("This verification link is invalid or has expired."))
     return render(request, "accounts/verify_email_invalid.html")
 
@@ -118,7 +118,7 @@ def resend_verification(request: AuthedHttpRequest) -> HttpResponse:
         send_verification_email(request, user)
         messages.success(request, _("Verification email sent."))
         return redirect("accounts:verification_sent")
-    return redirect("accounts:settings")
+    return redirect("accounts:account")
 
 
 @method_decorator(ratelimit(key="ip", rate=_profile_rate, method="GET", block=True), name="get")
@@ -140,10 +140,10 @@ class ProfileView(DetailView):
         return context
 
 
-class SettingsView(LoginRequiredMixin, UpdateView):
+class AccountView(LoginRequiredMixin, UpdateView):
     form_class = SettingsForm
-    template_name = "accounts/settings.html"
-    success_url = reverse_lazy("accounts:settings")
+    template_name = "accounts/account.html"
+    success_url = reverse_lazy("accounts:account")
 
     def get_object(self, queryset: QuerySet[User] | None = None) -> User:
         return self.request.user
@@ -177,7 +177,7 @@ class RecruiterApplyView(LoginRequiredMixin, CreateView):
     model = RecruiterApplication
     form_class = RecruiterApplicationForm
     template_name = "accounts/recruiter_apply.html"
-    success_url = reverse_lazy("accounts:settings")
+    success_url = reverse_lazy("accounts:account")
 
     def dispatch(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         user = self.request.user
@@ -189,7 +189,7 @@ class RecruiterApplyView(LoginRequiredMixin, CreateView):
             ).exists()
             if pending:
                 messages.info(request, _("Your recruiter application is already under review."))
-                return redirect("accounts:settings")
+                return redirect("accounts:account")
         return super().dispatch(request, *args, **kwargs)
 
     def form_valid(self, form: RecruiterApplicationForm) -> HttpResponse:
