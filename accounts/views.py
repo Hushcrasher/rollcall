@@ -138,6 +138,14 @@ class ProfileView(DetailView):
             .select_related("game", "company", "discipline")
             .order_by("-start_date")
         )
+        # `?preview=member` is honored for the owner only — for anyone else this
+        # already *is* the member view, so the param can never change what a
+        # third party sees.
+        user: Any = self.request.user
+        is_self = user.is_authenticated and user.pk == self.object.pk
+        preview = is_self and self.request.GET.get("preview") == "member"
+        context["is_owner"] = is_self and not preview
+        context["preview"] = preview
         return context
 
 

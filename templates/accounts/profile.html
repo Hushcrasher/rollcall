@@ -4,6 +4,13 @@
 {% block title %}{{ profile_user.display_name }} · Rollcall{% endblock %}
 
 {% block content %}
+  {% if preview %}
+    <p class="preview-bar">
+      {% translate "Preview — what a logged-in member sees." %}
+      <a href="{% url 'accounts:profile' profile_user.slug %}">{% translate "Back to my profile" %}</a>
+    </p>
+  {% endif %}
+
   <article>
     {% if profile_user.avatar %}
       <img src="{{ profile_user.avatar.url }}" alt="" width="120" height="120">
@@ -17,17 +24,31 @@
     {% if profile_user.location_display %}<p>{{ profile_user.location_display }}</p>{% endif %}
     {% if profile_user.bio %}<p>{{ profile_user.bio }}</p>{% endif %}
 
-    {% if profile_user.contactable and user.is_authenticated and user != profile_user %}
-      <p><a href="{% url 'contact:contact' profile_user.slug %}">{% translate "Contact" %}</a></p>
+    {% if is_owner %}
+      <p>
+        <a href="{% url 'accounts:profile_edit' %}">{% translate "Edit my profile" %}</a>
+        <a href="?preview=member">{% translate "View as member" %}</a>
+      </p>
     {% endif %}
-    {% if user.is_authenticated and user != profile_user %}
+
+    {% if profile_user.contactable %}
+      {% if preview %}
+        <p><span class="muted">{% translate "Contact" %}</span></p>
+      {% elif user.is_authenticated and user != profile_user %}
+        <p><a href="{% url 'contact:contact' profile_user.slug %}">{% translate "Contact" %}</a></p>
+      {% endif %}
+    {% endif %}
+
+    {% if preview %}
+      <p><span class="muted">{% translate "Report this profile" %}</span></p>
+    {% elif user.is_authenticated and user != profile_user %}
       <p><a href="{% url 'contact:report' %}?type=user&amp;id={{ profile_user.pk }}">{% translate "Report this profile" %}</a></p>
     {% endif %}
   </article>
 
   <section>
     <h2>{% translate "Credits" %}</h2>
-    {% if request.user == profile_user %}
+    {% if is_owner %}
       <p><a href="{% url 'contributions:create' %}">{% translate "Add a credit" %}</a></p>
     {% endif %}
 
@@ -43,7 +64,7 @@
           {% if c.end_date %}{{ c.end_date|date:"M Y" }}{% else %}{% translate "present" %}{% endif %}
         </span>
         <span class="badge">{% translate "Declared" %}</span>
-        {% if request.user == profile_user %}
+        {% if is_owner %}
           <a href="{% url 'contributions:edit' c.pk %}">{% translate "Edit" %}</a>
           <a href="{% url 'contributions:delete' c.pk %}">{% translate "Delete" %}</a>
         {% endif %}
