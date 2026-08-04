@@ -40,7 +40,21 @@ def test_a_public_profile_has_no_notice(client: Client, user: User) -> None:
     assert NOTICE not in client.get(user.get_absolute_url()).content
 
 
-def test_a_visitor_never_sees_the_notice(client: Client, user: User) -> None:
+def test_a_visitor_on_a_public_profile_sees_no_notice(client: Client, user: User) -> None:
     other = User.objects.create_user(email="you@example.com", password="x", display_name="You")
     client.force_login(other)
     assert NOTICE not in client.get(user.get_absolute_url()).content
+
+
+def test_a_private_profile_404s_for_a_visitor_so_the_notice_is_unreachable(
+    client: Client, user: User
+) -> None:
+    """A visitor can never be shown the notice on a private profile: _visible_users
+    filters them out of the queryset before any context (and thus the notice) is
+    built, so the page 404s instead of rendering with the notice suppressed."""
+    user.profile_public = False  # ty: ignore[invalid-assignment]
+    user.save(update_fields=["profile_public"])
+    other = User.objects.create_user(email="you@example.com", password="x", display_name="You")
+    client.force_login(other)
+    response = client.get(user.get_absolute_url())
+    assert response.status_code == 404
