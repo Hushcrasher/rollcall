@@ -49,6 +49,7 @@ __all__ = [
     "VerificationSentView",
     "export_personal_data",
     "github_activity",
+    "my_profile_redirect",
     "resend_verification",
     "verify_email",
 ]
@@ -63,6 +64,14 @@ def _visible_users(request: HttpRequest) -> QuerySet[User]:
     if request.user.is_authenticated:  # ty: ignore[unresolved-attribute]
         return User.objects.filter(Q(profile_public=True) | Q(pk=request.user.pk))  # ty: ignore[unresolved-attribute]
     return User.objects.filter(profile_public=True)
+
+
+@login_required
+def my_profile_redirect(request: AuthedHttpRequest) -> HttpResponse:
+    """Slugless entry point to one's own profile. LOGIN_REDIRECT_URL is a plain
+    string setting and cannot pass a slug to reverse(), so the slug is resolved
+    here at request time instead."""
+    return redirect(request.user.get_absolute_url())
 
 
 class SignupView(FormView):
