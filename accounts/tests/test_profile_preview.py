@@ -87,6 +87,12 @@ def test_preview_param_is_inert_for_a_visitor(client: Client, user: User, other:
 
 
 def test_anonymous_visitor_is_unaffected(client: Client, user: User) -> None:
+    """Pins the `is_visitor` half of the flag too: a flag computed as `not is_self`
+    instead of `is_authenticated and not is_self` would leak both affordances here,
+    and every other test in this file would stay green."""
     response = client.get(user.get_absolute_url() + "?preview=member")
     assert response.status_code == 200
-    assert b"Back to my profile" not in response.content
+    body = response.content.decode()
+    assert "Back to my profile" not in body
+    assert reverse("contact:contact", kwargs={"slug": user.slug}) not in body
+    assert reverse("contact:report") not in body

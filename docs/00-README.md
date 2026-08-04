@@ -33,7 +33,7 @@ Documentation set for implementation (intended to be handed to Claude Code).
 1. Repo bootstrap: Django project, custom user model (⚠️ before any migration), Docker/compose, CI, LICENSE, `.env.example`.
 2. Initial migrations: full schema from `04-DATABASE-SCHEMA.md`, including dormant parts; discipline data migration; dev fixtures.
 3. Seed management command (DuckDB → upsert) + tests on dedup.
-4. Accounts: signup, email verification, profile page, account page (3 visibility booleans), account deletion + JSON export.
+4. Accounts: signup, email verification, profile page (3 visibility booleans), account page, account deletion + JSON export.
 5. Contributions CRUD (game autocomplete via trigram, company optional, dates month/year) + person page + game page.
 6. Simple search (games/people).
 7. Recruiter side: application form + admin approval, recruiter search with filters + tests on the query, contact relay + rate limit, public "For recruiters" page.
