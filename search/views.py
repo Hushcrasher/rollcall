@@ -12,7 +12,9 @@ from django.shortcuts import render
 from django.utils.decorators import method_decorator
 from django.views.generic import TemplateView
 from django_countries import countries
+from django_ratelimit.core import is_ratelimited
 from django_ratelimit.decorators import ratelimit
+from django_ratelimit.exceptions import Ratelimited
 
 from games.igdb import IGDBClient
 from games.models import Engine, Genre
@@ -38,7 +40,12 @@ class SearchView(TemplateView):
         return context
 
 
-@method_decorator(ratelimit(key="ip", rate=_search_rate, method="GET", block=True), name="get")
+# Named explicitly: django-ratelimit derives a decorator's group from the view's
+# module and qualname, so renaming the view would have silently moved the
+# counter. Distinct from SearchView's, which is the behavior today.
+_RATELIMIT_GROUP = "people_search"
+
+
 class PeopleSearchView(TemplateView):
     """The home page: find people by what they've worked on. Open to everyone —
     the platform is free, and showing workers that the recruiter-side tool
@@ -47,6 +54,22 @@ class PeopleSearchView(TemplateView):
     The form's >=1-filter rule is a UX guard only, not a boundary."""
 
     template_name = "search/people_search.html"
+
+    def get(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
+        # Only a real search spends quota. This view is the home page now, so a
+        # blanket limit would let one shared IP turn the front door into a 403.
+        # Any query string counts — `?page=2` and junk params are part of the
+        # same generated URL space, and that space is what needs metering.
+        if request.GET and is_ratelimited(
+            request=request,
+            group=_RATELIMIT_GROUP,
+            key="ip",
+            rate=settings.SEARCH_RATELIMIT,
+            method="GET",
+            increment=True,
+        ):
+            raise Ratelimited
+        return super().get(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
         context = super().get_context_data(**kwargs)

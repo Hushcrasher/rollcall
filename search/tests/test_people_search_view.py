@@ -157,14 +157,32 @@ def test_more_credits_count_is_shown_beyond_three(client: Client) -> None:
     assert "+2 more matching credits" in content
 
 
-def test_rate_limited(client: Client, settings: Any) -> None:
+def test_the_bare_home_page_is_never_rate_limited(client: Client, settings: Any) -> None:
+    """This view is the front door now. A 403 on a search page is an annoyance;
+    a 403 on `/` is the site being down for everyone behind that IP — an office
+    NAT, a link-preview fetcher, a health check."""
     settings.RATELIMIT_ENABLE = True
     settings.SEARCH_RATELIMIT = "1/m"
     cache.clear()
 
     url = reverse("home")
+    for _ in range(5):
+        assert client.get(url).status_code == 200
+
+
+def test_a_real_search_is_rate_limited(client: Client, settings: Any) -> None:
+    """Any query string counts, `?page=2` and junk params included: they are the
+    same generated URL space, and leaving them free would unmeter the cheapest
+    enumeration path."""
+    settings.RATELIMIT_ENABLE = True
+    settings.SEARCH_RATELIMIT = "1/m"
+    cache.clear()
+
+    url = reverse("home")
+    assert client.get(url, {"open_to_work": "on"}).status_code == 200
+    assert client.get(url, {"open_to_work": "on"}).status_code == 403
+    # A bare hit still answers — the counter is spent, the front door is not.
     assert client.get(url).status_code == 200
-    assert client.get(url).status_code == 403
 
 
 def test_rate_limit_holds_while_other_ips_fill_the_cache(client: Client, settings: Any) -> None:
@@ -185,13 +203,14 @@ def test_rate_limit_holds_while_other_ips_fill_the_cache(client: Client, setting
     cache.clear()
 
     url = reverse("home")
-    assert client.get(url, REMOTE_ADDR="10.0.0.1").status_code == 200
-    assert client.get(url, REMOTE_ADDR="10.0.0.1").status_code == 403
+    search = {"open_to_work": "on"}
+    assert client.get(url, search, REMOTE_ADDR="10.0.0.1").status_code == 200
+    assert client.get(url, search, REMOTE_ADDR="10.0.0.1").status_code == 403
 
     for i in range(1_000):
         cache.set(f"rlbucket:10.1.{i // 256}.{i % 256}", 1, 60)
 
-    assert client.get(url, REMOTE_ADDR="10.0.0.1").status_code == 403
+    assert client.get(url, search, REMOTE_ADDR="10.0.0.1").status_code == 403
 
 
 def test_pagination_preserves_filters(client: Client) -> None:
