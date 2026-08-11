@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% translate "Create your account" %} · Rollcall{% endblock %}
+
+{% block content %}
+  <h1>{% translate "Last step — your account" %}</h1>
+  <p>{% translate "Your credit is ready. Create an account to put your name on it." %}</p>
+
+  <form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">{% translate "Create my account" %}</button>
+  </form>
+
+  <p>{% translate "Already have an account?" %}
+    <a href="{% url 'accounts:login' %}?next={% url 'contributions:declare_account' %}">{% translate "Log in" %}</a>
+    — {% translate "your credit is kept." %}</p>
+{% endblock %}

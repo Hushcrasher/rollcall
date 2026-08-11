@@ -4,9 +4,15 @@
 {% block title %}{% translate "Verify your email" %} · Rollcall{% endblock %}
 
 {% block content %}
-  <h1>{% translate "Check your inbox" %}</h1>
-  <p>{% blocktranslate %}We sent you a verification link. Click it to confirm your
-  email — you need a verified email before you can add credits.{% endblocktranslate %}</p>
+  {% if pending_credit %}
+    <h1>{% translate "One more step" %}</h1>
+    <p>{% blocktranslate with title=pending_credit.game.title %}Your credit on {{ title }} is
+    saved. Verify your email to publish it — check your inbox.{% endblocktranslate %}</p>
+  {% else %}
+    <h1>{% translate "Check your inbox" %}</h1>
+    <p>{% blocktranslate %}We sent you a verification link. Click it to confirm your
+    email — you need a verified email before you can add credits.{% endblocktranslate %}</p>
+  {% endif %}
 
   <form method="post" action="{% url 'accounts:resend_verification' %}">
     {% csrf_token %}

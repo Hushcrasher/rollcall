@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% translate "Which game did you work on?" %} · Rollcall{% endblock %}
+
+{% block content %}
+  <h1>{% translate "Which game did you work on?" %}</h1>
+
+  <form method="post">
+    {% csrf_token %}
+    <input type="search" name="q" size="35" value="{{ query }}" required
+           placeholder="{% translate 'Hollow Knight, Dishonored…' %}">
+    <button type="submit">{% translate "Search" %}</button>
+  </form>
+
+  {% if query %}
+    {% if games %}
+      <ul>
+        {% for game in games %}
+          <li>
+            <form method="post">
+              {% csrf_token %}
+              <input type="hidden" name="game" value="{{ game.pk }}">
+              <button type="submit">{{ game.title }}{% if game.release_date %} ({{ game.release_date|date:"Y" }}){% endif %}</button>
+            </form>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p>{% translate "No match." %}</p>
+    {% endif %}
+    {% comment %}
+      games:igdb_search is @login_required and stays that way — it is a write
+      path to an external API. A miss therefore converts into a signup instead
+      of a dead end.
+    {% endcomment %}
+    <p class="muted">{% translate "Can't find it? Create your account and we'll help you add it." %}
+      <a href="{% url 'accounts:signup' %}">{% translate "Create your account" %}</a></p>
+  {% endif %}
+{% endblock %}

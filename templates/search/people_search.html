@@ -47,12 +47,25 @@
 {% endblock %}
 
 {% block content %}
-  <h1>{% translate "Find people by what they've worked on" %}</h1>
+  {% if user.is_authenticated %}
+    <h1>{% translate "Find people by what they've worked on" %}</h1>
+  {% else %}
+    {% comment %}
+      Anonymous visitors lead with the question: metric #1 is workers declaring
+      their work, and a recruiter arrives with intent. This also means crawlers
+      index the home page under the question — accepted knowingly (spec
+      2026-08-11-deferred-registration-funnel-design.md).
+    {% endcomment %}
+    <h1>{% translate "Which game did you work on?" %}</h1>
+    <p>{% translate "Add a credit to your name. You can create your account at the end." %}</p>
+    <form method="post" action="{% url 'contributions:declare' %}">
+      {% csrf_token %}
+      <input type="search" name="q" size="35" required
+             placeholder="{% translate 'Hollow Knight, Dishonored…' %}">
+      <button type="submit">{% translate "Continue" %}</button>
+    </form>
 
-  {% if not user.is_authenticated %}
-    <p>{% blocktranslate %}Rollcall is a credits database for the video game industry.
-    Declare your work, be found by recruiters for what you actually shipped.{% endblocktranslate %}
-    <a href="{% url 'accounts:signup' %}">{% translate "Create your account" %}</a></p>
+    <h2>{% translate "Looking for someone?" %}</h2>
   {% endif %}
 
   {% comment %}

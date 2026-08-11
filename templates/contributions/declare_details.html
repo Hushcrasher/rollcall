@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% translate "Your credit" %} · Rollcall{% endblock %}
+
+{% block content %}
+  <h1>{% translate "Tell us about your work" %}</h1>
+  <p>{% blocktranslate with title=game.title %}On {{ title }}.{% endblocktranslate %}
+    <a href="{% url 'contributions:declare' %}">{% translate "Wrong game?" %}</a></p>
+
+  <form method="post">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+
+    {# The game is fixed by step 1 — carried as the form's hidden field. #}
+    {{ form.game }}
+    {{ form.game.errors }}
+
+    {% include "contributions/_employer_field.html" %}
+
+    <p>
+      <label for="{{ form.discipline.id_for_label }}">{% translate "Discipline" %}</label>
+      {{ form.discipline }} {{ form.discipline.errors }}
+    </p>
+    <p>
+      <label for="{{ form.job_title.id_for_label }}">{% translate "Job title" %}</label>
+      {{ form.job_title }} {{ form.job_title.errors }}
+    </p>
+    <p>
+      <label for="{{ form.start_date.id_for_label }}">{{ form.start_date.label }}</label>
+      {{ form.start_date }} {{ form.start_date.errors }}
+    </p>
+    <p>
+      <label for="{{ form.end_date.id_for_label }}">{{ form.end_date.label }}</label>
+      {{ form.end_date }} {{ form.end_date.errors }}
+      <small>{% translate "Leave empty if you're still working on it." %}</small>
+    </p>
+
+    <button type="submit">{% translate "Continue" %}</button>
+  </form>
+
+  <script>
+    const COMPANY_FIELD = "{{ form.company.auto_id }}";
+    const GAME_PK = "{{ game.pk }}";
+
+    function csrfToken() {
+      return document.querySelector("[name=csrfmiddlewaretoken]").value;
+    }
+
+    // The employer quick-picks for the game chosen in step 1. The credit form's
+    // version reloads this when the game changes; here the game is fixed, so it
+    // runs once.
+    function loadEmployers() {
+      const field = document.getElementById("employer-field");
+      const url = field.dataset.employersUrl.replace(/0\/employers\/$/, GAME_PK + "/employers/");
+      fetch(url)
+        .then((response) => response.text())
+        .then((html) => {
+          document.getElementById("employer-quickpicks").innerHTML = html;
+          field.querySelector(".employer-hint").hidden = true;
+          field.querySelector(".employer-search").hidden = false;
+        });
+    }
+
+    document.addEventListener("click", function (event) {
+      const option = event.target.closest("#employer-field .autocomplete-option");
+      if (!option) return;
+      document.getElementById(COMPANY_FIELD).value = option.dataset.id;
+      document.querySelector("#employer-field .chosen").textContent = option.dataset.label;
+      const results = document.querySelector("#employer-field .results");
+      if (results) results.innerHTML = "";
+    });
+
+    loadEmployers();
+  </script>
+{% endblock %}

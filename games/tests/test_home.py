@@ -12,32 +12,28 @@ from accounts.models import User
 
 pytestmark = pytest.mark.django_db
 
-PITCH = b"credits database for the video game industry"
+PITCH = b"Add a credit to your name"
 
 
 def test_home_is_public_and_renders_the_search_form(client: Client) -> None:
     response = client.get(reverse("home"))
     assert response.status_code == 200
-    # Substring stops before the apostrophe in "they've": how a template engine
-    # renders that entity is not what this test is about.
-    assert b"Find people by what they" in response.content
+    # The anonymous <h1> is now the declare question (covered by its own test
+    # below) — this just pins that the search form still renders, one heading
+    # down under "Looking for someone?".
+    assert b"Looking for someone?" in response.content
     assert b"discipline" in response.content.lower()
 
 
-def test_home_pitches_signup_to_an_anonymous_visitor(client: Client) -> None:
-    """Success metric #1 is workers signing up. With the "For recruiters" page
-    gone, this line is the only surviving statement of the recruiter promise
-    that docs/01-DESIGN.md §3.6 calls load-bearing for worker motivation."""
-    response = client.get(reverse("home"))
-    assert PITCH in response.content
-    # Scoped to the pitch <p> itself, not "anywhere on the page": base.html's
-    # nav also carries a permanent "Sign up" link, so an unscoped check would
-    # stay green even if the CTA were deleted from the pitch paragraph.
-    match = re.search(
-        rb"<p>(?:(?!</p>).)*?" + PITCH + rb"(?:(?!</p>).)*?</p>", response.content, re.DOTALL
-    )
-    assert match is not None, f"no pitch <p> found in:\n{response.content[-3000:]}"
-    assert reverse("accounts:signup").encode() in match.group(0)
+def test_home_invites_an_anonymous_visitor_to_declare(client: Client) -> None:
+    """Success metric #1 is workers declaring their work. The question is the
+    invitation, and it is scoped to the block that carries it — base.html's nav
+    would satisfy a looser assertion."""
+    body = client.get(reverse("home")).content.decode()
+    assert "Which game did you work on?" in body
+    match = re.search(r"<form[^>]*action=\"/declare/\"[^>]*>.*?</form>", body, re.S)
+    assert match is not None, "no form posting to /declare/ on the home page"
+    assert 'name="q"' in match.group(0)
 
 
 def test_a_member_gets_the_tool_without_the_pitch(client: Client) -> None:

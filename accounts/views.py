@@ -6,7 +6,7 @@ from typing import Any
 
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth import login, logout
+from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ObjectDoesNotExist
@@ -34,6 +34,7 @@ from accounts.forms import (
 from accounts.github import get_github_activity
 from accounts.http import AuthedHttpRequest
 from accounts.models import RecruiterApplication, User
+from accounts.registration import create_and_login
 from accounts.tokens import email_verification_token
 from contributions.models import Contribution
 
@@ -80,15 +81,27 @@ class SignupView(FormView):
     form_class = SignupForm
 
     def form_valid(self, form: SignupForm) -> HttpResponse:
-        user = form.save()
-        send_verification_email(self.request, user)
-        # Auto-login: the gate is on creating contributions, not on logging in.
-        login(self.request, user)
+        create_and_login(self.request, form)
         return redirect("accounts:verification_sent")
 
 
 class VerificationSentView(TemplateView):
     template_name = "accounts/verification_sent.html"
+
+    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+        # Named so the verification click collects something rather than lifting
+        # a restriction — it is the declare funnel's last exit.
+        user: Any = self.request.user
+        context["pending_credit"] = (
+            Contribution.objects.filter(user=user, status=Contribution.Status.PENDING)
+            .select_related("game")
+            .order_by("-id")
+            .first()
+            if user.is_authenticated
+            else None
+        )
+        return context
 
 
 def _user_from_uidb64(uidb64: str) -> User | None:

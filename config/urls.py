@@ -27,7 +27,7 @@ urlpatterns = [
     path("", include("accounts.urls")),
     path("", include("games.urls")),
     path("", include("contact.urls")),
-    path("credits/", include("contributions.urls")),
+    path("", include("contributions.urls")),
     path("search/", include("search.urls")),
 ]
 

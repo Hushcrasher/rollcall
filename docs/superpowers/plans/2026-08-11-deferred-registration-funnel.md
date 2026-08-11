@@ -346,6 +346,19 @@ git commit -m "refactor(contributions): the employer picker becomes a shared par
 
 The root leads with the question for anonymous visitors; `/declare/` turns a typed title into a chosen game. Deliberately plain HTML, no JavaScript: the disambiguation happens on its own screen where there is room for it.
 
+> **Tasks 3, 4 and 5 land as ONE commit.** The funnel is a chain: each step's
+> view redirects to the next step's URL name, so `DeclareGameView` needs
+> `contributions:declare_details` (Task 4) and `DeclareDetailsView` needs
+> `contributions:declare_account` (Task 5). Any split commits a view that raises
+> `NoReverseMatch` at request time. Implement Task 3's steps, then Task 4's, then
+> Task 5's, then run one gate and make one commit. The expected count after all
+> three is **396** (376 + 7 + 5 + 8).
+>
+> This was a decomposition error in the plan, caught at execution — twice, once
+> per boundary. The lesson for future plans: a task boundary cannot cut across a
+> redirect chain, because a URL name is a compile-time-invisible, runtime-hard
+> dependency.
+
 **Files:**
 - Create: `contributions/funnel.py`
 - Modify: `contributions/views.py`, `contributions/urls.py`
@@ -435,11 +448,25 @@ def test_home_does_not_ask_a_member(client: Client) -> None:
     assert b"Find people by what they" in body
 ```
 
-In `games/tests/test_home.py`, the pitch paragraph is replaced by the question. Replace `PITCH` and the two tests that use it:
+In `games/tests/test_home.py`, the pitch paragraph is replaced by the question. Replace `PITCH`:
 
 ```python
 PITCH = b"Add a credit to your name"
 ```
+
+`test_home_is_public_and_renders_the_search_form` asserts the old `<h1>` text, which anonymous visitors no longer see — the search now sits under an `<h2>`. Replace:
+
+```python
+    assert b"Find people by what they" in response.content
+```
+
+with:
+
+```python
+    assert b"Looking for someone?" in response.content  # the search kept its place, one heading down
+```
+
+The authenticated `<h1>` is covered by `test_home_does_not_ask_a_member` in the new module, so nothing is lost.
 
 and rename `test_home_pitches_signup_to_an_anonymous_visitor` to
 `test_home_invites_an_anonymous_visitor_to_declare`, replacing its body with:
@@ -540,9 +567,11 @@ class DeclareGameView(TemplateView):
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         game = self._picked_game(request)
         if game is not None:
-            draft = get_draft(request.session)
+            # `request.session` is added by middleware, which `ty` cannot see —
+            # the same accommodation the codebase already uses elsewhere.
+            draft = get_draft(request.session)  # ty: ignore[unresolved-attribute]
             draft["game"] = str(game.pk)
-            set_draft(request.session, draft)
+            set_draft(request.session, draft)  # ty: ignore[unresolved-attribute]
             return redirect("contributions:declare_details")
         return self.render_to_response(self.get_context_data(**kwargs))
 
