@@ -11,9 +11,12 @@ from django.urls import include, path
 from django.views.generic import TemplateView
 
 from config.sitemaps import SITEMAPS, robots_txt
+from search.views import PeopleSearchView
 
 urlpatterns = [
-    path("", TemplateView.as_view(template_name="home.html"), name="home"),
+    # The root IS the people search — not a redirect to it, so the URL name
+    # `home` keeps resolving for the logo and every other link.
+    path("", PeopleSearchView.as_view(), name="home"),
     path("admin/", admin.site.urls),
     path("robots.txt", robots_txt),
     path("sitemap.xml", sitemap, {"sitemaps": SITEMAPS}, name="sitemap"),

@@ -209,7 +209,7 @@ class RecruiterApplyView(LoginRequiredMixin, CreateView):
         user = self.request.user
         if user.is_authenticated:
             if user.is_recruiter:
-                return redirect("search:recruiter_search")
+                return redirect("home")
             pending = RecruiterApplication.objects.filter(
                 user=user, status=RecruiterApplication.Status.PENDING
             ).exists()

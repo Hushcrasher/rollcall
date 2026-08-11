@@ -1,6 +1,7 @@
-"""Recruiter search view — open to everyone (platform is free; findability IS
-the service). Anti-scraping: the IP rate limit, pagination and `profile_public`
-are the real mitigations; the >=1-filter rule is only a UX guard."""
+"""The people search — the home page, open to everyone (platform is free;
+findability IS the service). Anti-scraping: the IP rate limit, pagination and
+`profile_public` are the real mitigations; the >=1-filter rule is only a UX
+guard."""
 
 import re
 from datetime import date
@@ -52,7 +53,7 @@ def _candidate(name: str = "Great Candidate", **user_kwargs: Any) -> User:
 
 
 def test_search_page_is_public(client: Client) -> None:
-    response = client.get(reverse("search:recruiter_search"))
+    response = client.get(reverse("home"))
     assert response.status_code == 200
     assert b"discipline" in response.content.lower()
 
@@ -60,13 +61,13 @@ def test_search_page_is_public(client: Client) -> None:
 def test_member_is_not_redirected_to_apply(client: Client) -> None:
     member = User.objects.create_user(email="m@example.com", password="x", display_name="M")
     client.force_login(member)
-    assert client.get(reverse("search:recruiter_search")).status_code == 200
+    assert client.get(reverse("home")).status_code == 200
 
 
 def test_zero_filters_shows_error_and_no_people(client: Client) -> None:
     """UX guard: the accidental filterless submit lists nobody."""
     _candidate()
-    response = client.get(reverse("search:recruiter_search"), {"discipline": ""})
+    response = client.get(reverse("home"), {"discipline": ""})
     assert b"Pick at least one filter." in response.content
     assert b"Great Candidate" not in response.content
 
@@ -75,7 +76,7 @@ def test_anonymous_search_returns_matches_without_leaking_email(client: Client) 
     _candidate()
     design = Discipline.objects.get(name="Design")
 
-    response = client.get(reverse("search:recruiter_search"), {"discipline": design.pk})
+    response = client.get(reverse("home"), {"discipline": design.pk})
 
     assert b"Great Candidate" in response.content
     assert b"candidate@example.com" not in response.content
@@ -85,9 +86,7 @@ def test_private_profile_is_never_listed(client: Client) -> None:
     _candidate(profile_public=False)
     design = Discipline.objects.get(name="Design")
 
-    content = client.get(
-        reverse("search:recruiter_search"), {"discipline": design.pk}
-    ).content.decode()
+    content = client.get(reverse("home"), {"discipline": design.pk}).content.decode()
 
     assert "Great Candidate" not in content
     assert "No people match these filters." in content
@@ -97,9 +96,7 @@ def test_result_card_shows_credit_location_and_stats(client: Client) -> None:
     _candidate(location="Lyon", country="FR")
     design = Discipline.objects.get(name="Design")
 
-    content = client.get(
-        reverse("search:recruiter_search"), {"discipline": design.pk}
-    ).content.decode()
+    content = client.get(reverse("home"), {"discipline": design.pk}).content.decode()
 
     assert "Card Game" in content  # the matching credit
     assert "Level Designer" in content
@@ -129,9 +126,7 @@ def test_card_renders_present_and_engine_shares_and_never_none(client: Client) -
         start_date=date(2022, 1, 1),
     )
 
-    content = client.get(
-        reverse("search:recruiter_search"), {"discipline": design.pk}
-    ).content.decode()
+    content = client.get(reverse("home"), {"discipline": design.pk}).content.decode()
 
     assert "2020–present" in content  # career years, open end
     assert "2022–present" in content  # the ongoing credit's own dates
@@ -157,9 +152,7 @@ def test_more_credits_count_is_shown_beyond_three(client: Client) -> None:
             start_date=date(2022, 1, 1 + i),
         )
 
-    content = client.get(
-        reverse("search:recruiter_search"), {"discipline": design.pk}
-    ).content.decode()
+    content = client.get(reverse("home"), {"discipline": design.pk}).content.decode()
 
     assert "+2 more matching credits" in content
 
@@ -169,7 +162,7 @@ def test_rate_limited(client: Client, settings: Any) -> None:
     settings.SEARCH_RATELIMIT = "1/m"
     cache.clear()
 
-    url = reverse("search:recruiter_search")
+    url = reverse("home")
     assert client.get(url).status_code == 200
     assert client.get(url).status_code == 403
 
@@ -191,7 +184,7 @@ def test_rate_limit_holds_while_other_ips_fill_the_cache(client: Client, setting
     settings.SEARCH_RATELIMIT = "1/m"
     cache.clear()
 
-    url = reverse("search:recruiter_search")
+    url = reverse("home")
     assert client.get(url, REMOTE_ADDR="10.0.0.1").status_code == 200
     assert client.get(url, REMOTE_ADDR="10.0.0.1").status_code == 403
 
@@ -216,7 +209,7 @@ def test_pagination_preserves_filters(client: Client) -> None:
             start_date=date(2020, 1, 1),
         )
 
-    url = reverse("search:recruiter_search")
+    url = reverse("home")
     content = client.get(url, {"discipline": design.pk}).content.decode()
 
     # The filter must ride along in the Next link itself, or page 2 silently
@@ -257,7 +250,7 @@ def test_multi_value_filters_survive_pagination_links(client: Client) -> None:
         )
 
     content = client.get(
-        reverse("search:recruiter_search"),
+        reverse("home"),
         {"engines": [unreal.pk, unity.pk]},
     ).content.decode()
 
@@ -269,8 +262,6 @@ def test_multi_value_filters_survive_pagination_links(client: Client) -> None:
 def test_junk_page_param_does_not_error(client: Client) -> None:
     _candidate()
     design = Discipline.objects.get(name="Design")
-    response = client.get(
-        reverse("search:recruiter_search"), {"discipline": design.pk, "page": "abc"}
-    )
+    response = client.get(reverse("home"), {"discipline": design.pk, "page": "abc"})
     assert response.status_code == 200
     assert b"Great Candidate" in response.content

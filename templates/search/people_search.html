@@ -48,6 +48,12 @@
 {% block content %}
   <h1>{% translate "Find people by what they've worked on" %}</h1>
 
+  {% if not user.is_authenticated %}
+    <p>{% blocktranslate %}Rollcall is a credits database for the video game industry.
+    Declare your work, be found by recruiters for what you actually shipped.{% endblocktranslate %}
+    <a href="{% url 'accounts:signup' %}">{% translate "Create your account" %}</a></p>
+  {% endif %}
+
   {% comment %}
     Empty and permanently so: it exists only to own the typeahead search boxes
     (via their `form` attribute) so their `q` value stays out of the search

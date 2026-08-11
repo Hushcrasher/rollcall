@@ -39,13 +39,14 @@ class SearchView(TemplateView):
 
 
 @method_decorator(ratelimit(key="ip", rate=_search_rate, method="GET", block=True), name="get")
-class RecruiterSearchView(TemplateView):
-    """Open to everyone — the platform is free, and showing workers that the
-    recruiter-side tool exists is part of the promise (spec 2026-07-16).
+class PeopleSearchView(TemplateView):
+    """The home page: find people by what they've worked on. Open to everyone —
+    the platform is free, and showing workers that the recruiter-side tool
+    exists is part of the promise (spec 2026-07-16).
     Anti-scraping: the IP rate limit above, pagination, and `profile_public`.
     The form's >=1-filter rule is a UX guard only, not a boundary."""
 
-    template_name = "search/recruiter_search.html"
+    template_name = "search/people_search.html"
 
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
         context = super().get_context_data(**kwargs)

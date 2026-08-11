@@ -125,7 +125,7 @@ def test_filter_autocomplete_is_rate_limited(client: Client, settings: Any, url_
 
 
 def _search(client: Client, query: str) -> str:
-    return client.get(reverse("search:recruiter_search") + query).content.decode()
+    return client.get(reverse("home") + query).content.decode()
 
 
 def test_empty_form_does_not_ship_a_choice_per_country(client: Client) -> None:
