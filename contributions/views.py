@@ -3,14 +3,17 @@ non-negotiable #6); editing/deleting is restricted to the owner."""
 
 from typing import Any
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import QuerySet
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect
 from django.urls import reverse
+from django.utils.decorators import method_decorator
 from django.utils.translation import gettext as _
 from django.views.generic import CreateView, DeleteView, FormView, TemplateView, UpdateView
+from django_ratelimit.decorators import ratelimit
 
 from accounts.forms import SignupForm
 from accounts.models import User
@@ -36,12 +39,40 @@ class EmailVerifiedRequiredMixin(LoginRequiredMixin):
         return super().dispatch(request, *args, **kwargs)
 
 
+def _search_rate(group: str, request: HttpRequest) -> str:
+    # A callable, not a plain string, so the rate is read from settings at
+    # request time rather than baked in when this module is imported — the
+    # same reason search.views._search_rate is a callable.
+    return settings.SEARCH_RATELIMIT
+
+
+# Named explicitly, like search.views.PeopleSearchView's _RATELIMIT_GROUP:
+# django-ratelimit derives an unnamed decorator's group from the view's module
+# and qualname, so renaming this view would silently move the counter.
+_DECLARE_GAME_RATELIMIT_GROUP = "declare_game_search"
+
+
+@method_decorator(
+    ratelimit(
+        key="ip",
+        rate=_search_rate,
+        method="POST",
+        block=True,
+        group=_DECLARE_GAME_RATELIMIT_GROUP,
+    ),
+    name="post",
+)
 class DeclareGameView(TemplateView):
     """Step 1 — turn a typed title into a chosen game.
 
     Open to anonymous visitors: asking for the account before any value is the
     friction this funnel exists to remove. Plain form posts, no htmx: the root
     carries only a text box, and the disambiguation happens here.
+
+    The trigram search this runs is an unmetered anonymous search over `Game`
+    unless rate-limited — decorated on `post` only (not the class), so a bare
+    GET of the page always answers, for the same reason the home page's front
+    door does (search.views.PeopleSearchView).
     """
 
     template_name = "contributions/declare_game.html"
@@ -52,6 +83,14 @@ class DeclareGameView(TemplateView):
             # `request.session` is added by middleware, which `ty` cannot see —
             # the same accommodation the codebase already uses elsewhere.
             draft = get_draft(request.session)  # ty: ignore[unresolved-attribute]
+            if draft.get("game") != str(game.pk):
+                # A different game invalidates the rest of the draft — the
+                # employer especially: the funnel's JS can only SET a company,
+                # never clear one, so a stale employer from the previous game
+                # would otherwise be unclearable through the UI and get saved
+                # silently. Re-picking the SAME game (step 2's "Wrong game?"
+                # link) leaves the draft alone so nothing typed is lost.
+                draft = {}
             draft["game"] = str(game.pk)
             set_draft(request.session, draft)  # ty: ignore[unresolved-attribute]
             return redirect("contributions:declare_details")
@@ -67,9 +106,12 @@ class DeclareGameView(TemplateView):
     @staticmethod
     def _picked_game(request: HttpRequest) -> Game | None:
         # Unauthenticated POST on a public page: `?game=abc` must re-render, not
-        # 500, so the pk is filtered rather than coerced.
+        # 500, so the pk is filtered rather than coerced. `isdecimal()`, not
+        # `isdigit()`: superscripts like "²" are digits but int() rejects them,
+        # which raised ValueError -> 500 here. isdecimal() is still True for
+        # "１"/"٣" (int() accepts those) and False for "²".
         pk = request.POST.get("game", "")
-        return Game.objects.filter(pk=pk).first() if pk.isdigit() else None
+        return Game.objects.filter(pk=pk).first() if pk.isdecimal() else None
 
 
 class DeclareDetailsView(FormView):
@@ -80,7 +122,12 @@ class DeclareDetailsView(FormView):
     form_class = ContributionForm
 
     def dispatch(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
-        if "game" not in get_draft(request.session):  # ty: ignore[unresolved-attribute]
+        game_pk = get_draft(request.session).get("game")  # ty: ignore[unresolved-attribute]
+        if not game_pk or not Game.objects.filter(pk=game_pk).exists():
+            # No game in the draft (step 1 never reached), or the game was
+            # deleted between steps 1 and 2 — either way there is nothing here
+            # to fill in, and rendering it would show "On ." and feed a broken
+            # /games//employers/ URL to the JS.
             return redirect("contributions:declare")
         return super().dispatch(request, *args, **kwargs)
 
@@ -95,8 +142,12 @@ class DeclareDetailsView(FormView):
     def form_valid(self, form: ContributionForm) -> HttpResponse:
         # Raw POST strings, not cleaned_data: the session serializer is JSON and
         # `date` is not JSON-serialisable. Step 3 re-validates through the same
-        # form, so nothing is trusted on the way back in.
+        # form, so nothing is trusted on the way back in. `game` specifically
+        # is taken from the session draft, not POST: the dispatch guard above
+        # says "the game is fixed by step 1", and trusting a posted `game`
+        # here would let a crafted POST swap it.
         draft = {field: self.request.POST.get(field, "") for field in CREDIT_FIELDS}
+        draft["game"] = get_draft(self.request.session)["game"]
         set_draft(self.request.session, draft)
         return redirect("contributions:declare_account")
 
@@ -114,10 +165,25 @@ class DeclareAccountView(FormView):
 
     def dispatch(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         draft = get_draft(request.session)  # ty: ignore[unresolved-attribute]
-        if "game" not in draft or "discipline" not in draft:
+        if "game" not in draft:
             return redirect("contributions:declare")
-        if request.user.is_authenticated:  # ty: ignore[unresolved-attribute]
-            # Already a member — nothing to sign up for.
+        if "discipline" not in draft:
+            # A game was picked but step 2 was never finished — send them
+            # there to fill it in rather than making them re-pick the game the
+            # session already holds.
+            return redirect("contributions:declare_details")
+        if request.user.is_authenticated and request.method in (  # ty: ignore[unresolved-attribute]
+            "GET",
+            "POST",
+        ):
+            # Already a member — nothing to sign up for. This bypasses the
+            # normal method dispatch (and so CSRF protection, which only ever
+            # covered POST), so it is narrowed to GET and POST: GET because a
+            # member simply landing here — e.g. via `?next=` after logging in
+            # — legitimately has nothing left to sign up for, POST for
+            # symmetry with the anonymous path below. Everything else — HEAD
+            # above all, which browsers issue for prefetch/prerender — falls
+            # through to the default dispatch and 405s instead of writing.
             return self._save_credit(request, request.user)  # ty: ignore[unresolved-attribute]
         return super().dispatch(request, *args, **kwargs)
 

@@ -77,5 +77,37 @@ def test_an_invalid_credit_re_renders_with_errors(client: Client, game: Game) ->
         {"game": str(game.pk), "job_title": "", "start_date": ""},
     )
     assert response.status_code == 200
+    assert response.context["form"].errors  # the missing fields are reported
     assert SESSION_KEY in client.session
     assert "discipline" not in client.session[SESSION_KEY]
+
+
+def test_the_game_is_taken_from_the_session_not_the_post(client: Client, game: Game) -> None:
+    """The dispatch guard's contract is "the game is fixed by step 1" — a
+    crafted POST must not be able to swap it."""
+    other = Game.objects.create(title="Celeste", source=Game.Source.MANUAL)
+    _with_game(client, game)
+
+    client.post(
+        reverse("contributions:declare_details"),
+        {
+            "game": str(other.pk),
+            "discipline": str(Discipline.objects.get(name="Design").pk),
+            "job_title": "Level Designer",
+            "start_date": "2020-01",
+        },
+    )
+
+    assert client.session[SESSION_KEY]["game"] == str(game.pk)
+
+
+def test_a_deleted_game_redirects_to_the_question(client: Client, game: Game) -> None:
+    """A game removed between steps 1 and 2 must not render "On ." or feed a
+    broken /games//employers/ URL to the JS."""
+    _with_game(client, game)
+    game.delete()
+
+    response = client.get(reverse("contributions:declare_details"))
+
+    assert response.status_code == 302
+    assert response["Location"] == reverse("contributions:declare")

@@ -43,13 +43,11 @@
     const COMPANY_FIELD = "{{ form.company.auto_id }}";
     const GAME_PK = "{{ game.pk }}";
 
-    function csrfToken() {
-      return document.querySelector("[name=csrfmiddlewaretoken]").value;
-    }
-
     // The employer quick-picks for the game chosen in step 1. The credit form's
     // version reloads this when the game changes; here the game is fixed, so it
-    // runs once.
+    // runs once. `.employer-search` stays hidden until the toggle below reveals
+    // it — same as the credit form's version, so "Worked for another company?"
+    // isn't a no-op button sitting above an already-open search box.
     function loadEmployers() {
       const field = document.getElementById("employer-field");
       const url = field.dataset.employersUrl.replace(/0\/employers\/$/, GAME_PK + "/employers/");
@@ -58,7 +56,6 @@
         .then((html) => {
           document.getElementById("employer-quickpicks").innerHTML = html;
           field.querySelector(".employer-hint").hidden = true;
-          field.querySelector(".employer-search").hidden = false;
         });
     }
 
@@ -69,6 +66,14 @@
       document.querySelector("#employer-field .chosen").textContent = option.dataset.label;
       const results = document.querySelector("#employer-field .results");
       if (results) results.innerHTML = "";
+    });
+
+    // "Worked for another company?" → reveal the company search.
+    document.addEventListener("click", function (event) {
+      if (!event.target.closest(".employer-other-toggle")) return;
+      const search = document.querySelector("#employer-field .employer-search");
+      search.hidden = false;
+      search.querySelector(".autocomplete-input").focus();
     });
 
     loadEmployers();

@@ -8,7 +8,11 @@
   <p class="autocomplete-empty">{% translate "No companies found." %}</p>
 {% endfor %}
 
-{% if query %}
+{% if query and user.is_authenticated %}
+  {# games:company_create is @login_required and stays that way — anonymous
+     visitors (the declare funnel serves this endpoint too) get no button
+     rather than a dead one; see contribution_form.html's click handler for
+     the only caller that can actually use it. #}
   <button type="button" class="company-create" data-name="{{ query }}">
     {% blocktranslate %}Not there? Create "{{ query }}"{% endblocktranslate %}
   </button>

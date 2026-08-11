@@ -117,6 +117,7 @@ def suggest(request: HttpRequest) -> HttpResponse:
     )
 
 
+@ratelimit(key="ip", rate=_search_rate, method="GET", block=True)
 def game_autocomplete(request: HttpRequest) -> HttpResponse:
     query = request.GET.get("q", "")
     return render(
@@ -131,6 +132,7 @@ def game_autocomplete(request: HttpRequest) -> HttpResponse:
     )
 
 
+@ratelimit(key="ip", rate=_search_rate, method="GET", block=True)
 def company_autocomplete(request: HttpRequest) -> HttpResponse:
     query = request.GET.get("q", "")
     return render(
@@ -142,9 +144,13 @@ def company_autocomplete(request: HttpRequest) -> HttpResponse:
 
 # --- Recruiter-filter typeahead ---------------------------------------------
 #
-# These three back the engines/genres/countries filters on the people search
-# (the home page), so unlike the pickers above (which sit behind a login on
-# the credit form) they carry the same IP rate limit as the search pages.
+# These three back the engines/genres/countries filters on the public
+# recruiter search, and carry the same IP rate limit as the search pages they
+# serve — like game_autocomplete/company_autocomplete just above, which used
+# to sit behind a login on the credit form only. They no longer do: the
+# declare funnel (contributions.views.DeclareGameView / DeclareDetailsView)
+# serves both to anonymous visitors now, so the exemption that comment used to
+# claim no longer holds and they carry the same limit as everything else here.
 
 _FILTER_OPTIONS_SHOWN = 10
 

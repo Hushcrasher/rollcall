@@ -18,6 +18,7 @@ _DISALLOW = [
     "/account/",
     "/profile/",
     "/credits/",
+    "/declare/",
     "/contact/",
     "/report/",
     "/search/",

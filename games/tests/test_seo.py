@@ -47,6 +47,9 @@ def test_robots_txt_keeps_content_pages_and_denies_private_areas(client: Client)
     assert not parser.can_fetch("*", "/account/")
     # No carve-out survives the promise page it was written for.
     assert not parser.can_fetch("*", "/search/for-recruiters/")
+    # A POST-driven entry point with nothing crawlable behind it, and its page
+    # duplicates the home page's <h1>/<title> verbatim.
+    assert not parser.can_fetch("*", "/declare/")
 
 
 def test_robots_txt_closes_the_root_filter_trap(client: Client) -> None:

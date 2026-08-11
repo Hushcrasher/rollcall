@@ -3,9 +3,11 @@
 from typing import Any
 
 import pytest
+from django.core.cache import cache
 from django.test import Client
 from django.urls import reverse
 
+from accounts.models import User
 from games.models import Company, Game
 
 pytestmark = pytest.mark.django_db
@@ -38,10 +40,26 @@ def test_company_autocomplete_returns_matching_options(client: Client) -> None:
     assert b"Supergiant Games" in response.content
 
 
-def test_company_autocomplete_offers_a_create_option(client: Client) -> None:
+def test_company_autocomplete_offers_a_create_option_to_a_member(client: Client) -> None:
+    """games:company_create is @login_required and stays that way, so the
+    button that posts to it only makes sense once someone can actually use
+    it."""
+    user = User.objects.create_user(email="m@example.com", password="x", display_name="M")
+    client.force_login(user)
     response = client.get(reverse("search:company_autocomplete"), {"q": "Brand New Studio"})
     assert b"company-create" in response.content
     assert b"Brand New Studio" in response.content
+
+
+def test_company_autocomplete_hides_the_create_option_from_an_anonymous_visitor(
+    client: Client,
+) -> None:
+    """The declare funnel serves this endpoint to anonymous visitors too, and
+    unlike the credit form's version the button there has no click handler —
+    clicking it did nothing at all. It can't work anonymously either way:
+    games:company_create is @login_required."""
+    response = client.get(reverse("search:company_autocomplete"), {"q": "Brand New Studio"})
+    assert b"company-create" not in response.content
 
 
 def test_game_autocomplete_offers_igdb_when_configured(client: Client, settings: Any) -> None:
@@ -55,3 +73,19 @@ def test_game_autocomplete_hides_igdb_when_unconfigured(client: Client) -> None:
     # No IGDB creds in the default test settings.
     response = client.get(reverse("search:game_autocomplete"), {"q": "obscure"})
     assert b"igdb/search" not in response.content
+
+
+@pytest.mark.parametrize("url_name", ["search:game_autocomplete", "search:company_autocomplete"])
+def test_game_and_company_autocomplete_are_rate_limited(
+    client: Client, settings: Any, url_name: str
+) -> None:
+    """Both now serve the declare funnel to anonymous visitors, so they carry
+    the same IP rate limit as the public search pages (docs/02-ARCHITECTURE.md
+    §5) — same pattern as test_filter_autocomplete_is_rate_limited."""
+    settings.RATELIMIT_ENABLE = True
+    settings.SEARCH_RATELIMIT = "1/m"
+    cache.clear()
+
+    url = reverse(url_name)
+    assert client.get(url, {"q": "a"}).status_code == 200
+    assert client.get(url, {"q": "a"}).status_code == 403

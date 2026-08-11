@@ -71,7 +71,9 @@ def test_the_pending_credit_is_not_public_yet(client: Client, game: Game) -> Non
     client.post(reverse("contributions:declare_account"), SIGNUP)
 
     user = User.objects.get(email="new@example.com")
-    assert b"Level Designer" not in client.get(user.get_absolute_url()).content
+    response = client.get(user.get_absolute_url())
+    assert response.status_code == 200
+    assert b"Level Designer" not in response.content
 
 
 def test_an_already_verified_member_gets_an_active_credit(client: Client, game: Game) -> None:
@@ -101,6 +103,34 @@ def test_an_unverified_member_gets_a_pending_credit(client: Client, game: Game) 
     client.get(reverse("contributions:declare_account"))
 
     assert Contribution.objects.get().status == Contribution.Status.PENDING
+
+
+def test_a_half_filled_draft_goes_to_details_not_the_question(client: Client, game: Game) -> None:
+    """A game was picked but step 2 was never finished — send them to fill it
+    in, not back to re-pick a game the session already holds."""
+    session = client.session
+    session[SESSION_KEY] = {"game": str(game.pk)}
+    session.save()
+
+    response = client.get(reverse("contributions:declare_account"))
+
+    assert response.status_code == 302
+    assert response["Location"] == reverse("contributions:declare_details")
+
+
+def test_a_head_request_does_not_write_a_credit(client: Client, game: Game) -> None:
+    """`dispatch` used to run `_save_credit` for ANY method once authenticated
+    — a browser prefetch/prerender (HEAD) would write outside CSRF
+    protection. Only POST, and the authenticated GET the test above (and
+    `test_an_already_verified_member_gets_an_active_credit` below) rely on,
+    may reach the write."""
+    member = User.objects.create_user(email="head@example.com", password="x", display_name="H")
+    client.force_login(member)
+    _with_draft(client, game)
+
+    client.head(reverse("contributions:declare_account"))
+
+    assert Contribution.objects.count() == 0
 
 
 def test_a_stale_draft_goes_back_to_the_details_step(client: Client, game: Game) -> None:
