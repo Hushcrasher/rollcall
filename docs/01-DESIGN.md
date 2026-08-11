@@ -116,7 +116,7 @@ Rationale for inclusion: candidate motivation depends on believing the recruiter
 - Recruiter search with filters (discipline, engines, genres, country, rating, dates, open_to_work) — **open to all** since 2026-07-16 (§3.6)
 - Recruiter application form + manual validation (Django admin is enough) — dormant since 2026-07-16: still works, gates nothing
 - Contact relay form (honors `contactable`)
-- Public "For recruiters" page
+- Anonymous-visitor pitch line + signup link on the home page (the people search at `/` is the recruiter-facing surface; this line carries the promise the old "For recruiters" page used to)
 - Account deletion (cascade + anonymization) + JSON export
 - Report/flag page
 - UI in **English only**, but all strings through Django i18n from day one
@@ -132,4 +132,4 @@ Vouching/confirmations · company claim · manual game creation · internal mess
 2. A few real recruiters find the search, run searches, and send contact requests. (Reworded 2026-07-16: the old metric was "apply, get approved, run searches" — the apply/approve step is dormant since the search opened to all, so it can no longer be the signal. Sending a contact request still requires an account, which is the point where a recruiter becomes visible to us.)
 
 ### Fallback if the schedule slips
-Ship "For recruiters" page + contact relay first; advanced filters a few weeks later. The promise stays credible.
+Ship the home page's people search — its anonymous-visitor pitch line already carries the promise — + contact relay first; advanced filters a few weeks later. The promise stays credible.

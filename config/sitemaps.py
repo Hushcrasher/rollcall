@@ -35,13 +35,15 @@ _DISALLOW = [
     "/*?",
 ]
 
-# Emitted BEFORE the disallows, and that order is load-bearing. RFC 9309 §2.2.2
-# picks the longest match, but parsers with first-match semantics — Python's own
-# `urllib.robotparser` among them — take whichever rule they read first.
-# Allow-first is correct under both.
+# Emitted BEFORE the disallows. No current Disallow prefix overlaps `/u/`,
+# `/g/` or `/c/`, so today's ordering isn't load-bearing — but RFC 9309 §2.2.2
+# picks the longest match while parsers with first-match semantics (Python's
+# own `urllib.robotparser` among them) take whichever rule they read first, so
+# Allow-first is kept as the safe default under both kinds of parser.
 #
 # Public profile, game and company pages are a major acquisition channel ("who
-# worked on X"), so they are explicitly opened despite the disallows below.
+# worked on X"), so they are listed explicitly rather than left to whatever a
+# crawler infers from the disallows below.
 _ALLOW = ["/u/", "/g/", "/c/"]
 
 

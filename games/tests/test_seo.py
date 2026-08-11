@@ -25,10 +25,15 @@ def test_robots_txt_allows_indexing_and_points_to_sitemap(client: Client) -> Non
 
 def test_robots_txt_keeps_content_pages_and_denies_private_areas(client: Client) -> None:
     """Asserted by parsing the response with a real robots parser rather than
-    grepping for the lines: a rule can be present and still be silently inert
-    under first-match parsers if it is emitted in the wrong order (verified:
-    `urllib.robotparser` is one of them). This fails if a rule is dropped OR
-    merely reordered.
+    grepping for the lines, so a rule that is present but does not actually
+    grant/deny the paths it should still fails the test. This fails if a rule
+    is dropped.
+
+    It does NOT currently pin the emission order of Allow vs. Disallow: that
+    used to matter when `Allow: /search/for-recruiters/` had to beat
+    `Disallow: /search/` under first-match parsers (`urllib.robotparser` among
+    them), but that carve-out was removed with the page, and no surviving
+    `Allow` prefix (`/u/`, `/g/`, `/c/`) overlaps any `Disallow` prefix.
     """
     body = client.get("/robots.txt").content.decode()
 

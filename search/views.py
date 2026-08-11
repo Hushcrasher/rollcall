@@ -50,8 +50,11 @@ class PeopleSearchView(TemplateView):
     """The home page: find people by what they've worked on. Open to everyone —
     the platform is free, and showing workers that the recruiter-side tool
     exists is part of the promise (spec 2026-07-16).
-    Anti-scraping: the IP rate limit above, pagination, and `profile_public`.
-    The form's >=1-filter rule is a UX guard only, not a boundary."""
+    Anti-scraping: the IP rate limit in `get()` below, pagination, and
+    `profile_public`. The rate limit only meters requests that carry a query
+    string — the bare front door is unmetered by design, so it is not a limit
+    on the view as a whole. The form's >=1-filter rule is a UX guard only, not
+    a boundary."""
 
     template_name = "search/people_search.html"
 
@@ -68,6 +71,12 @@ class PeopleSearchView(TemplateView):
             method="GET",
             increment=True,
         ):
+            # Raised directly rather than routed through
+            # `settings.RATELIMIT_EXCEPTION_CLASS` (which the `@ratelimit`
+            # decorator on SearchView above does honour) — a divergence, but an
+            # inert one while that setting is unset: `Ratelimited` subclasses
+            # `PermissionDenied`, so both paths 403 today. Set that setting and
+            # this branch would stop following it.
             raise Ratelimited
         return super().get(request, *args, **kwargs)
 
@@ -133,9 +142,9 @@ def company_autocomplete(request: HttpRequest) -> HttpResponse:
 
 # --- Recruiter-filter typeahead ---------------------------------------------
 #
-# These three back the engines/genres/countries filters on the *public*
-# recruiter search, so unlike the pickers above (which sit behind a login on the
-# credit form) they carry the same IP rate limit as the search pages.
+# These three back the engines/genres/countries filters on the people search
+# (the home page), so unlike the pickers above (which sit behind a login on
+# the credit form) they carry the same IP rate limit as the search pages.
 
 _FILTER_OPTIONS_SHOWN = 10
 

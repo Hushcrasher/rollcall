@@ -36,5 +36,5 @@ Documentation set for implementation (intended to be handed to Claude Code).
 4. Accounts: signup, email verification, profile page (3 visibility booleans), account page, account deletion + JSON export.
 5. Contributions CRUD (game autocomplete via trigram, company optional, dates month/year) + person page + game page.
 6. Simple search (games/people).
-7. Recruiter side: application form + admin approval, recruiter search with filters + tests on the query, contact relay + rate limit, public "For recruiters" page.
+7. Recruiter side: application form + admin approval, recruiter search with filters + tests on the query, contact relay + rate limit. The search is the home page and is itself the recruiter-facing surface; its anonymous-visitor pitch line carries the promise a separate "For recruiters" page used to.
 8. Report form, rate limiting, robots/sitemap, Sentry.

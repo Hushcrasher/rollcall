@@ -100,6 +100,7 @@ python manage.py seed_games
 
 ## Fallback if the schedule slips
 
-Ship the "For recruiters" page + contact relay first; advanced recruiter
-filters can follow a few weeks later. The candidate-facing promise stays
-credible either way.
+Ship the home page's people search — its anonymous-visitor pitch line already
+carries the recruiter promise, so there is no separate "For recruiters" page
+to build — + contact relay first; advanced recruiter filters can follow a few
+weeks later. The candidate-facing promise stays credible either way.
