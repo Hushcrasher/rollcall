@@ -37,6 +37,11 @@ class Contribution(models.Model):
 
     class Status(models.TextChoices):
         ACTIVE = "active", _("Active")
+        # Written by the declare funnel before the email is verified: the credit
+        # exists so it survives the verification mail round trip (routinely
+        # opened on another device), but nothing outside `active` is rendered
+        # anywhere public. Flipped by accounts.views.verify_email.
+        PENDING = "pending", _("Pending verification")
         DISPUTED = "disputed", _("Disputed")  # dormant — never shown publicly
         REMOVED = "removed", _("Removed")  # dormant
 

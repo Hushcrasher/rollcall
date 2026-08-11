@@ -105,7 +105,17 @@ def verify_email(request: HttpRequest, uidb64: str, token: str) -> HttpResponse:
         if user.email_verified_at is None:
             user.email_verified_at = timezone.now()
             user.save(update_fields=["email_verified_at"])
-        messages.success(request, _("Your email is verified — you can now add credits."))
+        # Publish anything the declare funnel parked before verification. update()
+        # returns the row count, which is also how we know what to say.
+        published = Contribution.objects.filter(
+            user=user, status=Contribution.Status.PENDING
+        ).update(status=Contribution.Status.ACTIVE)
+        if published:
+            messages.success(
+                request, _("Your email is verified — your credit is now live on your profile.")
+            )
+        else:
+            messages.success(request, _("Your email is verified — you can now add credits."))
         return redirect("accounts:my_profile")
     messages.error(request, _("This verification link is invalid or has expired."))
     return render(request, "accounts/verify_email_invalid.html")
