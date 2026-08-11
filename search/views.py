@@ -14,9 +14,8 @@ from django.views.generic import TemplateView
 from django_countries import countries
 from django_ratelimit.decorators import ratelimit
 
-from accounts.models import User
 from games.igdb import IGDBClient
-from games.models import Engine, Game, Genre
+from games.models import Engine, Genre
 from search.forms import RecruiterSearchForm
 from search.services import recruiter_search, search_companies, search_games, search_people
 
@@ -36,18 +35,6 @@ class SearchView(TemplateView):
         context["people"] = search_people(query)
         context["games"] = search_games(query, limit=20)
         context["companies"] = search_companies(query, limit=20)
-        return context
-
-
-class RecruitersLandingView(TemplateView):
-    """Public promise page. Honest, real counts — no inflated counters."""
-
-    template_name = "search/recruiters_landing.html"
-
-    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
-        context = super().get_context_data(**kwargs)
-        context["public_profiles"] = User.objects.filter(profile_public=True).count()
-        context["games"] = Game.objects.count()
         return context
 
 

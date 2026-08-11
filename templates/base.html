@@ -71,7 +71,6 @@
   <footer>
     {% block footer %}{% endblock %}
     <nav>
-      <a href="{% url 'search:recruiters_landing' %}">{% translate "For recruiters" %}</a>
       <a href="{% url 'terms' %}">{% translate "Terms" %}</a>
       <a href="{% url 'privacy' %}">{% translate "Privacy" %}</a>
       {% if user.is_authenticated %}

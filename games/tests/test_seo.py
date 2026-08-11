@@ -23,28 +23,25 @@ def test_robots_txt_allows_indexing_and_points_to_sitemap(client: Client) -> Non
     assert b"Disallow: /profile/" in body
 
 
-def test_robots_txt_opens_the_promise_page_but_not_the_filter_search(client: Client) -> None:
-    """The "For recruiters" landing page lives *under* the disallowed `/search/`
-    prefix, so its indexability rests entirely on Allow/Disallow precedence.
-
-    Asserted by parsing the response with a real robots parser rather than
-    grepping for the `Allow:` line: the line being present proves nothing —
-    emitted *after* `Disallow: /search/` it is silently inert under first-match
-    parsers (verified: `urllib.robotparser` denies the page in that order).
-    This fails if the rule is dropped OR merely reordered.
-
-    `/search/recruiters/` must stay denied: a combinatorial filter-URL space is
-    a crawl trap that the IP rate limit would only fight.
+def test_robots_txt_keeps_content_pages_and_denies_private_areas(client: Client) -> None:
+    """Asserted by parsing the response with a real robots parser rather than
+    grepping for the lines: a rule can be present and still be silently inert
+    under first-match parsers if it is emitted in the wrong order (verified:
+    `urllib.robotparser` is one of them). This fails if a rule is dropped OR
+    merely reordered.
     """
     body = client.get("/robots.txt").content.decode()
 
     parser = RobotFileParser()
     parser.parse(body.splitlines())
 
-    assert parser.can_fetch("*", "/search/for-recruiters/")
-    assert not parser.can_fetch("*", "/search/recruiters/")
+    assert parser.can_fetch("*", "/u/someone/")  # public profiles are the SEO channel
+    assert parser.can_fetch("*", "/g/some-game/")
+    assert parser.can_fetch("*", "/c/some-studio/")
     assert not parser.can_fetch("*", "/search/")
-    assert parser.can_fetch("*", "/u/someone/")  # public profiles still indexable
+    assert not parser.can_fetch("*", "/account/")
+    # No carve-out survives the promise page it was written for.
+    assert not parser.can_fetch("*", "/search/for-recruiters/")
 
 
 def test_sitemap_lists_public_profiles_and_games(client: Client) -> None:

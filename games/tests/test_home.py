@@ -11,4 +11,3 @@ def test_home_is_public_and_links_to_key_pages(client: Client) -> None:
     response = client.get(reverse("home"))
     assert response.status_code == 200
     assert reverse("search:search").encode() in response.content
-    assert reverse("search:recruiters_landing").encode() in response.content
