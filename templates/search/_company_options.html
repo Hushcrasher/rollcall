@@ -6,6 +6,16 @@
   </button>
 {% empty %}
   <p class="autocomplete-empty">{% translate "No companies found." %}</p>
+  {% if not user.is_authenticated %}
+    {# The declare funnel serves this endpoint to anonymous visitors too, and
+       withholds games:company_create's button from them (see below) — without
+       this, a studio that isn't in the database is a dead end. Members reach
+       this same endpoint from the credit form, where the create button below
+       already gives them a way forward, so this stays out of their way. #}
+    <p class="autocomplete-hint">
+      {% translate "Employer is optional — you can add it once you've created your account." %}
+    </p>
+  {% endif %}
 {% endfor %}
 
 {% if query and user.is_authenticated %}

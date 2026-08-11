@@ -150,7 +150,12 @@ def company_autocomplete(request: HttpRequest) -> HttpResponse:
 # to sit behind a login on the credit form only. They no longer do: the
 # declare funnel (contributions.views.DeclareGameView / DeclareDetailsView)
 # serves both to anonymous visitors now, so the exemption that comment used to
-# claim no longer holds and they carry the same limit as everything else here.
+# claim no longer holds.
+#
+# `suggest`, above, is the one endpoint in this module that stays unmetered:
+# it is the sitewide nav typeahead, it predates this branch, and it runs on
+# every page for every visitor — rate-limiting it is a real behaviour change
+# outside what this branch is about, not an oversight to fix here.
 
 _FILTER_OPTIONS_SHOWN = 10
 

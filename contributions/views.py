@@ -10,10 +10,10 @@ from django.db.models import QuerySet
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect
 from django.urls import reverse
-from django.utils.decorators import method_decorator
 from django.utils.translation import gettext as _
 from django.views.generic import CreateView, DeleteView, FormView, TemplateView, UpdateView
-from django_ratelimit.decorators import ratelimit
+from django_ratelimit.core import is_ratelimited
+from django_ratelimit.exceptions import Ratelimited
 
 from accounts.forms import SignupForm
 from accounts.models import User
@@ -39,29 +39,12 @@ class EmailVerifiedRequiredMixin(LoginRequiredMixin):
         return super().dispatch(request, *args, **kwargs)
 
 
-def _search_rate(group: str, request: HttpRequest) -> str:
-    # A callable, not a plain string, so the rate is read from settings at
-    # request time rather than baked in when this module is imported — the
-    # same reason search.views._search_rate is a callable.
-    return settings.SEARCH_RATELIMIT
-
-
 # Named explicitly, like search.views.PeopleSearchView's _RATELIMIT_GROUP:
 # django-ratelimit derives an unnamed decorator's group from the view's module
 # and qualname, so renaming this view would silently move the counter.
 _DECLARE_GAME_RATELIMIT_GROUP = "declare_game_search"
 
 
-@method_decorator(
-    ratelimit(
-        key="ip",
-        rate=_search_rate,
-        method="POST",
-        block=True,
-        group=_DECLARE_GAME_RATELIMIT_GROUP,
-    ),
-    name="post",
-)
 class DeclareGameView(TemplateView):
     """Step 1 — turn a typed title into a chosen game.
 
@@ -70,9 +53,12 @@ class DeclareGameView(TemplateView):
     carries only a text box, and the disambiguation happens here.
 
     The trigram search this runs is an unmetered anonymous search over `Game`
-    unless rate-limited — decorated on `post` only (not the class), so a bare
-    GET of the page always answers, for the same reason the home page's front
-    door does (search.views.PeopleSearchView).
+    unless rate-limited. Metered by hand inside `post()`, like
+    `search.views.PeopleSearchView.get()`, so only the POST that actually
+    searches (carries `q`) spends quota: a bare GET always answers, and so
+    does the POST that merely picks an already-listed game (carries `game`)
+    — PeopleSearchView's model is "only a real search spends quota", and a
+    pick isn't one.
     """
 
     template_name = "contributions/declare_game.html"
@@ -84,16 +70,27 @@ class DeclareGameView(TemplateView):
             # the same accommodation the codebase already uses elsewhere.
             draft = get_draft(request.session)  # ty: ignore[unresolved-attribute]
             if draft.get("game") != str(game.pk):
-                # A different game invalidates the rest of the draft — the
-                # employer especially: the funnel's JS can only SET a company,
-                # never clear one, so a stale employer from the previous game
-                # would otherwise be unclearable through the UI and get saved
-                # silently. Re-picking the SAME game (step 2's "Wrong game?"
-                # link) leaves the draft alone so nothing typed is lost.
-                draft = {}
+                # A different game invalidates only the employer — the
+                # funnel's JS can only SET a company, never clear one, so a
+                # stale employer from the previous game would otherwise be
+                # unclearable through the UI and get saved silently.
+                # `discipline`, `job_title`, `start_date` and `end_date` are
+                # game-independent, so a different pick leaves them alone.
+                # Re-picking the SAME game (step 2's "Wrong game?" link)
+                # leaves the whole draft alone so nothing typed is lost.
+                draft.pop("company", None)
             draft["game"] = str(game.pk)
             set_draft(request.session, draft)  # ty: ignore[unresolved-attribute]
             return redirect("contributions:declare_details")
+        if "q" in request.POST and is_ratelimited(
+            request=request,
+            group=_DECLARE_GAME_RATELIMIT_GROUP,
+            key="ip",
+            rate=settings.SEARCH_RATELIMIT,
+            method="POST",
+            increment=True,
+        ):
+            raise Ratelimited
         return self.render_to_response(self.get_context_data(**kwargs))
 
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
@@ -181,9 +178,12 @@ class DeclareAccountView(FormView):
             # covered POST), so it is narrowed to GET and POST: GET because a
             # member simply landing here — e.g. via `?next=` after logging in
             # — legitimately has nothing left to sign up for, POST for
-            # symmetry with the anonymous path below. Everything else — HEAD
-            # above all, which browsers issue for prefetch/prerender — falls
-            # through to the default dispatch and 405s instead of writing.
+            # symmetry with the anonymous path below. Everything else falls
+            # through to the default dispatch instead of writing — including
+            # HEAD, which browsers issue for prefetch/prerender: that still
+            # answers 200 (Django aliases `self.head` to `self.get` whenever
+            # `get` is defined), it just never reaches this branch, so the
+            # write never happens.
             return self._save_credit(request, request.user)  # ty: ignore[unresolved-attribute]
         return super().dispatch(request, *args, **kwargs)
 

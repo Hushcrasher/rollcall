@@ -29,6 +29,16 @@ def test_declare_is_open_to_anonymous_visitors(client: Client) -> None:
     assert client.get(reverse("contributions:declare")).status_code == 200
 
 
+# A non-greedy `.*?</form>` under re.S does not stop at the FIRST `</form>` —
+# it stops at the first position where the rest of the pattern also matches,
+# which can be several forms later. On this page that let a match starting at
+# base.html's nav search form run straight through to a `name="game"` deep in
+# the picking form, "bounded" only by whichever `</form>` happened to follow.
+# The negative-lookahead idiom below excludes `</form>` from what `.` can
+# consume, so the match cannot cross a form boundary at all.
+_GAME_FORM_RE = r'<form[^>]*>(?:(?!</form>).)*?name="game"(?:(?!</form>).)*?</form>'
+
+
 def test_posting_a_title_lists_matching_games(client: Client, game: Game) -> None:
     """Scoped to the form carrying the hidden `game` input, not just the page
     text — the search box's own placeholder ("Hollow Knight, Dishonored…")
@@ -37,9 +47,25 @@ def test_posting_a_title_lists_matching_games(client: Client, game: Game) -> Non
     response = client.post(reverse("contributions:declare"), {"q": "hollow"})
     assert response.status_code == 200
     body = response.content.decode()
-    match = re.search(r'<form[^>]*>.*?name="game".*?</form>', body, re.S)
+    match = re.search(_GAME_FORM_RE, body, re.S)
     assert match is not None, "no form carrying a pickable game"
     assert "Hollow Knight" in match.group(0)
+
+
+def test_the_bounded_regex_does_not_bleed_into_the_nav_search_form(client: Client) -> None:
+    """Proof the fix actually bounds the match to one form. No Hollow Knight
+    row exists in this test at all — only a Celeste one, queried by title —
+    so if the match window still contained "Hollow Knight" it could only have
+    bled in from base.html's nav search form through the declare box's own
+    placeholder ("Hollow Knight, Dishonored…"), exactly as the unbounded
+    `.*?` regex used to do."""
+    Game.objects.create(title="Celeste", source=Game.Source.MANUAL)
+    response = client.post(reverse("contributions:declare"), {"q": "celeste"})
+    assert response.status_code == 200
+    body = response.content.decode()
+    match = re.search(_GAME_FORM_RE, body, re.S)
+    assert match is not None, "no form carrying a pickable game"
+    assert "Hollow Knight" not in match.group(0)
 
 
 def test_picking_a_game_stores_it_and_moves_on(client: Client, game: Game) -> None:
@@ -60,7 +86,9 @@ def test_a_junk_game_id_does_not_500(client: Client) -> None:
 def test_repicking_a_different_game_clears_the_old_employer(client: Client, game: Game) -> None:
     """Step 2's own "Wrong game?" link leads here. The stale employer is
     unclearable through the UI (the funnel's JS can only set a company, never
-    clear one), so a different pick must drop the rest of the draft."""
+    clear one), so a different pick must drop it — but `discipline`,
+    `job_title`, `start_date` and `end_date` are game-independent, so a
+    different pick must not throw those away too."""
     other = Game.objects.create(title="Celeste", source=Game.Source.MANUAL)
     session = client.session
     session[SESSION_KEY] = {"game": str(game.pk), "company": "42", "job_title": "Artist"}
@@ -68,7 +96,7 @@ def test_repicking_a_different_game_clears_the_old_employer(client: Client, game
 
     client.post(reverse("contributions:declare"), {"game": str(other.pk)})
 
-    assert client.session[SESSION_KEY] == {"game": str(other.pk)}
+    assert client.session[SESSION_KEY] == {"game": str(other.pk), "job_title": "Artist"}
 
 
 def test_repicking_the_same_game_keeps_the_draft(client: Client, game: Game) -> None:
@@ -124,6 +152,21 @@ def test_a_bare_get_is_never_rate_limited(client: Client, settings: Any) -> None
     client.post(url, {"q": "a"})
     client.post(url, {"q": "a"})
     assert client.get(url).status_code == 200
+
+
+def test_picking_a_game_is_never_rate_limited(client: Client, game: Game, settings: Any) -> None:
+    """PeopleSearchView — this view's cited model — meters only requests that
+    actually search. The POST that carries `game` is a pick, not a search, so
+    it must not share the search POST's quota: a visitor who searched once
+    and is now clicking a result must not find the click itself blocked."""
+    settings.RATELIMIT_ENABLE = True
+    settings.SEARCH_RATELIMIT = "1/m"
+    cache.clear()
+
+    url = reverse("contributions:declare")
+    for _ in range(3):
+        response = client.post(url, {"game": str(game.pk)})
+        assert response.status_code == 302
 
 
 def test_home_does_not_ask_a_member(client: Client) -> None:

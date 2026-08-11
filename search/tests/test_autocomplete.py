@@ -62,6 +62,27 @@ def test_company_autocomplete_hides_the_create_option_from_an_anonymous_visitor(
     assert b"company-create" not in response.content
 
 
+def test_company_autocomplete_tells_an_anonymous_visitor_the_employer_is_optional(
+    client: Client,
+) -> None:
+    """The declare funnel serves this endpoint to anonymous visitors, and
+    withholds the create button from them — without this hint, a studio that
+    isn't in the database is a dead end with no way forward."""
+    response = client.get(reverse("search:company_autocomplete"), {"q": "Nonexistent Studio"})
+    assert b"No companies found." in response.content
+    assert b"optional" in response.content
+
+
+def test_company_autocomplete_keeps_the_optional_hint_away_from_a_member(client: Client) -> None:
+    """Members reach this endpoint from the logged-in credit form, where the
+    create button already gives them a way forward — the hint is noise there."""
+    user = User.objects.create_user(email="m2@example.com", password="x", display_name="M2")
+    client.force_login(user)
+    response = client.get(reverse("search:company_autocomplete"), {"q": "Nonexistent Studio"})
+    assert b"No companies found." in response.content
+    assert b"optional" not in response.content
+
+
 def test_game_autocomplete_offers_igdb_when_configured(client: Client, settings: Any) -> None:
     settings.IGDB_CLIENT_ID = "cid"
     settings.IGDB_CLIENT_SECRET = "secret"
