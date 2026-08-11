@@ -163,8 +163,8 @@ link, and filtered result pages are not distinct content.
   box already matches all three (`suggest()` returns games, people and
   companies); the label just stops under-selling it.
 - The input has no declared width, so it falls to the browser default of roughly
-  20 characters and would truncate that placeholder. It gets `size="34"` — one
-  more than the 33-character string — so the label is fully visible. Without it
+  20 characters and would truncate that placeholder. It gets `size="35"` — one
+  more than the 34-character string — so the label is fully visible. Without it
   the fix is invisible, which is the whole failure it is meant to correct.
 - **Footer**: the "For recruiters" link goes. Terms, Privacy and Report remain.
 - **Logo**: already `{% url 'home' %}`. Unchanged, and now lands on the search.
