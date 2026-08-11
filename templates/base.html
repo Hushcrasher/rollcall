@@ -36,7 +36,9 @@
       <a href="{% url 'home' %}">Rollcall</a>
       <span class="nav-search">
         <form action="{% url 'search:search' %}" method="get" role="search" style="display:inline">
-          <input type="search" name="q" placeholder="{% translate 'Search…' %}" autocomplete="off"
+          {# size=35 — one more than the 34-character placeholder, which the ~20-char browser default would truncate. #}
+          <input type="search" name="q" size="35" autocomplete="off"
+                 placeholder="{% translate 'Search games, companies and people' %}"
                  hx-get="{% url 'search:suggest' %}" hx-trigger="keyup changed delay:250ms"
                  hx-target="#nav-suggest">
         </form>
