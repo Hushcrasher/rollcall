@@ -35,6 +35,10 @@ def test_details_is_open_to_anonymous_visitors(client: Client, game: Game) -> No
     response = client.get(reverse("contributions:declare_details"))
     assert response.status_code == 200
     assert b"Hollow Knight" in response.content  # the chosen game is shown back
+    # The employer field partial is shared with the credit form
+    # (contributions/_employer_field.html); a {# ... #} comment there that
+    # spans more than one line is not lexed as a comment and leaks into the page.
+    assert b"{#" not in response.content
 
 
 def test_a_valid_credit_moves_to_the_account_step(client: Client, game: Game) -> None:

@@ -7,11 +7,13 @@
 {% empty %}
   <p class="autocomplete-empty">{% translate "No companies found." %}</p>
   {% if not user.is_authenticated %}
-    {# The declare funnel serves this endpoint to anonymous visitors too, and
-       withholds games:company_create's button from them (see below) — without
-       this, a studio that isn't in the database is a dead end. Members reach
-       this same endpoint from the credit form, where the create button below
-       already gives them a way forward, so this stays out of their way. #}
+    {% comment %}
+      The declare funnel serves this endpoint to anonymous visitors too, and
+      withholds games:company_create's button from them (see below) — without
+      this, a studio that isn't in the database is a dead end. Members reach
+      this same endpoint from the credit form, where the create button below
+      already gives them a way forward, so this stays out of their way.
+    {% endcomment %}
     <p class="autocomplete-hint">
       {% translate "Employer is optional — you can add it once you've created your account." %}
     </p>
@@ -19,10 +21,12 @@
 {% endfor %}
 
 {% if query and user.is_authenticated %}
-  {# games:company_create is @login_required and stays that way — anonymous
-     visitors (the declare funnel serves this endpoint too) get no button
-     rather than a dead one; see contribution_form.html's click handler for
-     the only caller that can actually use it. #}
+  {% comment %}
+    games:company_create is @login_required and stays that way — anonymous
+    visitors (the declare funnel serves this endpoint too) get no button
+    rather than a dead one; see contribution_form.html's click handler for
+    the only caller that can actually use it.
+  {% endcomment %}
   <button type="button" class="company-create" data-name="{{ query }}">
     {% blocktranslate %}Not there? Create "{{ query }}"{% endblocktranslate %}
   </button>

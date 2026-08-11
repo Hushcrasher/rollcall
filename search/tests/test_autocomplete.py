@@ -49,6 +49,8 @@ def test_company_autocomplete_offers_a_create_option_to_a_member(client: Client)
     response = client.get(reverse("search:company_autocomplete"), {"q": "Brand New Studio"})
     assert b"company-create" in response.content
     assert b"Brand New Studio" in response.content
+    assert b"{#" not in response.content  # {# ... #} is single-line only; a
+    # multi-line one leaks its raw text into the fragment instead of being lexed
 
 
 def test_company_autocomplete_hides_the_create_option_from_an_anonymous_visitor(
@@ -60,6 +62,7 @@ def test_company_autocomplete_hides_the_create_option_from_an_anonymous_visitor(
     games:company_create is @login_required."""
     response = client.get(reverse("search:company_autocomplete"), {"q": "Brand New Studio"})
     assert b"company-create" not in response.content
+    assert b"{#" not in response.content
 
 
 def test_company_autocomplete_tells_an_anonymous_visitor_the_employer_is_optional(
@@ -71,6 +74,7 @@ def test_company_autocomplete_tells_an_anonymous_visitor_the_employer_is_optiona
     response = client.get(reverse("search:company_autocomplete"), {"q": "Nonexistent Studio"})
     assert b"No companies found." in response.content
     assert b"optional" in response.content
+    assert b"{#" not in response.content
 
 
 def test_company_autocomplete_keeps_the_optional_hint_away_from_a_member(client: Client) -> None:
@@ -81,6 +85,7 @@ def test_company_autocomplete_keeps_the_optional_hint_away_from_a_member(client:
     response = client.get(reverse("search:company_autocomplete"), {"q": "Nonexistent Studio"})
     assert b"No companies found." in response.content
     assert b"optional" not in response.content
+    assert b"{#" not in response.content
 
 
 def test_game_autocomplete_offers_igdb_when_configured(client: Client, settings: Any) -> None:

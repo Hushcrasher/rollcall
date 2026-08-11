@@ -83,6 +83,20 @@ def test_verified_user_can_create_a_credit(
     assert contribution.start_date == date(2021, 3, 1)
 
 
+def test_create_form_page_renders_for_a_verified_member(
+    client: Client, verified_user: User
+) -> None:
+    """The employer field partial is shared with the declare funnel's step 2
+    (contributions/_employer_field.html); a {# ... #} comment there that spans
+    more than one line is not lexed as a comment and leaks into this page."""
+    client.force_login(verified_user)
+
+    response = client.get(reverse("contributions:create"))
+
+    assert response.status_code == 200
+    assert b"{#" not in response.content
+
+
 def test_multiple_credits_on_the_same_game_are_allowed(
     client: Client, verified_user: User, game: Game, discipline: Discipline
 ) -> None:

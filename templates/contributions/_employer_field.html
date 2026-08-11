@@ -1,8 +1,10 @@
 {% load i18n %}
-{# Employer — constrained to the game's studios, then search / create.
-   Shared by the credit form and the declare funnel's step 2, so the two cannot
-   drift. Expects `form` (a ContributionForm) in the context, and the including
-   template to carry the employer JS. #}
+{% comment %}
+  Employer — constrained to the game's studios, then search / create.
+  Shared by the credit form and the declare funnel's step 2, so the two cannot
+  drift. Expects `form` (a ContributionForm) in the context, and the including
+  template to carry the employer JS.
+{% endcomment %}
 <div class="autocomplete" id="employer-field" data-hidden="{{ form.company.auto_id }}"
      data-employers-url="{% url 'games:game_employers' 0 %}">
   <label>{% translate "Employer company (optional)" %}</label>
