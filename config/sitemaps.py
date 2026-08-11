@@ -13,7 +13,27 @@ from django.urls import reverse
 from accounts.models import User
 from games.models import Company, Game
 
-_DISALLOW = ["/admin/", "/account/", "/profile/", "/credits/", "/contact/", "/report/", "/search/"]
+_DISALLOW = [
+    "/admin/",
+    "/account/",
+    "/profile/",
+    "/credits/",
+    "/contact/",
+    "/report/",
+    "/search/",
+    # The people search is the home page, so its combinatorial filter-URL space
+    # (`/?discipline=3&engines=5&page=2`) cannot be closed with a path prefix —
+    # `Disallow: /` would delist the whole site. Closed by query string instead:
+    # `/` carries none and stays crawlable, as a home page must, and `/u/`,
+    # `/g/`, `/c/` are clean-path URLs, so nothing indexable is lost.
+    #
+    # Coverage is PARTIAL and deliberately so. RFC 9309 §2.2.3 defines `*` in a
+    # path and Google and Bing implement it, but `urllib.robotparser` ignores
+    # wildcards and reads this as a literal prefix matching nothing. The trap is
+    # shut for the crawlers that would actually burn budget on it. The root
+    # template's rel=canonical is the second layer for anything that gets past.
+    "/*?",
+]
 
 # Emitted BEFORE the disallows, and that order is load-bearing. RFC 9309 §2.2.2
 # picks the longest match, but parsers with first-match semantics — Python's own
