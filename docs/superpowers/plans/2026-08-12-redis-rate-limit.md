@@ -64,7 +64,8 @@ def test_a_cache_failure_does_not_lock_everyone_out(client: Client, settings: An
 
     The failure is simulated rather than staged with a real Redis: this is
     exactly the shape django-redis's IGNORE_EXCEPTIONS produces — `add` returns
-    falsy, `incr` raises — so the branch under test is the one prod will take.
+    falsy, `incr` returns `None` — so the branch under test is the one prod
+    will take.
     """
     settings.RATELIMIT_ENABLE = True
     settings.SEARCH_RATELIMIT = "1/m"
@@ -74,12 +75,9 @@ def test_a_cache_failure_does_not_lock_everyone_out(client: Client, settings: An
     url = reverse("home")
     search = {"open_to_work": "on"}
 
-    def _dead_incr(*args: Any, **kwargs: Any) -> int:
-        raise ValueError("cache unreachable")
-
     with (
         mock.patch.object(backend, "add", return_value=False),
-        mock.patch.object(backend, "incr", side_effect=_dead_incr),
+        mock.patch.object(backend, "incr", return_value=None),
     ):
         # Well past the 1/m limit: none of these may be refused.
         for _ in range(5):

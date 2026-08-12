@@ -31,8 +31,11 @@ CACHES = {
 }
 
 # Failing open must not mean failing silently: without these, a Redis outage is
-# invisible — the same defect, one level up.
-DJANGO_REDIS_IGNORE_EXCEPTIONS = True
+# invisible — the same defect, one level up. (DJANGO_REDIS_IGNORE_EXCEPTIONS is
+# not set here: the per-cache OPTIONS["IGNORE_EXCEPTIONS"] above already wins —
+# django-redis reads OPTIONS first and only falls back to this setting when
+# OPTIONS omits it — so setting both would just be one more knob to keep in
+# sync.)
 DJANGO_REDIS_LOG_IGNORED_EXCEPTIONS = True
 DJANGO_REDIS_LOGGER = "rollcall.cache"
 

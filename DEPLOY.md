@@ -47,6 +47,15 @@ PaaS or a VPS.
 
 Set `SENTRY_DSN`. Prod initialises Sentry with `send_default_pii=False`.
 
+## 4b. GitHub — "Public side projects" block
+
+Set `GITHUB_TOKEN` to a **classic Personal Access Token** with the `read:user`
+scope (no repo access needed). It is used server-side only for the profile
+GitHub block (REST profile + GraphQL contributions). Without it the block is
+hidden for profiles that have no cached data yet — the rest of the profile is
+unaffected. Rate limit with a token is 5,000 req/h; the cache-aside TTL means a
+warm profile view costs zero calls and a daily refresh costs one.
+
 ## 4c. Redis — rate-limit counters
 
 **Add this with the first deploy, not after it: prod refuses to start without
@@ -62,10 +71,12 @@ past `MAX_ENTRIES`, so a limit does not weaken — it silently stops holding. A
 graceful fallback would leave a deployment looking healthy while the
 anti-scraping mitigation `docs/01-DESIGN.md` §3.6 relies on quietly did not.
 
-**If Redis goes down**, the site stays up and nothing is rate-limited for the
-duration (`RATELIMIT_FAIL_OPEN`). The outage is logged to the `rollcall.cache`
-logger, so it surfaces in the PaaS log stream and in Sentry rather than passing
-unnoticed.
+**If Redis goes down**, the site stays up and none of the *IP* rate limits are
+enforced for the duration (`RATELIMIT_FAIL_OPEN`) — the contact relay's
+per-sender limit is backed by the database, not this cache, and keeps holding
+(`contact/views.py`, `docs/01-DESIGN.md` §3.6). The outage is logged to the
+`rollcall.cache` logger, so it surfaces in the PaaS log stream and in Sentry
+rather than passing unnoticed.
 
 ⚠️ **Expect to retune the limits, and do not mistake it for a regression.**
 Until now each gunicorn worker counted separately, so `SEARCH_RATELIMIT=60/m`
@@ -74,15 +85,6 @@ a factor equal to the worker count**, on the day Redis lands, without any number
 changing. If 403s appear on a search that worked yesterday, that is the limit
 holding for the first time. Both limits are env vars, so retuning needs no
 redeploy.
-
-## 4b. GitHub — "Public side projects" block
-
-Set `GITHUB_TOKEN` to a **classic Personal Access Token** with the `read:user`
-scope (no repo access needed). It is used server-side only for the profile
-GitHub block (REST profile + GraphQL contributions). Without it the block is
-hidden for profiles that have no cached data yet — the rest of the profile is
-unaffected. Rate limit with a token is 5,000 req/h; the cache-aside TTL means a
-warm profile view costs zero calls and a daily refresh costs one.
 
 ## 5. Seed the games catalog (after the ToS/parquet prerequisites)
 
