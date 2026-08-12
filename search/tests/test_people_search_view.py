@@ -6,10 +6,11 @@ guard."""
 import re
 from datetime import date
 from typing import Any
+from unittest import mock
 from urllib.parse import parse_qs, urlparse
 
 import pytest
-from django.core.cache import cache
+from django.core.cache import cache, caches
 from django.test import Client
 from django.urls import reverse
 
@@ -211,6 +212,37 @@ def test_rate_limit_holds_while_other_ips_fill_the_cache(client: Client, setting
         cache.set(f"rlbucket:10.1.{i // 256}.{i % 256}", 1, 60)
 
     assert client.get(url, search, REMOTE_ADDR="10.0.0.1").status_code == 403
+
+
+def test_a_cache_failure_does_not_lock_everyone_out(client: Client, settings: Any) -> None:
+    """django-ratelimit fails CLOSED by default: when the cache does not answer
+    it returns `should_limit: True`, so a Redis outage would 403 every
+    rate-limited page at once. The limit is a mitigation, not a boundary
+    (docs/01-DESIGN.md §3.6) — the site staying up is worth more than a window
+    of unmetered traffic.
+
+    The failure is simulated rather than staged with a real Redis: this is
+    exactly the shape django-redis's IGNORE_EXCEPTIONS produces — `add` returns
+    falsy, `incr` raises — so the branch under test is the one prod will take.
+    """
+    settings.RATELIMIT_ENABLE = True
+    settings.SEARCH_RATELIMIT = "1/m"
+    cache.clear()
+
+    backend = caches["default"]
+    url = reverse("home")
+    search = {"open_to_work": "on"}
+
+    def _dead_incr(*args: Any, **kwargs: Any) -> int:
+        raise ValueError("cache unreachable")
+
+    with (
+        mock.patch.object(backend, "add", return_value=False),
+        mock.patch.object(backend, "incr", side_effect=_dead_incr),
+    ):
+        # Well past the 1/m limit: none of these may be refused.
+        for _ in range(5):
+            assert client.get(url, search).status_code == 200
 
 
 def test_pagination_preserves_filters(client: Client) -> None:

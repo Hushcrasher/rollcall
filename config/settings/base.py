@@ -158,12 +158,13 @@ SEED_ALERT_EMAIL = env("SEED_ALERT_EMAIL", default="")
 CONTACT_RATE_LIMIT_PER_DAY = env.int("CONTACT_RATE_LIMIT_PER_DAY", default=20)
 
 # --- Caching ----------------------------------------------------------------
-# Explicit only to raise MAX_ENTRIES: LocMemCache defaults to 300 entries and
-# culls every 3rd key once past it, which silently evicts *live* rate-limit
-# counters — one key per client IP, so ~300 distinct visitors is enough. That
-# resets the limit docs/01-DESIGN.md §3.6 names as the real anti-scraping
-# mitigation, to zero, under ordinary traffic. Still per-process; Redis is the
-# fix (ROADMAP).
+# Dev and tests only — prod overrides this with Redis (config/settings/prod.py),
+# because LocMemCache is per-process and culls live keys.
+#
+# MAX_ENTRIES is explicit because LocMemCache defaults to 300 entries and culls
+# every 3rd key once past it, silently evicting *live* rate-limit counters (one
+# key per client IP, so ~300 distinct visitors is enough). Harmless on a
+# single-process runserver; it is why prod may not use this backend.
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
@@ -172,7 +173,14 @@ CACHES = {
 }
 
 # --- Rate limiting (anti-scraping on public pages) --------------------------
-# Per-IP limits; tune via env. NB: counters live in CACHES["default"], which is
-# per-process — add Redis in prod for limits that hold across workers.
+# Per-IP limits; tune via env. Counters live in CACHES["default"] — Redis in
+# prod (config/settings/prod.py), LocMemCache in dev and tests.
 PROFILE_RATELIMIT = env("PROFILE_RATELIMIT", default="120/m")
 SEARCH_RATELIMIT = env("SEARCH_RATELIMIT", default="60/m")
+
+# django-ratelimit fails CLOSED by default: a cache it cannot reach yields
+# `should_limit: True`, i.e. 403 on every rate-limited page at once. The limit
+# is a mitigation, not a boundary (docs/01-DESIGN.md §3.6), so a cache outage
+# must cost metering, not availability. Set here rather than in prod.py so dev
+# and prod cannot diverge on it.
+RATELIMIT_FAIL_OPEN = True
