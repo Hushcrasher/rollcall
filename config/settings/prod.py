@@ -7,6 +7,46 @@ DEBUG = False
 
 SECRET_KEY = env("DJANGO_SECRET_KEY")  # required — crash early if missing
 
+# --- Cache: Redis ------------------------------------------------------------
+# Required, and deliberately fatal when absent. Rate-limit counters live in this
+# cache; LocMemCache is per-process and culls live keys, so falling back to it
+# would leave a deployment that looks healthy while the anti-scraping mitigation
+# docs/01-DESIGN.md §3.6 relies on quietly does not hold.
+REDIS_URL = env("REDIS_URL")  # required — crash early if missing
+
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": REDIS_URL,
+        "OPTIONS": {
+            # Return None instead of raising when Redis is unreachable. Django's
+            # own RedisCache backend catches nothing, so the exception would
+            # escape past django-ratelimit's handlers and 500 the request before
+            # RATELIMIT_FAIL_OPEN (base.py) could be evaluated. This is the only
+            # reason this project depends on django-redis rather than the
+            # built-in backend.
+            "IGNORE_EXCEPTIONS": True,
+        },
+    }
+}
+
+# Failing open must not mean failing silently: without these, a Redis outage is
+# invisible — the same defect, one level up.
+DJANGO_REDIS_IGNORE_EXCEPTIONS = True
+DJANGO_REDIS_LOG_IGNORED_EXCEPTIONS = True
+DJANGO_REDIS_LOGGER = "rollcall.cache"
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "loggers": {
+        # Sentry's SDK captures log records as events; this logger is what makes
+        # a swallowed Redis outage visible there and in the PaaS log stream.
+        "rollcall.cache": {"handlers": ["console"], "level": "ERROR", "propagate": True},
+    },
+}
+
 # Security hardening behind the PaaS TLS terminator.
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SECURE_SSL_REDIRECT = True

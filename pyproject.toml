@@ -11,6 +11,7 @@ dependencies = [
     "django-environ>=0.14.0",
     "django-htmx>=1.27.0",
     "django-ratelimit>=4.1.0",
+    "django-redis>=7.0.0",
     "django-storages[s3]>=1.14.6",
     "duckdb>=1.5.4",
     "gunicorn>=26.0.0",
@@ -31,7 +32,7 @@ dev = [
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings.test"
 python_files = ["test_*.py"]
-testpaths = ["accounts", "games", "contributions", "search", "contact"]
+testpaths = ["accounts", "games", "contributions", "search", "contact", "config"]
 
 [tool.ruff]
 line-length = 100
