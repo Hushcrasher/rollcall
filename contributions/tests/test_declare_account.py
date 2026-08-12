@@ -123,8 +123,8 @@ def test_abandoning_the_funnel_writes_nothing(client: Client, game: Game) -> Non
     (not `_with_draft`'s session shortcut, which never invokes either view)
     and never reaching step 3 (the session expires, the tab is closed) must
     leave no trace at all: no `User`, no `Contribution`."""
-    client.post(reverse("contributions:declare"), {"game": str(game.pk)})
-    client.post(
+    step1 = client.post(reverse("contributions:declare"), {"game": str(game.pk)})
+    step2 = client.post(
         reverse("contributions:declare_details"),
         {
             "game": str(game.pk),
@@ -134,6 +134,13 @@ def test_abandoning_the_funnel_writes_nothing(client: Client, game: Game) -> Non
             "end_date": "",
         },
     )
+
+    # Both steps must have SUCCEEDED for the assertions below to mean anything.
+    # A step-2 POST that fails validation returns 200, never reaches form_valid,
+    # and would swallow a write introduced there — leaving a test that reads like
+    # a funnel walk and proves nothing. This spot has been written wrong twice.
+    assert step1.status_code == 302
+    assert step2.status_code == 302
 
     assert User.objects.count() == 0
     assert Contribution.objects.count() == 0
