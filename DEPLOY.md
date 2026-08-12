@@ -47,6 +47,34 @@ PaaS or a VPS.
 
 Set `SENTRY_DSN`. Prod initialises Sentry with `send_default_pii=False`.
 
+## 4c. Redis — rate-limit counters
+
+**Add this with the first deploy, not after it: prod refuses to start without
+`REDIS_URL`.**
+
+1. Add Railway's **Redis** plugin to the project. It injects a connection URL —
+   expose it to the app service as `REDIS_URL`.
+2. That is the whole setup. Prod points `CACHES["default"]` at it automatically.
+
+Why it is required rather than optional: rate-limit counters live in this cache.
+The dev/test fallback (`LocMemCache`) is per-process *and* culls live keys once
+past `MAX_ENTRIES`, so a limit does not weaken — it silently stops holding. A
+graceful fallback would leave a deployment looking healthy while the
+anti-scraping mitigation `docs/01-DESIGN.md` §3.6 relies on quietly did not.
+
+**If Redis goes down**, the site stays up and nothing is rate-limited for the
+duration (`RATELIMIT_FAIL_OPEN`). The outage is logged to the `rollcall.cache`
+logger, so it surfaces in the PaaS log stream and in Sentry rather than passing
+unnoticed.
+
+⚠️ **Expect to retune the limits, and do not mistake it for a regression.**
+Until now each gunicorn worker counted separately, so `SEARCH_RATELIMIT=60/m`
+was really `60/m × workers`. With shared counters it means 60/m — **stricter by
+a factor equal to the worker count**, on the day Redis lands, without any number
+changing. If 403s appear on a search that worked yesterday, that is the limit
+holding for the first time. Both limits are env vars, so retuning needs no
+redeploy.
+
 ## 4b. GitHub — "Public side projects" block
 
 Set `GITHUB_TOKEN` to a **classic Personal Access Token** with the `read:user`
@@ -90,12 +118,6 @@ python manage.py seed_games
 
 - **Rehearse one database restore** from a Railway backup — do it once, for real.
 - Review the legal pages (`/terms/`, `/privacy/`) with counsel.
-- Rate limiting uses a per-process in-memory cache (`CACHES` in
-  `config/settings/base.py`). Two consequences: each gunicorn worker counts
-  separately, and once the cache exceeds `MAX_ENTRIES` it culls keys —
-  including live counters, so a limit **silently stops holding** rather than
-  merely weakening. `MAX_ENTRIES` is set to 50k to buy headroom; a shared cache
-  (Redis) pointed at by `CACHES` is the real fix.
 - For ~400k games, switch `sitemap.xml` to a paginated sitemap index.
 
 ## Fallback if the schedule slips
