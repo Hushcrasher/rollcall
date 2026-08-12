@@ -99,13 +99,39 @@ def test_company_autocomplete_tells_an_anonymous_visitor_the_employer_is_optiona
 
 
 def test_company_autocomplete_keeps_the_optional_hint_away_from_a_member(client: Client) -> None:
-    """Members reach this endpoint from the logged-in credit form, where the
-    create button already gives them a way forward — the hint is noise there."""
+    """A member reaching this endpoint from the logged-in credit form sends
+    `offer_create=1` (see test_company_autocomplete_offers_a_create_option_to_the_credit_form) —
+    that page's working create button already gives them a way forward, so
+    the hint is noise there. Without `offer_create=1` the same authenticated
+    request is the declare funnel's step 2, which gets its own hint instead
+    (test_company_autocomplete_tells_a_member_on_the_declare_funnels_step_2_the_employer_is_optional)."""
     user = User.objects.create_user(email="m2@example.com", password="x", display_name="M2")
+    client.force_login(user)
+    response = client.get(
+        reverse("search:company_autocomplete"), {"q": "Nonexistent Studio", "offer_create": "1"}
+    )
+    assert b"No companies found." in response.content
+    assert b"optional" not in response.content
+    assert b"{#" not in response.content
+
+
+def test_company_autocomplete_tells_a_member_on_the_declare_funnels_step_2_the_employer_is_optional(
+    client: Client,
+) -> None:
+    """A logged-in member can walk the declare funnel too. Step 2
+    (declare_details.html) sends no `offer_create`, so unlike the credit form
+    they get no create button (see
+    test_company_autocomplete_hides_the_create_option_from_the_declare_funnels_step_2)
+    — without a hint of their own that was a silent dead end: not the
+    anonymous hint above (wrong copy — they already have an account) and not
+    the button (nothing listens for its click on this page)."""
+    user = User.objects.create_user(email="m6@example.com", password="x", display_name="M6")
     client.force_login(user)
     response = client.get(reverse("search:company_autocomplete"), {"q": "Nonexistent Studio"})
     assert b"No companies found." in response.content
-    assert b"optional" not in response.content
+    assert b"optional" in response.content
+    assert b"add it later from your credit" in response.content
+    assert b"company-create" not in response.content
     assert b"{#" not in response.content
 
 
@@ -139,21 +165,29 @@ def test_game_and_company_autocomplete_are_rate_limited_for_anonymous_visitors(
 
 
 @pytest.mark.parametrize("url_name", ["search:game_autocomplete", "search:company_autocomplete"])
-def test_game_and_company_autocomplete_are_not_rate_limited_for_a_member(
+def test_game_and_company_autocomplete_meter_each_member_without_sharing_a_nat_counter(
     client: Client, settings: Any, url_name: str
 ) -> None:
-    """These two also back the logged-in credit form's keyup typeahead. On a
-    shared studio NAT a per-IP limit meant for anonymous scraping would 403
-    one member's requests because of another's — and htmx does not swap on a
-    403, so the dropdown would silently stop updating. The anti-scraping
-    target is anonymous traffic, so a member's requests must not spend the
-    same quota."""
+    """These two also back the logged-in credit form's keyup typeahead, keyed
+    by `user_or_ip` rather than `ip`. Two members behind the same office NAT
+    (both hit from this test's single IP) must not share a counter — a
+    per-IP limit meant for anonymous scraping would otherwise 403 one
+    member's requests because of another's, and htmx does not swap on a 403,
+    so the dropdown would silently stop updating. Unlike the earlier
+    `None`-for-authenticated approach (reverted — it hands out an unmetered
+    endpoint to anyone with a free, unverified account), each member is
+    still metered on their own budget: Alice's second request 403s, but Bob
+    signing in right after is untouched by Alice's usage."""
     settings.RATELIMIT_ENABLE = True
     settings.SEARCH_RATELIMIT = "1/m"
     cache.clear()
-    user = User.objects.create_user(email="nat@example.com", password="x", display_name="Nat")
-    client.force_login(user)
-
+    alice = User.objects.create_user(email="alice@example.com", password="x", display_name="Alice")
+    bob = User.objects.create_user(email="bob@example.com", password="x", display_name="Bob")
     url = reverse(url_name)
-    for _ in range(3):
-        assert client.get(url, {"q": "a"}).status_code == 200
+
+    client.force_login(alice)
+    assert client.get(url, {"q": "a"}).status_code == 200
+    assert client.get(url, {"q": "a"}).status_code == 403  # Alice is metered, not exempt
+
+    client.force_login(bob)
+    assert client.get(url, {"q": "a"}).status_code == 200  # Bob's own budget, untouched

@@ -17,6 +17,20 @@
     <p class="autocomplete-hint">
       {% translate "Employer is optional — you can add it once you've created your account." %}
     </p>
+  {% elif not offer_create %}
+    {% comment %}
+      A logged-in member can walk the declare funnel too, and step 2
+      (declare_details.html) has no `.company-create` handler, so offer_create
+      is never set there — the button below stays hidden for them, same as
+      for an anonymous visitor. Unlike an anonymous visitor they already have
+      an account, so the hint above ("once you've created your account") is
+      wrong; this is their own hint, pointing at the credit form's working
+      button instead. The credit form itself sends offer_create=1, so this
+      branch never fires there — it gets the button above, not a hint.
+    {% endcomment %}
+    <p class="autocomplete-hint">
+      {% translate "Employer is optional — you can add it later from your credit." %}
+    </p>
   {% endif %}
 {% endfor %}
 

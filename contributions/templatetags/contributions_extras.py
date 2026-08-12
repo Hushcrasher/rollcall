@@ -1,7 +1,6 @@
 """Template helpers for contributions/_employer_field.html."""
 
 from django import template
-from django.utils.safestring import SafeString
 
 from contributions.forms import ContributionForm
 from games.models import Company
@@ -10,9 +9,16 @@ register = template.Library()
 
 
 @register.filter
-def employer_label(form: ContributionForm) -> str | SafeString:
+def employer_label(form: ContributionForm) -> str:
     """The employer name shown back on the `.chosen` line of
     contributions/_employer_field.html.
+
+    Scoped to `ContributionForm` specifically (the type hint above is the
+    contract, not a suggestion) — it reads `form.instance.company` and
+    `form["company"]`, so a form without those would raise `AttributeError`.
+    The single call site (`_employer_field.html`, included only by
+    `contribution_form.html` and `declare_details.html`) always passes one;
+    there is no other caller to guard against.
 
     `form.instance.company` is right whenever `_post_clean` has actually
     populated the instance — editing an existing credit, or re-rendering an

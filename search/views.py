@@ -26,19 +26,6 @@ def _search_rate(group: str, request: HttpRequest) -> str:
     return settings.SEARCH_RATELIMIT
 
 
-def _anonymous_search_rate(group: str, request: HttpRequest) -> str | None:
-    # `None` tells django_ratelimit.core.get_usage to skip limiting entirely
-    # (see its `if rate is None: return None`) — the logged-in credit form's
-    # own keyup typeahead hits these two endpoints too, and a shared-NAT
-    # studio full of members would otherwise blow through a per-IP limit
-    # meant for anonymous scraping and see htmx silently stop swapping (htmx
-    # does not swap on a 403). The anti-scraping target is anonymous traffic,
-    # so only that traffic spends quota here.
-    if request.user.is_authenticated:  # ty: ignore[unresolved-attribute]
-        return None
-    return settings.SEARCH_RATELIMIT
-
-
 @method_decorator(ratelimit(key="ip", rate=_search_rate, method="GET", block=True), name="get")
 class SearchView(TemplateView):
     template_name = "search/search.html"
@@ -130,7 +117,7 @@ def suggest(request: HttpRequest) -> HttpResponse:
     )
 
 
-@ratelimit(key="ip", rate=_anonymous_search_rate, method="GET", block=True)
+@ratelimit(key="user_or_ip", rate=_search_rate, method="GET", block=True)
 def game_autocomplete(request: HttpRequest) -> HttpResponse:
     query = request.GET.get("q", "")
     return render(
@@ -145,7 +132,7 @@ def game_autocomplete(request: HttpRequest) -> HttpResponse:
     )
 
 
-@ratelimit(key="ip", rate=_anonymous_search_rate, method="GET", block=True)
+@ratelimit(key="user_or_ip", rate=_search_rate, method="GET", block=True)
 def company_autocomplete(request: HttpRequest) -> HttpResponse:
     query = request.GET.get("q", "")
     # `offer_create` is sent only by contribution_form.html's employer field
@@ -167,15 +154,24 @@ def company_autocomplete(request: HttpRequest) -> HttpResponse:
 # --- Recruiter-filter typeahead ---------------------------------------------
 #
 # These three back the engines/genres/countries filters on the public
-# recruiter search and carry `_search_rate` unconditionally, unlike
-# game_autocomplete/company_autocomplete just above. Those two now meter
-# anonymous requests only (`_anonymous_search_rate`): the declare funnel
-# (contributions.views.DeclareGameView / DeclareDetailsView) serves both to
-# anonymous visitors, which is the traffic the limit is for, but the
-# logged-in credit form's keyup typeahead hits the very same two endpoints,
-# and a shared-NAT studio full of members must not be able to 403 each other
-# off it. These three engine/genre/country endpoints have no such
-# already-authenticated caller to protect, so there is nothing to carve out.
+# recruiter search and carry `key="ip"` unconditionally, unlike
+# game_autocomplete/company_autocomplete just above. Those two key by
+# `"user_or_ip"` instead (django_ratelimit.core._SIMPLE_KEYS's built-in
+# composite: `request.user.pk` when authenticated, else the IP) — the declare
+# funnel (contributions.views.DeclareGameView / DeclareDetailsView) serves
+# both to anonymous visitors, which is the traffic the per-IP limit is for,
+# but the logged-in credit form's own keyup typeahead hits the very same two
+# endpoints, and a shared-NAT studio full of members must not be able to 403
+# each other off it. Returning `None` from the rate to exempt authenticated
+# requests outright was tried and reverted: an account is free and neither
+# `/signup/` nor `/declare/account/` carries a rate limit of its own, so
+# unconditionally skipping the limit for "authenticated" handed out an
+# unmetered endpoint to anyone willing to sign up, verified or not. Keying by
+# account instead of exempting it keeps both properties — every member is
+# still metered, on `settings.SEARCH_RATELIMIT` like everyone else, just
+# never on a counter shared with whoever else is behind the same router.
+# These three engine/genre/country endpoints have no such already-
+# authenticated caller to protect, so there is nothing to carve out.
 #
 # `suggest`, above, is the one endpoint in this module that stays unmetered:
 # it is the sitewide nav typeahead, it predates this branch, and it runs on

@@ -90,10 +90,16 @@ departure from the letter of the rule and is recorded here rather than glossed:
   non-negotiable #6 actually protects — that nothing unverified is
   *published* — holds either way.
 
-The asymmetry is deliberate and defensible: in the funnel the work was done by
-an anonymous visitor *before* an account existed, so there was no unverified
-user acting. Discarding that work to satisfy the letter of the rule would
-destroy the only thing the feature exists to protect.
+The asymmetry is deliberate and defensible, but not because of who was logged
+in while the work happened — a logged-in unverified member walking `/declare/`
+*is* an unverified user acting, same as anyone typing into `/credits/new/`.
+The argument is narrower than that: by the time the row is written, the credit
+it describes was already filled in — game, employer, discipline, dates — and
+discarding that work to satisfy the letter of the rule would destroy the only
+thing the feature exists to protect. What makes the row safe to write regardless
+is not the account's history but that nothing built from it is *published*
+until the same verification gate opens it, whether the account is a brand-new
+signup or a member who logged in partway through and has not yet verified.
 
 An account that never verifies leaves its pending row in place forever, invisible
 to everyone. That is accepted: it is not published, it is covered by account

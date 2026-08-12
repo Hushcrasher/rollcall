@@ -119,10 +119,21 @@ def test_a_half_filled_draft_goes_to_details_not_the_question(client: Client, ga
 
 
 def test_abandoning_the_funnel_writes_nothing(client: Client, game: Game) -> None:
-    """Steps 1 and 2 only ever touch the session — filling both and never
-    reaching step 3 (the session expires, the tab is closed) must leave no
-    trace at all: no `User`, no `Contribution`."""
-    _with_draft(client, game)
+    """Steps 1 and 2 only ever touch the session — walking both for real
+    (not `_with_draft`'s session shortcut, which never invokes either view)
+    and never reaching step 3 (the session expires, the tab is closed) must
+    leave no trace at all: no `User`, no `Contribution`."""
+    client.post(reverse("contributions:declare"), {"game": str(game.pk)})
+    client.post(
+        reverse("contributions:declare_details"),
+        {
+            "game": str(game.pk),
+            "discipline": str(Discipline.objects.get(name="Design").pk),
+            "job_title": "Level Designer",
+            "start_date": "2020-01",
+            "end_date": "",
+        },
+    )
 
     assert User.objects.count() == 0
     assert Contribution.objects.count() == 0

@@ -68,6 +68,14 @@ def test_pending_is_absent_from_the_company_page(client: Client) -> None:
 
 
 def test_pending_is_absent_from_the_sitemap(client: Client, pending: Contribution) -> None:
+    """This cannot currently fail: `config/sitemaps.py`'s `ProfileSitemap`,
+    `GameSitemap` and `CompanySitemap` emit nothing but `<loc>` URLs — no
+    contribution-level data of any status, pending or active, ever reaches
+    `/sitemap.xml`. So this is not proof that an existing filter keeps
+    pending credits out of it; there is no such filter, because there is
+    nothing to filter. It is a regression guard against a future change that
+    starts including contribution detail in the sitemap without also
+    filtering on status."""
     response = client.get(reverse("sitemap"))
     assert b"Level Designer" not in response.content
 
