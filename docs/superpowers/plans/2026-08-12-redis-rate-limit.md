@@ -94,7 +94,7 @@ from unittest import mock
 from django.core.cache import cache, caches
 ```
 
-`cache` is already imported; add `caches` beside it and `mock` at the top with the other stdlib imports. Patch `caches["default"]` — the concrete backend — and **not** the `cache` proxy: the proxy's `__setattr__` forwards to the backend while `__delattr__` does not, so patching through it restores incorrectly.
+`cache` is already imported; add `caches` beside it and `mock` at the top with the other stdlib imports. Patch `caches["default"]` — the concrete backend — rather than the `cache` proxy: it is the object `django_ratelimit.core.get_usage` actually calls, so there is no indirection to reason about, and the test does not depend on `ConnectionProxy`'s internals surviving a future Django upgrade.
 
 - [ ] **Step 2: Run it to make sure it fails**
 
