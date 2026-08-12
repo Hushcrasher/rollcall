@@ -1,9 +1,12 @@
-{% load i18n %}
+{% load i18n contributions_extras %}
 {% comment %}
   Employer — constrained to the game's studios, then search / create.
   Shared by the credit form and the declare funnel's step 2, so the two cannot
   drift. Expects `form` (a ContributionForm) in the context, and the including
-  template to carry the employer JS.
+  template to carry the employer JS. The including template also decides
+  `offer_company_create`: only contribution_form.html carries the
+  `.company-create` click handler, so only it passes it — see
+  search/_company_options.html, which is what actually renders the button.
 {% endcomment %}
 <div class="autocomplete" id="employer-field" data-hidden="{{ form.company.auto_id }}"
      data-employers-url="{% url 'games:game_employers' 0 %}">
@@ -14,10 +17,11 @@
   <div class="employer-search" hidden>
     <input type="text" class="autocomplete-input" name="q" autocomplete="off"
            placeholder="{% translate 'Search companies…' %}"
-           hx-get="{% url 'search:company_autocomplete' %}" hx-trigger="keyup changed delay:250ms"
+           hx-get="{% url 'search:company_autocomplete' %}{% if offer_company_create %}?offer_create=1{% endif %}"
+           hx-trigger="keyup changed delay:250ms"
            hx-target="next .results">
     <div class="results"></div>
   </div>
-  <p class="chosen">{% if form.company.value %}{{ form.instance.company }}{% endif %}</p>
+  <p class="chosen">{{ form|employer_label }}</p>
   {{ form.company.errors }}
 </div>

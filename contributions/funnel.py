@@ -15,9 +15,13 @@ from django.contrib.sessions.backends.base import SessionBase
 
 SESSION_KEY = "declare_credit"
 
-# The ContributionForm fields the funnel carries, in Meta order.
+# The ContributionForm fields the funnel carries from step 2's POST, in Meta
+# order. "game" is deliberately absent: it is fixed by step 1 and always taken
+# from the session draft, never from step 2's POST
+# (contributions.views.DeclareDetailsView.form_valid overwrites it
+# immediately after assembling this dict) — trusting a posted `game` there
+# would let a crafted POST swap it after the dispatch guard already fixed it.
 CREDIT_FIELDS: tuple[str, ...] = (
-    "game",
     "company",
     "discipline",
     "job_title",

@@ -118,6 +118,16 @@ def test_a_half_filled_draft_goes_to_details_not_the_question(client: Client, ga
     assert response["Location"] == reverse("contributions:declare_details")
 
 
+def test_abandoning_the_funnel_writes_nothing(client: Client, game: Game) -> None:
+    """Steps 1 and 2 only ever touch the session — filling both and never
+    reaching step 3 (the session expires, the tab is closed) must leave no
+    trace at all: no `User`, no `Contribution`."""
+    _with_draft(client, game)
+
+    assert User.objects.count() == 0
+    assert Contribution.objects.count() == 0
+
+
 def test_a_head_request_does_not_write_a_credit(client: Client, game: Game) -> None:
     """`dispatch` used to run `_save_credit` for ANY method once authenticated
     — a browser prefetch/prerender (HEAD) would write outside CSRF

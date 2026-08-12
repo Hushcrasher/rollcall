@@ -80,10 +80,15 @@ departure from the letter of the rule and is recorded here rather than glossed:
 - **What the rule protects** is that an unverified account cannot *publish*.
   That holds completely — a pending credit is displayed nowhere.
 - **What changes** is that an unverified account can cause a row to exist.
-- **The normal path is unchanged.** `/credits/new/` keeps
-  `EmailVerifiedRequiredMixin` exactly as it is. A member who signs up through
-  the ordinary route and then tries to add a credit before verifying is still
-  bounced.
+- **The gate that stays is `/credits/new/`.** It keeps
+  `EmailVerifiedRequiredMixin` exactly as it is: a member who signs up through
+  the ordinary route and then tries *that* route before verifying is still
+  bounced. The funnel is a second, narrower path into the same table, and it
+  does not carry that gate — `DeclareAccountView.dispatch` writes a pending
+  row for any visitor who completes it, verified or not. That is not a hole
+  in the rule; it is the case the rule was never written to cover, and what
+  non-negotiable #6 actually protects — that nothing unverified is
+  *published* — holds either way.
 
 The asymmetry is deliberate and defensible: in the funnel the work was done by
 an anonymous visitor *before* an account existed, so there was no unverified

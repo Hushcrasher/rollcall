@@ -26,6 +26,19 @@ def _search_rate(group: str, request: HttpRequest) -> str:
     return settings.SEARCH_RATELIMIT
 
 
+def _anonymous_search_rate(group: str, request: HttpRequest) -> str | None:
+    # `None` tells django_ratelimit.core.get_usage to skip limiting entirely
+    # (see its `if rate is None: return None`) — the logged-in credit form's
+    # own keyup typeahead hits these two endpoints too, and a shared-NAT
+    # studio full of members would otherwise blow through a per-IP limit
+    # meant for anonymous scraping and see htmx silently stop swapping (htmx
+    # does not swap on a 403). The anti-scraping target is anonymous traffic,
+    # so only that traffic spends quota here.
+    if request.user.is_authenticated:  # ty: ignore[unresolved-attribute]
+        return None
+    return settings.SEARCH_RATELIMIT
+
+
 @method_decorator(ratelimit(key="ip", rate=_search_rate, method="GET", block=True), name="get")
 class SearchView(TemplateView):
     template_name = "search/search.html"
@@ -117,7 +130,7 @@ def suggest(request: HttpRequest) -> HttpResponse:
     )
 
 
-@ratelimit(key="ip", rate=_search_rate, method="GET", block=True)
+@ratelimit(key="ip", rate=_anonymous_search_rate, method="GET", block=True)
 def game_autocomplete(request: HttpRequest) -> HttpResponse:
     query = request.GET.get("q", "")
     return render(
@@ -132,25 +145,37 @@ def game_autocomplete(request: HttpRequest) -> HttpResponse:
     )
 
 
-@ratelimit(key="ip", rate=_search_rate, method="GET", block=True)
+@ratelimit(key="ip", rate=_anonymous_search_rate, method="GET", block=True)
 def company_autocomplete(request: HttpRequest) -> HttpResponse:
     query = request.GET.get("q", "")
+    # `offer_create` is sent only by contribution_form.html's employer field
+    # (contributions/_employer_field.html's `offer_company_create` flag) —
+    # the one page with a `.company-create` click handler. Without it the
+    # button did nothing when this same endpoint served the declare funnel's
+    # step 2. Still gated on is_authenticated too: games:company_create is
+    # @login_required, so a crafted `?offer_create=1` from an anonymous
+    # visitor must not surface a button that can only fail.
+    is_authenticated: bool = request.user.is_authenticated  # ty: ignore[unresolved-attribute]
+    offer_create = request.GET.get("offer_create") == "1" and is_authenticated
     return render(
         request,
         "search/_company_options.html",
-        {"companies": search_companies(query), "query": query},
+        {"companies": search_companies(query), "query": query, "offer_create": offer_create},
     )
 
 
 # --- Recruiter-filter typeahead ---------------------------------------------
 #
 # These three back the engines/genres/countries filters on the public
-# recruiter search, and carry the same IP rate limit as the search pages they
-# serve — like game_autocomplete/company_autocomplete just above, which used
-# to sit behind a login on the credit form only. They no longer do: the
-# declare funnel (contributions.views.DeclareGameView / DeclareDetailsView)
-# serves both to anonymous visitors now, so the exemption that comment used to
-# claim no longer holds.
+# recruiter search and carry `_search_rate` unconditionally, unlike
+# game_autocomplete/company_autocomplete just above. Those two now meter
+# anonymous requests only (`_anonymous_search_rate`): the declare funnel
+# (contributions.views.DeclareGameView / DeclareDetailsView) serves both to
+# anonymous visitors, which is the traffic the limit is for, but the
+# logged-in credit form's keyup typeahead hits the very same two endpoints,
+# and a shared-NAT studio full of members must not be able to 403 each other
+# off it. These three engine/genre/country endpoints have no such
+# already-authenticated caller to protect, so there is nothing to carve out.
 #
 # `suggest`, above, is the one endpoint in this module that stays unmetered:
 # it is the sitewide nav typeahead, it predates this branch, and it runs on

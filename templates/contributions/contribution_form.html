@@ -24,7 +24,7 @@
       {{ form.game.errors }}
     </div>
 
-    {% include "contributions/_employer_field.html" %}
+    {% include "contributions/_employer_field.html" with offer_company_create=True %}
 
     <p>
       <label for="{{ form.discipline.id_for_label }}">{% translate "Discipline" %}</label>

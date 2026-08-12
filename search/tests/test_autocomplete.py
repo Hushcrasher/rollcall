@@ -40,13 +40,16 @@ def test_company_autocomplete_returns_matching_options(client: Client) -> None:
     assert b"Supergiant Games" in response.content
 
 
-def test_company_autocomplete_offers_a_create_option_to_a_member(client: Client) -> None:
+def test_company_autocomplete_offers_a_create_option_to_the_credit_form(client: Client) -> None:
     """games:company_create is @login_required and stays that way, so the
     button that posts to it only makes sense once someone can actually use
-    it."""
+    it. `offer_create=1` is what contribution_form.html's employer field
+    sends — it's the one page with a `.company-create` click handler."""
     user = User.objects.create_user(email="m@example.com", password="x", display_name="M")
     client.force_login(user)
-    response = client.get(reverse("search:company_autocomplete"), {"q": "Brand New Studio"})
+    response = client.get(
+        reverse("search:company_autocomplete"), {"q": "Brand New Studio", "offer_create": "1"}
+    )
     assert b"company-create" in response.content
     assert b"Brand New Studio" in response.content
     assert b"{#" not in response.content  # {# ... #} is single-line only; a
@@ -60,9 +63,27 @@ def test_company_autocomplete_hides_the_create_option_from_an_anonymous_visitor(
     unlike the credit form's version the button there has no click handler —
     clicking it did nothing at all. It can't work anonymously either way:
     games:company_create is @login_required."""
-    response = client.get(reverse("search:company_autocomplete"), {"q": "Brand New Studio"})
+    response = client.get(
+        reverse("search:company_autocomplete"), {"q": "Brand New Studio", "offer_create": "1"}
+    )
     assert b"company-create" not in response.content
     assert b"{#" not in response.content
+
+
+def test_company_autocomplete_hides_the_create_option_from_the_declare_funnels_step_2(
+    client: Client,
+) -> None:
+    """A logged-in member can walk the declare funnel too (an explicitly
+    supported path), and declare_details.html — unlike contribution_form.html
+    — carries no `.company-create` click handler. Without sending
+    `offer_create`, the button must not appear even though the request is
+    authenticated; a member reaching this same endpoint from the credit form
+    is covered by test_company_autocomplete_offers_a_create_option_to_the_credit_form
+    above."""
+    user = User.objects.create_user(email="m5@example.com", password="x", display_name="M5")
+    client.force_login(user)
+    response = client.get(reverse("search:company_autocomplete"), {"q": "Brand New Studio"})
+    assert b"company-create" not in response.content
 
 
 def test_company_autocomplete_tells_an_anonymous_visitor_the_employer_is_optional(
@@ -102,7 +123,7 @@ def test_game_autocomplete_hides_igdb_when_unconfigured(client: Client) -> None:
 
 
 @pytest.mark.parametrize("url_name", ["search:game_autocomplete", "search:company_autocomplete"])
-def test_game_and_company_autocomplete_are_rate_limited(
+def test_game_and_company_autocomplete_are_rate_limited_for_anonymous_visitors(
     client: Client, settings: Any, url_name: str
 ) -> None:
     """Both now serve the declare funnel to anonymous visitors, so they carry
@@ -115,3 +136,24 @@ def test_game_and_company_autocomplete_are_rate_limited(
     url = reverse(url_name)
     assert client.get(url, {"q": "a"}).status_code == 200
     assert client.get(url, {"q": "a"}).status_code == 403
+
+
+@pytest.mark.parametrize("url_name", ["search:game_autocomplete", "search:company_autocomplete"])
+def test_game_and_company_autocomplete_are_not_rate_limited_for_a_member(
+    client: Client, settings: Any, url_name: str
+) -> None:
+    """These two also back the logged-in credit form's keyup typeahead. On a
+    shared studio NAT a per-IP limit meant for anonymous scraping would 403
+    one member's requests because of another's — and htmx does not swap on a
+    403, so the dropdown would silently stop updating. The anti-scraping
+    target is anonymous traffic, so a member's requests must not spend the
+    same quota."""
+    settings.RATELIMIT_ENABLE = True
+    settings.SEARCH_RATELIMIT = "1/m"
+    cache.clear()
+    user = User.objects.create_user(email="nat@example.com", password="x", display_name="Nat")
+    client.force_login(user)
+
+    url = reverse(url_name)
+    for _ in range(3):
+        assert client.get(url, {"q": "a"}).status_code == 200

@@ -6,7 +6,7 @@ from django.urls import reverse
 
 from contributions.funnel import SESSION_KEY
 from contributions.models import Contribution, Discipline
-from games.models import Game
+from games.models import Company, Game
 
 pytestmark = pytest.mark.django_db
 
@@ -103,6 +103,28 @@ def test_the_game_is_taken_from_the_session_not_the_post(client: Client, game: G
     )
 
     assert client.session[SESSION_KEY]["game"] == str(game.pk)
+
+
+def test_repicking_the_same_game_does_not_render_none_as_the_employer(
+    client: Client, game: Game
+) -> None:
+    """Step 2 is unbound with `initial` taken from the session draft, so
+    `form["company"].value()` is a pk string while `form.instance` is a
+    fresh, unsaved Contribution() — rendering `form.instance.company` prints
+    the literal "None" instead of the employer's name. Reachable by the path
+    the funnel designs for: fill step 2 with an employer, click "Wrong
+    game?", re-pick the SAME game — which deliberately preserves `company` —
+    and land back on step 2."""
+    company = Company.objects.create(name="Silver Forge Games", source=Company.Source.MANUAL)
+    session = client.session
+    session[SESSION_KEY] = {"game": str(game.pk), "company": str(company.pk)}
+    session.save()
+
+    client.post(reverse("contributions:declare"), {"game": str(game.pk)})  # re-pick the same game
+    response = client.get(reverse("contributions:declare_details"))
+
+    assert b"Silver Forge Games" in response.content
+    assert b">None<" not in response.content
 
 
 def test_a_deleted_game_redirects_to_the_question(client: Client, game: Game) -> None:

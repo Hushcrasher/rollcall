@@ -1,5 +1,11 @@
-"""Contribution CRUD. Creating a credit requires a verified email (design
-non-negotiable #6); editing/deleting is restricted to the owner."""
+"""Contribution CRUD, and the declare funnel's three steps.
+
+`/credits/new/` still requires a verified email (design non-negotiable #6);
+editing/deleting is restricted to the owner. The declare funnel below
+(`DeclareGameView` / `DeclareDetailsView` / `DeclareAccountView`) is a second,
+narrower path into the same table: it writes a credit at signup regardless of
+verification, `pending` until `accounts.views.verify_email` publishes it — see
+docs/superpowers/specs/2026-08-11-deferred-registration-funnel-design.md."""
 
 from typing import Any
 
@@ -53,15 +59,24 @@ class DeclareGameView(TemplateView):
     carries only a text box, and the disambiguation happens here.
 
     The trigram search this runs is an unmetered anonymous search over `Game`
-    unless rate-limited. Metered by hand inside `post()`, like
-    `search.views.PeopleSearchView.get()`, so only the POST that actually
-    searches (carries `q`) spends quota: a bare GET always answers, and so
-    does the POST that merely picks an already-listed game (carries `game`)
-    — PeopleSearchView's model is "only a real search spends quota", and a
-    pick isn't one.
+    unless rate-limited. Metered by hand in `_meter_search_if_any`, called from
+    both `get()` and `post()`, like `search.views.PeopleSearchView.get()`: only
+    a request that actually searches (a non-blank `q`, GET or POST) spends
+    quota, on one shared counter regardless of method — a bare GET always
+    answers, and so does the POST that merely picks an already-listed game
+    (carries `game`) — PeopleSearchView's model is "only a real search spends
+    quota", and a pick isn't one. `method` is deliberately left at its default
+    (`ALL`, matching every HTTP method) on the `is_ratelimited` call below —
+    passing e.g. `method="POST"` would fold the method into the cache key
+    (django_ratelimit.core._make_cache_key) and split GET and POST onto
+    separate counters, defeating the point of sharing one.
     """
 
     template_name = "contributions/declare_game.html"
+
+    def get(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
+        self._meter_search_if_any(request)
+        return super().get(request, *args, **kwargs)
 
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         game = self._picked_game(request)
@@ -82,16 +97,26 @@ class DeclareGameView(TemplateView):
             draft["game"] = str(game.pk)
             set_draft(request.session, draft)  # ty: ignore[unresolved-attribute]
             return redirect("contributions:declare_details")
-        if "q" in request.POST and is_ratelimited(
+        self._meter_search_if_any(request)
+        return self.render_to_response(self.get_context_data(**kwargs))
+
+    @staticmethod
+    def _meter_search_if_any(request: HttpRequest) -> None:
+        # GET carries `q` on a direct `/declare/?q=…` hit; POST carries it from
+        # the step-1 search box. Whichever it is, only a query that would
+        # actually reach `search_games` (get_context_data below skips it for a
+        # blank one) spends quota — the earlier version only ever checked
+        # `request.POST`, so `GET /declare/?q=…` ran the trigram search over
+        # the whole `Game` table for free.
+        query = request.POST.get("q", "") or request.GET.get("q", "")
+        if query.strip() and is_ratelimited(
             request=request,
             group=_DECLARE_GAME_RATELIMIT_GROUP,
             key="ip",
             rate=settings.SEARCH_RATELIMIT,
-            method="POST",
             increment=True,
         ):
             raise Ratelimited
-        return self.render_to_response(self.get_context_data(**kwargs))
 
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
         context = super().get_context_data(**kwargs)
@@ -173,17 +198,26 @@ class DeclareAccountView(FormView):
             "GET",
             "POST",
         ):
-            # Already a member — nothing to sign up for. This bypasses the
-            # normal method dispatch (and so CSRF protection, which only ever
-            # covered POST), so it is narrowed to GET and POST: GET because a
-            # member simply landing here — e.g. via `?next=` after logging in
-            # — legitimately has nothing left to sign up for, POST for
-            # symmetry with the anonymous path below. Everything else falls
-            # through to the default dispatch instead of writing — including
-            # HEAD, which browsers issue for prefetch/prerender: that still
-            # answers 200 (Django aliases `self.head` to `self.get` whenever
-            # `get` is defined), it just never reaches this branch, so the
-            # write never happens.
+            # Already a member — nothing to sign up for. Narrowed to GET and
+            # POST: GET because a member simply landing here — e.g. via
+            # `?next=` after logging in — legitimately has nothing left to
+            # sign up for, POST for symmetry with the anonymous path below.
+            # Everything else falls through to the default dispatch instead
+            # of writing — including HEAD, which browsers issue for
+            # prefetch/prerender: that still answers 200 (Django aliases
+            # `self.head` to `self.get` whenever `get` is defined), it just
+            # never reaches this branch, so the write never happens.
+            #
+            # The GET branch writes to the database with no CSRF token
+            # covering it — CsrfViewMiddleware runs ahead of every view
+            # regardless of method, so this is not a bypass of CSRF
+            # protection; a POST here without a token 403s like anywhere
+            # else. What actually makes the uncovered GET tolerable is that
+            # there is nothing for a forged one to control: steps 1 and 2
+            # (`DeclareGameView.post`, `DeclareDetailsView.form_valid`) are
+            # themselves CSRF-protected POSTs, so an attacker cannot seed the
+            # victim's session draft — a forged hit on this GET can only
+            # re-save whatever the victim already typed.
             return self._save_credit(request, request.user)  # ty: ignore[unresolved-attribute]
         return super().dispatch(request, *args, **kwargs)
 

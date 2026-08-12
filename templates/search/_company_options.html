@@ -20,12 +20,16 @@
   {% endif %}
 {% endfor %}
 
-{% if query and user.is_authenticated %}
+{% if query and offer_create %}
   {% comment %}
-    games:company_create is @login_required and stays that way — anonymous
-    visitors (the declare funnel serves this endpoint too) get no button
-    rather than a dead one; see contribution_form.html's click handler for
-    the only caller that can actually use it.
+    `offer_create` (set by search.views.company_autocomplete) is true only
+    when BOTH the request is authenticated AND it came from a page that
+    actually has a `.company-create` click handler — today that is only
+    contribution_form.html, via _employer_field.html's `offer_company_create`
+    flag. games:company_create is @login_required and stays that way.
+    Without the second half of that condition, the declare funnel's step 2
+    (which shares this same endpoint, and is reachable by a logged-in member
+    too) would offer this button with nothing listening for the click.
   {% endcomment %}
   <button type="button" class="company-create" data-name="{{ query }}">
     {% blocktranslate %}Not there? Create "{{ query }}"{% endblocktranslate %}

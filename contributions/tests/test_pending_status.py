@@ -17,7 +17,7 @@ from django.utils.http import urlsafe_base64_encode
 from accounts.models import User
 from accounts.tokens import email_verification_token
 from contributions.models import Contribution, Discipline
-from games.models import Game
+from games.models import Company, Game
 
 pytestmark = pytest.mark.django_db
 
@@ -37,6 +37,10 @@ def pending() -> Contribution:
 
 
 def test_pending_is_absent_from_the_owner_profile(client: Client, pending: Contribution) -> None:
+    """Logged in as the owner: they're who would most expect to see their own
+    credit, so this is the stronger version of the assertion — a pending
+    credit is invisible even to its own author."""
+    client.force_login(pending.user)
     body = client.get(pending.user.get_absolute_url()).content  # ty: ignore[unresolved-attribute]
     assert b"Level Designer" not in body
 
@@ -44,6 +48,28 @@ def test_pending_is_absent_from_the_owner_profile(client: Client, pending: Contr
 def test_pending_is_absent_from_the_game_page(client: Client, pending: Contribution) -> None:
     body = client.get(pending.game.get_absolute_url()).content  # ty: ignore[unresolved-attribute]
     assert b"Level Designer" not in body
+
+
+def test_pending_is_absent_from_the_company_page(client: Client) -> None:
+    user = User.objects.create_user(email="cp@example.com", password="x", display_name="CP")
+    game = Game.objects.create(title="Company Page Game", source=Game.Source.MANUAL)
+    company = Company.objects.create(name="Pending Employer", source=Company.Source.MANUAL)
+    Contribution.objects.create(
+        user=user,
+        game=game,
+        company=company,
+        discipline=Discipline.objects.get(name="Design"),
+        job_title="Level Designer",
+        start_date=date(2020, 1, 1),
+        status=Contribution.Status.PENDING,
+    )
+    body = client.get(company.get_absolute_url()).content
+    assert b"Level Designer" not in body
+
+
+def test_pending_is_absent_from_the_sitemap(client: Client, pending: Contribution) -> None:
+    response = client.get(reverse("sitemap"))
+    assert b"Level Designer" not in response.content
 
 
 def test_pending_is_absent_from_the_people_search(client: Client, pending: Contribution) -> None:
@@ -69,11 +95,15 @@ def test_verifying_the_email_publishes_the_pending_credit(
 
 
 def test_verifying_twice_changes_nothing(client: Client, pending: Contribution) -> None:
-    """The link is single-use, so the second hit lands on the invalid page. The
-    credit must stay active either way — this pins that the flip is not undone."""
+    """The token folds `email_verified_at` into its hash
+    (accounts.tokens.EmailVerificationTokenGenerator), so it stops checking
+    out the moment verification sets that field — the second hit lands on the
+    invalid-link page rather than silently re-running the publish. The credit
+    must stay active either way — this pins that the flip is not undone."""
     url = _verify_url(pending.user)  # ty: ignore[invalid-argument-type]
     client.get(url)
-    client.get(url)
+    second = client.get(url)
+    assert b"This link is invalid or has expired" in second.content
     pending.refresh_from_db()
     assert pending.status == Contribution.Status.ACTIVE
 

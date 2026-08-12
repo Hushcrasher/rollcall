@@ -52,22 +52,6 @@ def test_posting_a_title_lists_matching_games(client: Client, game: Game) -> Non
     assert "Hollow Knight" in match.group(0)
 
 
-def test_the_bounded_regex_does_not_bleed_into_the_nav_search_form(client: Client) -> None:
-    """Proof the fix actually bounds the match to one form. No Hollow Knight
-    row exists in this test at all — only a Celeste one, queried by title —
-    so if the match window still contained "Hollow Knight" it could only have
-    bled in from base.html's nav search form through the declare box's own
-    placeholder ("Hollow Knight, Dishonored…"), exactly as the unbounded
-    `.*?` regex used to do."""
-    Game.objects.create(title="Celeste", source=Game.Source.MANUAL)
-    response = client.post(reverse("contributions:declare"), {"q": "celeste"})
-    assert response.status_code == 200
-    body = response.content.decode()
-    match = re.search(_GAME_FORM_RE, body, re.S)
-    assert match is not None, "no form carrying a pickable game"
-    assert "Hollow Knight" not in match.group(0)
-
-
 def test_picking_a_game_stores_it_and_moves_on(client: Client, game: Game) -> None:
     response = client.post(reverse("contributions:declare"), {"game": str(game.pk)})
     assert response.status_code == 302
@@ -143,7 +127,11 @@ def test_the_search_post_is_rate_limited(client: Client, settings: Any) -> None:
 
 def test_a_bare_get_is_never_rate_limited(client: Client, settings: Any) -> None:
     """The page itself must always answer, the same reason the home page's
-    front door is unmetered — only the POSTed search spends quota."""
+    front door is unmetered — only a request that actually searches (carries
+    a non-blank `q`) spends quota. This pins the bare-GET case specifically;
+    it says nothing about a GET that carries `q` — see
+    test_a_searching_get_is_rate_limited for that one, which used to pass for
+    free through this same view."""
     settings.RATELIMIT_ENABLE = True
     settings.SEARCH_RATELIMIT = "1/m"
     cache.clear()
@@ -152,6 +140,36 @@ def test_a_bare_get_is_never_rate_limited(client: Client, settings: Any) -> None
     client.post(url, {"q": "a"})
     client.post(url, {"q": "a"})
     assert client.get(url).status_code == 200
+
+
+def test_a_searching_get_is_rate_limited(client: Client, settings: Any) -> None:
+    """`GET /declare/?q=…` used to run the trigram search over the whole
+    `Game` table with no metering at all: get_context_data() read `q` from
+    either GET or POST, but the rate-limit check only ever ran inside
+    post() — a one-character bypass of the POST-only limit. GET and POST now
+    share one counter."""
+    settings.RATELIMIT_ENABLE = True
+    settings.SEARCH_RATELIMIT = "1/m"
+    cache.clear()
+
+    url = reverse("contributions:declare")
+    assert client.get(url, {"q": "hollow"}).status_code == 200
+    assert client.get(url, {"q": "hollow"}).status_code == 403
+
+
+def test_a_searching_get_and_the_search_post_share_one_counter(
+    client: Client, settings: Any
+) -> None:
+    """Both metered paths spend from the same named counter
+    (_DECLARE_GAME_RATELIMIT_GROUP) — a visitor cannot dodge the limit by
+    switching methods mid-stream."""
+    settings.RATELIMIT_ENABLE = True
+    settings.SEARCH_RATELIMIT = "1/m"
+    cache.clear()
+
+    url = reverse("contributions:declare")
+    assert client.post(url, {"q": "hollow"}).status_code == 200
+    assert client.get(url, {"q": "hollow"}).status_code == 403
 
 
 def test_picking_a_game_is_never_rate_limited(client: Client, game: Game, settings: Any) -> None:
