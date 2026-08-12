@@ -158,13 +158,12 @@ SEED_ALERT_EMAIL = env("SEED_ALERT_EMAIL", default="")
 CONTACT_RATE_LIMIT_PER_DAY = env.int("CONTACT_RATE_LIMIT_PER_DAY", default=20)
 
 # --- Caching ----------------------------------------------------------------
-# Dev and tests only — prod overrides this with Redis (config/settings/prod.py),
-# because LocMemCache is per-process and culls live keys.
-#
-# MAX_ENTRIES is explicit because LocMemCache defaults to 300 entries and culls
-# every 3rd key once past it, silently evicting *live* rate-limit counters (one
-# key per client IP, so ~300 distinct visitors is enough). Harmless on a
-# single-process runserver; it is why prod may not use this backend.
+# Not usable in production: LocMemCache is per-process, so rate-limit counters
+# would not be shared across gunicorn workers — and it culls every 3rd key once
+# past MAX_ENTRIES, silently evicting *live* counters (one key per client IP, so
+# ~300 distinct visitors is enough at the 300-entry default). A limit does not
+# weaken under that, it stops holding. Harmless on a single-process runserver.
+# MAX_ENTRIES is raised here so dev and tests are not surprised by culling.
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
@@ -173,8 +172,8 @@ CACHES = {
 }
 
 # --- Rate limiting (anti-scraping on public pages) --------------------------
-# Per-IP limits; tune via env. Counters live in CACHES["default"] — Redis in
-# prod (config/settings/prod.py), LocMemCache in dev and tests.
+# Per-IP limits; tune via env. Counters live in CACHES["default"], so the
+# backend that cache points at decides whether a limit actually holds.
 PROFILE_RATELIMIT = env("PROFILE_RATELIMIT", default="120/m")
 SEARCH_RATELIMIT = env("SEARCH_RATELIMIT", default="60/m")
 
