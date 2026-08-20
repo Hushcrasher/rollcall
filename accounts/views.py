@@ -12,13 +12,14 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q, QuerySet
 from django.http import Http404, HttpRequest, HttpResponse, JsonResponse
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
 from django.utils.translation import gettext as _
+from django.views import View
 from django.views.decorators.http import require_POST
 from django.views.generic import CreateView, DetailView, FormView, TemplateView, UpdateView
 from django_ratelimit.decorators import ratelimit
@@ -27,13 +28,15 @@ from accounts.emails import send_verification_email
 from accounts.export import build_personal_data_export
 from accounts.forms import (
     EmailAuthenticationForm,
+    PortfolioImageForm,
     ProfileForm,
     RecruiterApplicationForm,
     SignupForm,
 )
 from accounts.github import get_github_activity
 from accounts.http import AuthedHttpRequest
-from accounts.models import RecruiterApplication, User
+from accounts.mixins import EmailVerifiedRequiredMixin
+from accounts.models import MAX_PORTFOLIO_IMAGES, ProfileImage, RecruiterApplication, User
 from accounts.registration import create_and_login
 from accounts.tokens import email_verification_token
 from contributions.models import Contribution
@@ -44,6 +47,8 @@ __all__ = [
     "AccountDeleteView",
     "AccountView",
     "EmailAuthenticationForm",
+    "PortfolioAddView",
+    "PortfolioDeleteView",
     "ProfileEditView",
     "ProfileView",
     "RecruiterApplyView",
@@ -193,6 +198,58 @@ class ProfileEditView(LoginRequiredMixin, UpdateView):
     def form_valid(self, form: ProfileForm) -> HttpResponse:
         messages.success(self.request, _("Your profile was saved."))
         return super().form_valid(form)
+
+    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+        context["portfolio_images"] = self.request.user.portfolio_images.all()
+        context["portfolio_form"] = PortfolioImageForm()
+        return context
+
+
+# Named group, house rule: an unnamed decorator derives its group from the
+# view's qualname, so a rename would silently move the counter.
+@method_decorator(
+    ratelimit(group="portfolio_add", key="user", rate="10/h", method="POST", block=True),
+    name="post",
+)
+class PortfolioAddView(EmailVerifiedRequiredMixin, View):
+    verification_message = _("Please verify your email before adding images.")
+
+    def post(self, request: AuthedHttpRequest, *args: object, **kwargs: object) -> HttpResponse:
+        if request.user.portfolio_images.count() >= MAX_PORTFOLIO_IMAGES:  # ty: ignore[unresolved-attribute]
+            messages.error(request, _("You can show up to 12 images."))
+            return redirect("accounts:profile_edit")
+        form = PortfolioImageForm(request.POST, request.FILES)
+        if not form.is_valid():
+            for field_errors in form.errors.values():
+                for error in field_errors:
+                    messages.error(request, error)
+            return redirect("accounts:profile_edit")
+        processed = form.cleaned_data["image"]
+        ProfileImage.objects.create(
+            user=request.user,
+            image=processed.image,
+            thumbnail=processed.thumbnail,
+            caption=form.cleaned_data["caption"],
+        )
+        messages.success(request, _("Image added."))
+        return redirect("accounts:profile_edit")
+
+
+class PortfolioDeleteView(LoginRequiredMixin, View):
+    def post(
+        self, request: AuthedHttpRequest, pk: int, *args: object, **kwargs: object
+    ) -> HttpResponse:
+        stored = get_object_or_404(ProfileImage, pk=pk, user=request.user)
+        # FieldFile at runtime; ty sees the ImageField (same bridge as the
+        # avatar in AccountDeleteView). Row deletion doesn't remove files.
+        image: Any = stored.image
+        image.delete(save=False)
+        thumbnail: Any = stored.thumbnail
+        thumbnail.delete(save=False)
+        stored.delete()
+        messages.success(request, _("Image removed."))
+        return redirect("accounts:profile_edit")
 
 
 class AccountView(LoginRequiredMixin, TemplateView):

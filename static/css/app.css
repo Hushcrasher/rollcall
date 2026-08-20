@@ -59,3 +59,10 @@ nav form button[type=submit] { background: none; border: none; color: var(--pico
 /* Shown only when people_search.html's <noscript> block un-hides it. */
 .noscript-note { display: none; }
 .pagination { margin: 1rem 0; }
+
+/* Profile gallery (spec 2026-08-20-profile-gallery) — layout only. */
+.portfolio-grid {
+  list-style: none; padding: 0;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr)); gap: .6rem;
+}
+.portfolio-grid img { width: 100%; height: auto; display: block; }

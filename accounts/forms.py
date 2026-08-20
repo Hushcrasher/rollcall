@@ -5,6 +5,7 @@ from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.utils.translation import gettext_lazy as _
 
 from accounts.github import extract_login
+from accounts.images import ProcessedImage, process_image
 from accounts.models import GitHubSnapshot, GitHubYearlyContribution, RecruiterApplication, User
 
 CONSENT_LABEL = _(
@@ -100,3 +101,14 @@ class ProfileForm(forms.ModelForm):
         if commit:
             user.save()
         return user
+
+
+class PortfolioImageForm(forms.Form):
+    """FileField, not ImageField: the pipeline does the validating, so its
+    messages stay the single source of truth (accounts/images.py)."""
+
+    image = forms.FileField(label=_("Image"))
+    caption = forms.CharField(label=_("Caption"), max_length=140, required=False)
+
+    def clean_image(self) -> ProcessedImage:
+        return process_image(self.cleaned_data["image"], max_side=2560, thumbnail=True)

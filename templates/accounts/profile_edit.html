@@ -12,5 +12,30 @@
     <button type="submit">{% translate "Save" %}</button>
   </form>
 
+  <section>
+    <h2>{% translate "Work" %}</h2>
+    <p class="muted">{% translate "Show your work — up to 12 images on your profile, newest first." %}</p>
+    {% if portfolio_images %}
+      <ul class="portfolio-grid">
+        {% for pimg in portfolio_images %}
+          <li>
+            <a href="{{ pimg.image.url }}"><img src="{{ pimg.thumbnail.url }}" alt="{{ pimg.caption }}"></a>
+            {% if pimg.caption %}<p class="muted">{{ pimg.caption }}</p>{% endif %}
+            <form action="{% url 'accounts:portfolio_delete' pimg.pk %}" method="post">
+              {% csrf_token %}
+              <button type="submit" class="outline secondary">{% translate "Delete" %}</button>
+            </form>
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+    <form action="{% url 'accounts:portfolio_add' %}" method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      <p>{{ portfolio_form.image.label_tag }} {{ portfolio_form.image }}</p>
+      <p>{{ portfolio_form.caption.label_tag }} {{ portfolio_form.caption }}</p>
+      <button type="submit">{% translate "Add image" %}</button>
+    </form>
+  </section>
+
   <p><a href="{% url 'accounts:my_profile' %}">{% translate "Back to my profile" %}</a></p>
 {% endblock %}

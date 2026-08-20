@@ -63,6 +63,12 @@ urlpatterns: list[URLPattern | URLResolver] = [
     # Own profile — slugless, so settings and templates can link without a slug.
     path("profile/", views.my_profile_redirect, name="my_profile"),
     path("profile/edit/", views.ProfileEditView.as_view(), name="profile_edit"),
+    path("profile/images/", views.PortfolioAddView.as_view(), name="portfolio_add"),
+    path(
+        "profile/images/<int:pk>/delete/",
+        views.PortfolioDeleteView.as_view(),
+        name="portfolio_delete",
+    ),
     # Public profile — kept last so it never shadows the fixed routes above.
     path("u/<slug:slug>/", views.ProfileView.as_view(), name="profile"),
 ]
