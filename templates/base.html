@@ -34,7 +34,7 @@
           <li>
             <form action="{% url 'accounts:logout' %}" method="post">
               {% csrf_token %}
-              <button type="submit" class="outline secondary">{% translate "Log out" %}</button>
+              <button type="submit">{% translate "Log out" %}</button>
             </form>
           </li>
         {% else %}
