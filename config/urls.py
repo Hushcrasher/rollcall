@@ -22,6 +22,7 @@ urlpatterns = [
     path("sitemap.xml", sitemap, {"sitemaps": SITEMAPS}, name="sitemap"),
     path("terms/", TemplateView.as_view(template_name="legal/terms.html"), name="terms"),
     path("privacy/", TemplateView.as_view(template_name="legal/privacy.html"), name="privacy"),
+    path("about/", TemplateView.as_view(template_name="about.html"), name="about"),
     # Accounts own the root: /signup, /login, /account, /u/<slug>/ … (SEO for
     # "who worked on X" wants clean profile URLs). Later phases add /games etc.
     path("", include("accounts.urls")),

@@ -60,6 +60,7 @@
   <footer>
     {% block footer %}{% endblock %}
     <nav>
+      <a href="{% url 'about' %}">{% translate "About" %}</a>
       <a href="{% url 'terms' %}">{% translate "Terms" %}</a>
       <a href="{% url 'privacy' %}">{% translate "Privacy" %}</a>
       {% if user.is_authenticated %}
