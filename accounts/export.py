@@ -1,7 +1,7 @@
 """Personal-data export (GDPR portability) — docs/04-DATABASE-SCHEMA.md §14.
 
-Includes identity, settings, contributions, vouches emitted, and contact
-requests. Reports are excluded (per the GDPR data map).
+Includes identity, settings, contributions, vouches emitted, contact
+requests, and the portfolio. Reports are excluded (per the GDPR data map).
 
 Related rows are fetched through their own models' managers (e.g.
 `Contribution.objects.filter(user=…)`) rather than reverse accessors — same
@@ -66,5 +66,13 @@ def build_personal_data_export(user: User) -> dict[str, Any]:
         "contact_requests_received": [
             {"subject": r.subject, "sent_at": _iso(r.sent_at)}
             for r in ContactRequest.objects.filter(recipient=user)
+        ],
+        "portfolio": [
+            {
+                "caption": image.caption,
+                "created_at": _iso(image.created_at),
+                "file": image.image.name,
+            }
+            for image in user.portfolio_images.all()  # ty: ignore[unresolved-attribute]
         ],
     }

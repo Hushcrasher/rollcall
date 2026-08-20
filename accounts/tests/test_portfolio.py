@@ -215,3 +215,33 @@ def test_avatar_goes_through_the_pipeline(client: Client) -> None:
     assert b"TestCam" not in data
     out = Image.open(BytesIO(data))
     assert max(out.size) <= 512
+
+
+def test_account_deletion_removes_portfolio_files(client: Client) -> None:
+    """Non-negotiable zone: deletion must fully work (docs/00 #5). Cascade
+    removes rows; this pins the files."""
+    user = _user()
+    client.force_login(user)
+    client.post(reverse("accounts:portfolio_add"), {"image": _png_upload()})
+    stored = user.portfolio_images.get()  # ty: ignore[unresolved-attribute]
+    storage, image_name, thumb_name = (
+        stored.image.storage,
+        stored.image.name,
+        stored.thumbnail.name,
+    )
+    client.post(reverse("accounts:account_delete"))
+    assert not User.objects.filter(pk=user.pk).exists()
+    assert not storage.exists(image_name)
+    assert not storage.exists(thumb_name)
+
+
+def test_export_includes_the_portfolio(client: Client) -> None:
+    user = _user()
+    client.force_login(user)
+    client.post(
+        reverse("accounts:portfolio_add"), {"image": _png_upload(), "caption": "Boss fight"}
+    )
+    data = client.get(reverse("accounts:export_data")).json()
+    assert len(data["portfolio"]) == 1
+    assert data["portfolio"][0]["caption"] == "Boss fight"
+    assert data["portfolio"][0]["file"].endswith(".webp")

@@ -278,6 +278,11 @@ class AccountDeleteView(LoginRequiredMixin, TemplateView):
         avatar: Any = user.avatar
         if avatar:
             avatar.delete(save=False)  # FK deletion doesn't remove files
+        for stored in user.portfolio_images.all():  # ty: ignore[unresolved-attribute]
+            image: Any = stored.image
+            image.delete(save=False)
+            thumbnail: Any = stored.thumbnail
+            thumbnail.delete(save=False)
         logout(request)
         user.delete()
         messages.success(request, _("Your account and all your credits were deleted."))
