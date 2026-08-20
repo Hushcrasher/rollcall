@@ -12,28 +12,36 @@
 <body>
   <header>
     <nav>
-      <a href="{% url 'home' %}">Rollcall</a>
-      <span class="nav-search">
-        <form action="{% url 'search:search' %}" method="get" role="search" style="display:inline">
-          {# size=35 — one more than the 34-character placeholder, which the ~20-char browser default would truncate. #}
-          <input type="search" name="q" size="35" autocomplete="off"
-                 placeholder="{% translate 'Search games, companies and people' %}"
-                 hx-get="{% url 'search:suggest' %}" hx-trigger="keyup changed delay:250ms"
-                 hx-target="#nav-suggest">
-        </form>
-        <div id="nav-suggest" class="nav-suggest"></div>
-      </span>
-      {% if user.is_authenticated %}
-        <a href="{% url 'accounts:my_profile' %}">{% translate "My profile" %}</a>
-        <a href="{% url 'accounts:account' %}">{% translate "Account" %}</a>
-        <form action="{% url 'accounts:logout' %}" method="post" style="display:inline">
-          {% csrf_token %}
-          <button type="submit">{% translate "Log out" %}</button>
-        </form>
-      {% else %}
-        <a href="{% url 'accounts:login' %}">{% translate "Log in" %}</a>
-        <a href="{% url 'accounts:signup' %}">{% translate "Sign up" %}</a>
-      {% endif %}
+      <ul>
+        <li><a href="{% url 'home' %}"><strong>ROLLCALL</strong></a></li>
+      </ul>
+      <ul class="nav-search">
+        <li>
+          <form action="{% url 'search:search' %}" method="get" role="search">
+            <input type="search" name="q" autocomplete="off"
+                   placeholder="{% translate 'Search games, companies and people' %}"
+                   hx-get="{% url 'search:suggest' %}" hx-trigger="keyup changed delay:250ms"
+                   hx-target="#nav-suggest">
+          </form>
+          <div id="nav-suggest" class="nav-suggest"></div>
+        </li>
+      </ul>
+      <ul>
+        {% if user.is_authenticated %}
+          <li><a role="button" href="{% url 'contributions:create' %}">{% translate "Add your credit" %}</a></li>
+          <li><a href="{% url 'accounts:my_profile' %}">{% translate "My profile" %}</a></li>
+          <li><a href="{% url 'accounts:account' %}">{% translate "Account" %}</a></li>
+          <li>
+            <form action="{% url 'accounts:logout' %}" method="post">
+              {% csrf_token %}
+              <button type="submit" class="outline secondary">{% translate "Log out" %}</button>
+            </form>
+          </li>
+        {% else %}
+          <li><a role="button" href="{% url 'contributions:declare' %}">{% translate "Add your credit" %}</a></li>
+          <li><a href="{% url 'accounts:login' %}">{% translate "Log in" %}</a></li>
+        {% endif %}
+      </ul>
     </nav>
   </header>
 
