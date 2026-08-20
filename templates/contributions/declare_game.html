@@ -8,7 +8,7 @@
 
   <form method="post">
     {% csrf_token %}
-    <input type="search" name="q" size="35" value="{{ query }}" required
+    <input type="search" name="q" value="{{ query }}" required
            placeholder="{% translate 'Hollow Knight, Dishonored…' %}">
     <button type="submit">{% translate "Search" %}</button>
   </form>

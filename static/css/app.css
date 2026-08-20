@@ -1,0 +1,53 @@
+/* Functional layout only — aesthetics come from Pico (vendored). The review
+   bar for edits here: positioning, flex/grid, widths, spacing. No colors,
+   fonts, radii or shadows; unavoidable colors use Pico variables. */
+
+/* Nav search + autocomplete dropdowns (base.html, contribution forms). */
+.nav-search, .autocomplete { position: relative; display: inline-block; }
+.nav-search { flex: 1; min-width: 0; }
+.nav-search input { width: 100%; min-width: 0; margin-bottom: 0; }
+.results, .nav-suggest {
+  position: absolute; z-index: 100; left: 0; top: 100%;
+  min-width: 20rem; max-width: 90vw; max-height: 20rem; overflow-y: auto;
+  background: var(--pico-background-color); color: inherit;
+  border: 1px solid var(--pico-muted-border-color);
+}
+.results:empty, .nav-suggest:empty { display: none; }
+.autocomplete-option, .igdb-option, .igdb-trigger, .suggest-item {
+  display: block; width: 100%; text-align: left; box-sizing: border-box;
+  padding: .35rem .6rem; background: none; border: none; cursor: pointer;
+  color: inherit; text-decoration: none; font: inherit;
+}
+.autocomplete-option:hover, .igdb-option:hover,
+.igdb-trigger:hover, .suggest-item:hover {
+  background: var(--pico-primary-background); color: var(--pico-primary-inverse);
+}
+.igdb-trigger { border-top: 1px solid var(--pico-muted-border-color); font-style: italic; }
+.suggest-item small { opacity: .6; }
+
+/* Used by profile.html, _github_block.html and the search cards — global,
+   so it isn't only styled on whichever page happens to define it. */
+.muted { opacity: .7; }
+.preview-bar, .notice { border: 1px solid var(--pico-muted-border-color); padding: .4rem .6rem; }
+
+/* People search (home): filter blocks and typeahead chips. */
+.filter { margin: .6rem 0; }
+.filter > label { font-weight: bold; display: block; }
+.filter .helptext { margin: 0 0 .3rem; }
+.chips { list-style: none; margin: 0 0 .3rem; padding: 0; display: flex; flex-wrap: wrap; gap: .3rem; }
+.chips:empty { display: none; }
+.chip {
+  display: inline-flex; align-items: center; gap: .3rem;
+  border: 1px solid var(--pico-muted-border-color); padding: .1rem .3rem .1rem .6rem;
+}
+.chip-remove {
+  background: none; border: none; cursor: pointer; color: inherit;
+  font: inherit; line-height: 1; padding: .1rem .3rem;
+}
+.chip-remove:hover {
+  background: var(--pico-primary-background); color: var(--pico-primary-inverse);
+}
+.autocomplete-empty { padding: .35rem .6rem; margin: 0; }
+/* Shown only when people_search.html's <noscript> block un-hides it. */
+.noscript-note { display: none; }
+.pagination { margin: 1rem 0; }

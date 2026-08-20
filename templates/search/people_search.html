@@ -5,29 +5,6 @@
 
 {% block extra_head %}
 <link rel="canonical" href="{% url 'home' %}">
-<style>
-  .filter { margin: .6rem 0; }
-  .filter > label { font-weight: bold; display: block; }
-  .filter .helptext { margin: 0 0 .3rem; }
-  .chips { list-style: none; margin: 0 0 .3rem; padding: 0; display: flex; flex-wrap: wrap; gap: .3rem; }
-  .chips:empty { display: none; }
-  .chip {
-    display: inline-flex; align-items: center; gap: .3rem;
-    border: 1px solid GrayText; border-radius: 1rem; padding: .1rem .3rem .1rem .6rem;
-  }
-  .chip-remove {
-    background: none; border: none; cursor: pointer; color: inherit;
-    font: inherit; line-height: 1; padding: .1rem .3rem; border-radius: 50%;
-  }
-  .chip-remove:hover { background: Highlight; color: HighlightText; }
-  .autocomplete-empty { padding: .35rem .6rem; margin: 0; }
-  /* Shown only when the <noscript> block below un-hides it. */
-  .noscript-note { display: none; }
-  .person-card { border: 1px solid GrayText; padding: .6rem .8rem; margin: .6rem 0; }
-  .person-card h3 { margin: 0 0 .2rem; }
-  .person-card ul { margin: .3rem 0; }
-  .pagination { margin: 1rem 0; }
-</style>
 {% comment %}
   No-JS is an ACCEPTED limitation for these three facets, not a graceful
   degradation — the typeahead is htmx, and htmx is JavaScript. Rather than leave
@@ -143,7 +120,7 @@
       <h2>{% blocktranslate count counter=results_page.total %}{{ counter }} result{% plural %}{{ counter }} results{% endblocktranslate %}</h2>
 
       {% for r in results_page.results %}
-        <article class="person-card">
+        <article>
           <h3>
             <a href="{% url 'accounts:profile' r.user.slug %}">{{ r.user.display_name }}</a>
             {% if r.user.open_to_work %}<span class="badge">{% translate "Open to work" %}</span>{% endif %}
