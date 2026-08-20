@@ -107,10 +107,14 @@ def test_no_match_says_so_and_offers_the_account(client: Client) -> None:
     assert reverse("accounts:signup").encode() in body
 
 
-def test_home_leads_with_the_question_for_anonymous_visitors(client: Client) -> None:
-    body = client.get(reverse("home")).content
-    assert b"Which game did you work on?" in body
-    assert reverse("contributions:declare").encode() in body
+def test_home_routes_anonymous_visitors_to_declare(client: Client) -> None:
+    """The question and its game form live at /declare/ now; the home page
+    links there from a one-line banner (spec 2026-08-20 supersedes the
+    2026-08-11 funnel-first order)."""
+    body = client.get(reverse("home")).content.decode()
+    assert "Which game did you work on?" not in body
+    main = body[body.index("<main") : body.index("</main>")]
+    assert reverse("contributions:declare") in main
 
 
 def test_the_search_post_is_rate_limited(client: Client, settings: Any) -> None:
@@ -187,10 +191,10 @@ def test_picking_a_game_is_never_rate_limited(client: Client, game: Game, settin
         assert response.status_code == 302
 
 
-def test_home_does_not_ask_a_member(client: Client) -> None:
+def test_home_does_not_pitch_a_member(client: Client) -> None:
     """They already have an account — the invitation is spent."""
     user = User.objects.create_user(email="m@example.com", password="x", display_name="M")
     client.force_login(user)
     body = client.get(reverse("home")).content
-    assert b"Which game did you work on?" not in body
+    assert b"Worked on a game?" not in body
     assert b"Find people by what they" in body

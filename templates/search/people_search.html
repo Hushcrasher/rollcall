@@ -24,25 +24,14 @@
 {% endblock %}
 
 {% block content %}
-  {% if user.is_authenticated %}
-    <h1>{% translate "Find people by what they've worked on" %}</h1>
-  {% else %}
+  <h1>{% translate "Find people by what they've worked on" %}</h1>
+  {% if not user.is_authenticated %}
     {% comment %}
-      Anonymous visitors lead with the question: metric #1 is workers declaring
-      their work, and a recruiter arrives with intent. This also means crawlers
-      index the home page under the question — accepted knowingly (spec
-      2026-08-11-deferred-registration-funnel-design.md).
+      One line, not the funnel: /declare/ carries the question and the game
+      form. Fragmented across three translate calls to keep the links —
+      acceptable while LANGUAGES = [en] only.
     {% endcomment %}
-    <h1>{% translate "Which game did you work on?" %}</h1>
-    <p>{% translate "Add a credit to your name. You can create your account at the end." %}</p>
-    <form method="post" action="{% url 'contributions:declare' %}">
-      {% csrf_token %}
-      <input type="search" name="q" size="35" required
-             placeholder="{% translate 'Hollow Knight, Dishonored…' %}">
-      <button type="submit">{% translate "Continue" %}</button>
-    </form>
-
-    <h2>{% translate "Looking for someone?" %}</h2>
+    <p>{% translate "Worked on a game?" %} <a href="{% url 'contributions:declare' %}">{% translate "Add your credit" %}</a> — {% translate "no account needed to start." %}</p>
   {% endif %}
 
   {% comment %}
@@ -56,7 +45,7 @@
     {% translate "The engine, genre and country filters need JavaScript. Without it you can still filter by discipline, rating, year and open-to-work." %}
   </p>
 
-  <form method="get">
+  <form method="get" action="{% url 'home' %}#results">
     {{ form.non_field_errors }}
     <p>{{ form.discipline.errors }}{{ form.discipline.label_tag }} {{ form.discipline }}</p>
     {% comment %}
@@ -116,7 +105,7 @@
   </script>
 
   {% if searched %}
-    <section>
+    <section id="results">
       <h2>{% blocktranslate count counter=results_page.total %}{{ counter }} result{% plural %}{{ counter }} results{% endblocktranslate %}</h2>
 
       {% for r in results_page.results %}
