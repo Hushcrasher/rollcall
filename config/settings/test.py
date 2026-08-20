@@ -1,7 +1,14 @@
 """Test settings — used by pytest (see [tool.pytest.ini_options] in pyproject.toml)."""
 
+import tempfile
+from pathlib import Path
+
 from .base import *  # noqa: F403
 from .base import MIDDLEWARE
+
+# Uploaded test files (avatars) go to a per-run temp dir, not the repo's
+# media/ — tests must not leave cross-run state in the working tree.
+MEDIA_ROOT = Path(tempfile.mkdtemp(prefix="rollcall-test-media-"))
 
 DEBUG = False
 

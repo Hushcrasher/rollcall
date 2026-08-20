@@ -39,7 +39,7 @@ A **single Django monolith** (server-rendered) backed by **one managed PostgreSQ
 
 ## 3. The seed pipeline
 
-- **What:** a Django management command (`python manage.py seed_games`) that uses **DuckDB** to read the remote parquet (HTTP/S3, constant memory), performs the Steam↔IGDB deduplication/merge in SQL, then **upserts** into Postgres in batches (`INSERT ... ON CONFLICT (igdb_id) DO UPDATE`, and by `steam_appid` for Steam-only rows).
+- **What:** two steps. **Prepare** (`python manage.py prepare_seed_parquet`, `games/seed/prepare.py`) performs the Steam↔IGDB deduplication/merge in DuckDB SQL over Hushcrasher's raw source files and writes ONE prepared parquet matching the contract in `games/seed/schema.py`. **Seed** (`python manage.py seed_games`) reads that prepared parquet with DuckDB (local/HTTP/S3, constant memory) and bulk-upserts into Postgres (by `igdb_id`, else `steam_appid`). The prepared-parquet contract is the fork boundary: a fork produces a conforming parquet however it likes and never touches prepare.py.
 - **Idempotent by design:** first run = initial seed; subsequent runs = weekly refresh. Same code. Rerunnable at will with no damage.
 - **Trigger:** the PaaS scheduled job (weekly cron). NOT a Prefect flow on Hushcrasher's VPS — that would couple the app's feeding to external infra and require inbound DB credentials living elsewhere. The command makes **no assumption about its launcher**, so a 5-line Prefect flow can invoke it remotely later if Hushcrasher wants to chain "parquet refresh → app seed".
 - **Failure handling:** logs + a simple email alert on failure. No orchestration framework.
@@ -64,10 +64,10 @@ A **single Django monolith** (server-rendered) backed by **one managed PostgreSQ
 
 | Concern | Decision | Notes |
 |---|---|---|
-| Hosting | **PaaS: Scalingo** (or Clever Cloud) | EU/French → simpler GDPR file. ~€30/mo to start, scales vertically far. |
+| Hosting | **PaaS: Railway** (EU region) — decision 2026, overriding the original Scalingo/Clever Cloud default | Railway is US-owned: pick the EU region and sign the DPA (see ROADMAP prerequisites + DEPLOY.md). |
 | Deployment | **Dockerfile** (not buildpacks) | Same image runs anywhere. `compose.yml` for local dev shares the base. |
 | Database | Managed Postgres on the PaaS | Automatic backups. **Rehearse one restore before launch.** Exit = `pg_dump`. |
-| Object storage | S3-compatible bucket via django-storages | Avatars only in POC. Prefer **Scaleway** (EU, GDPR coherence); **Cloudflare R2** acceptable (SCCs to document). Switching = 3 env vars. PaaS disk is ephemeral → bucket required from the first avatar. |
+| Object storage | S3-compatible bucket via django-storages — **Cloudflare R2** chosen (EU jurisdiction option, SCCs/DPA to document) | Avatars only in POC. Switching provider = 3 env vars. PaaS disk is ephemeral → bucket required from the first avatar. |
 | Scheduled jobs | PaaS scheduler → mgmt commands | Weekly seed. No Celery/queue in POC. |
 | Email | **Brevo** (or Postmark) | Never raw SMTP from the server. Free tier fine for POC. |
 | Errors | Sentry (free tier) | No metrics/dashboard stack in POC. |

@@ -54,3 +54,27 @@ def test_import_is_idempotent() -> None:
 def test_import_returns_none_when_igdb_has_no_such_game() -> None:
     assert import_igdb_game(999999, client=_FakeClient(None)) is None
     assert Game.objects.count() == 0
+
+
+def test_import_over_a_seeded_game_preserves_its_steam_data() -> None:
+    """An IGDB payload never carries Steam fields, so importing a game that
+    already exists locally (matched by igdb_id) must not overwrite its
+    steam_appid / steam_positive_pct / steam_review_count with NULLs — that
+    would drop the game out of every rating filter until the next weekly seed."""
+    Game.objects.create(
+        igdb_id=26226,
+        steam_appid=504230,
+        title="Celeste",
+        steam_positive_pct=97,
+        steam_review_count=50000,
+        source=Game.Source.SEED,
+    )
+
+    game = import_igdb_game(26226, client=_FakeClient(CELESTE))
+
+    assert game is not None
+    assert game.steam_appid == 504230
+    assert game.steam_positive_pct == 97
+    assert game.steam_review_count == 50000
+    # The IGDB-owned fields do refresh.
+    assert game.summary == "Help Madeline climb a mountain."

@@ -40,3 +40,36 @@ jobs:
       - run: uv sync --frozen
       - run: uv run python manage.py check
       - run: uv run pytest
+
+  # A fresh clone must be able to build the production image — this is both
+  # the contributor onboarding path (docker compose up) and the deploy path.
+  # Broke once, silently: collectstatic imports prod settings, whose required
+  # env vars grow over time.
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build .
+
+  # CONTRIBUTING.md makes the DCO mandatory; without a check it is a rule
+  # only a reviewer's eyeball enforces. PRs only — history predates the check.
+  dco:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Every PR commit carries a Signed-off-by trailer
+        run: |
+          set -eu
+          base="${{ github.event.pull_request.base.sha }}"
+          head="${{ github.event.pull_request.head.sha }}"
+          missing=0
+          for sha in $(git rev-list "$base".."$head" --no-merges); do
+            if ! git log -1 --format=%B "$sha" | grep -qi '^Signed-off-by: .*<.*@.*>'; then
+              echo "::error::Commit $sha is missing a Signed-off-by trailer (git commit -s)"
+              missing=1
+            fi
+          done
+          exit "$missing"

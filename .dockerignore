@@ -1,0 +1,33 @@
+# .gitignore does NOT apply to Docker build contexts — without this file,
+# `COPY . .` would bake local secrets (.env) and the private parquet data
+# into image layers, and a host .venv would shadow the image's own.
+
+.git
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Secrets — never in an image layer.
+.env
+
+# Private data — stays out of the open-source repo AND out of any image.
+data/
+*.parquet
+
+# Local state and caches
+staticfiles/
+media/
+db.sqlite3
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Tooling / editors
+.claude/
+.superpowers/
+.github/
+.DS_Store
+.idea/
+.vscode/

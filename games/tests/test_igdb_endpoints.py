@@ -59,7 +59,9 @@ def test_search_shows_a_notice_when_igdb_is_unconfigured(client: Client, member:
 
 
 def test_import_requires_login(client: Client) -> None:
-    assert client.post(reverse("games:igdb_import"), {"igdb_id": 1}).status_code == 302
+    response = client.post(reverse("games:igdb_import"), {"igdb_id": 1})
+    assert response.status_code == 302
+    assert Game.objects.count() == 0  # the redirect must not hide a write
 
 
 def test_import_creates_the_game_and_returns_json(

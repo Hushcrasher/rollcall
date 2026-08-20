@@ -24,7 +24,8 @@ is done and what is next, and [docs/](docs/00-README.md) for the full design pac
 ## Stack
 
 Django monolith (server-rendered templates + htmx) · PostgreSQL 16 ·
-DuckDB-powered batch seed from a parquet source · Docker · deployed on an EU PaaS.
+DuckDB-powered batch seed from a parquet source · Docker · deployed on
+Railway + Cloudflare R2 (EU regions; see [DEPLOY.md](DEPLOY.md)).
 
 ## Development
 
@@ -36,10 +37,17 @@ docker compose up
 # (port taken? put POSTGRES_PORT=5433 in .env)
 ```
 
+Then, in a second terminal, load the fake dataset — without it the app runs
+on an empty database:
+
+```bash
+docker compose exec web python manage.py load_dev_fixtures
+```
+
 Natively with [uv](https://docs.astral.sh/uv/) (Postgres required, e.g. `docker compose up db`):
 
 ```bash
-cp .env.example .env          # fill in DJANGO_SECRET_KEY at least
+cp .env.example .env          # optional in dev — every value may stay blank
 uv sync
 uv run python manage.py migrate
 uv run python manage.py load_dev_fixtures   # fake games/users/credits (dev only)

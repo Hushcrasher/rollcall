@@ -40,6 +40,11 @@ _SOURCE_FIELDS = (
 )
 _ROLES = ("developers", "publishers", "porting", "supporting")
 
+# IGDB payloads never carry Steam data, so an igdb_live upsert over an existing
+# game must leave the Steam columns alone — writing the canonical's Nones would
+# wipe seed-owned data until the next weekly refresh restores it.
+_STEAM_FIELDS = ("steam_appid", "steam_positive_pct", "steam_review_count")
+
 
 class UpsertStats(TypedDict):
     created: int
@@ -79,6 +84,9 @@ class _BulkLoader:
     def __init__(self, source: str) -> None:
         self.source = source
         self.now = timezone.now()
+        self.update_fields = [
+            f for f in _SOURCE_FIELDS if source != Game.Source.IGDB_LIVE or f not in _STEAM_FIELDS
+        ]
         self.stats: UpsertStats = {"created": 0, "updated": 0}
         self.genres: dict[str, int] = {}
         self.engines: dict[str, int] = {}
@@ -166,7 +174,7 @@ class _BulkLoader:
         Game.objects.bulk_create([g for g, _ in to_create], batch_size=1000)
         if to_update:
             Game.objects.bulk_update(
-                [g for g, _ in to_update], fields=list(_SOURCE_FIELDS), batch_size=1000
+                [g for g, _ in to_update], fields=self.update_fields, batch_size=1000
             )
         self.stats["created"] += len(to_create)
         self.stats["updated"] += len(to_update)

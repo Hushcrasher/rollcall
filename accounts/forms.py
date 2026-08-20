@@ -20,6 +20,12 @@ class SignupForm(UserCreationForm):
         model = User
         fields = ["email", "display_name"]
 
+    def clean_email(self) -> str:
+        # Stored lowercase so "John@X.com" and "john@x.com" are one account —
+        # phones autocapitalize, and login matches the stored value exactly.
+        # The Lower(email) unique constraint on the model is the DB backstop.
+        return self.cleaned_data["email"].lower()
+
 
 class EmailAuthenticationForm(AuthenticationForm):
     """Login form labelled for email (the USERNAME_FIELD is `email`)."""
@@ -28,6 +34,11 @@ class EmailAuthenticationForm(AuthenticationForm):
         super().__init__(*args, **kwargs)
         self.fields["username"].label = _("Email")
         self.fields["username"].widget = forms.EmailInput(attrs={"autofocus": True})
+
+    def clean_username(self) -> str:
+        # Emails are stored lowercase (SignupForm / UserManager); fold the
+        # login input the same way so case never locks a member out.
+        return self.cleaned_data["username"].lower()
 
 
 class RecruiterApplicationForm(forms.ModelForm):

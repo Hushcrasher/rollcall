@@ -12,6 +12,7 @@ from django.contrib.auth.models import AbstractUser
 from django.contrib.postgres.indexes import GinIndex
 from django.core.validators import RegexValidator
 from django.db import models
+from django.db.models.functions import Lower
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.text import slugify
@@ -32,7 +33,9 @@ class UserManager(BaseUserManager):
     def _create_user(self, email: str, password: str | None, **extra_fields: Any) -> "User":
         if not email:
             raise ValueError("An email address is required")
-        email = self.normalize_email(email)
+        # Full lowercase, not just normalize_email's domain-lowering: emails
+        # are stored case-folded everywhere (see SignupForm.clean_email).
+        email = self.normalize_email(email).lower()
         user = self.model(email=email, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
@@ -131,6 +134,12 @@ class User(AbstractUser):
     class Meta:
         verbose_name = _("user")
         verbose_name_plural = _("users")
+        constraints = [
+            # Backstop for the case-folding done in SignupForm / UserManager /
+            # the login form: two case-variants of one address can never
+            # become two accounts, whatever code path writes the row.
+            models.UniqueConstraint(Lower("email"), name="user_email_ci_unique"),
+        ]
         indexes = [
             # People search (typo-tolerant) — docs/04-DATABASE-SCHEMA.md §1.
             GinIndex(

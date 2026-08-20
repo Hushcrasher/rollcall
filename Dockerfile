@@ -20,8 +20,13 @@ COPY . .
 
 ENV DJANGO_SETTINGS_MODULE=config.settings.prod
 
-# Static files are baked into the image and served by whitenoise.
-RUN DJANGO_SECRET_KEY=build-only-not-a-secret python manage.py collectstatic --noinput
+# Static files are baked into the image and served by whitenoise. The two env
+# vars are build-only placeholders: prod settings crash at import without them
+# (deliberately — see config/settings/prod.py), but collectstatic touches
+# neither the secret nor the cache, and the real values arrive at runtime.
+RUN DJANGO_SECRET_KEY=build-only-not-a-secret \
+    REDIS_URL=redis://collectstatic-placeholder:6379/0 \
+    python manage.py collectstatic --noinput
 
 EXPOSE 8000
 

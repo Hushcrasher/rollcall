@@ -81,13 +81,27 @@ def igdb_search(request: HttpRequest) -> HttpResponse:
     return render(request, "games/_igdb_options.html", context)
 
 
+# Quick-pick relevance order — NOT the enum strings' alphabetical order, which
+# would sort porting before publisher.
+_EMPLOYER_ROLE_ORDER = [
+    GameCompany.Role.DEVELOPER,
+    GameCompany.Role.PUBLISHER,
+    GameCompany.Role.PORTING,
+    GameCompany.Role.SUPPORTING,
+]
+
+
 def game_employers(request: HttpRequest, pk: int) -> HttpResponse:
     """The companies credited on this game — quick-picks for the employer field.
     Deduplicated across roles; ordered developer → publisher → porting → support."""
     game = get_object_or_404(Game, pk=pk)
     employers: list[dict[str, Any]] = []
     seen: set[int] = set()
-    for link in GameCompany.objects.filter(game=game).select_related("company").order_by("role"):
+    links = sorted(
+        GameCompany.objects.filter(game=game).select_related("company"),
+        key=lambda link: _EMPLOYER_ROLE_ORDER.index(link.role),
+    )
+    for link in links:
         if link.company_id in seen:
             continue
         seen.add(link.company_id)
@@ -105,6 +119,12 @@ def company_create(request: HttpRequest) -> JsonResponse:
     name = request.POST.get("name", "").strip()
     if not name:
         return JsonResponse({"error": "name required"}, status=400)
+    # `_meta` is Django model machinery the type checker cannot see — the
+    # same accommodation the codebase uses for other descriptors.
+    max_length = Company._meta.get_field("name").max_length or 300  # ty: ignore[unresolved-attribute]
+    if len(name) > max_length:
+        # varchar(300): an unchecked longer value would be a DataError 500.
+        return JsonResponse({"error": "name too long"}, status=400)
     company, _ = Company.objects.get_or_create(
         name=name, defaults={"source": Company.Source.MANUAL}
     )

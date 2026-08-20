@@ -1,7 +1,10 @@
 """`python manage.py seed_games` — the weekly batch seed (docs/02-ARCHITECTURE.md §3).
 
-Reads Hushcrasher's parquet with DuckDB, dedups Steam↔IGDB in SQL, then upserts
-into Postgres. Idempotent: first run = initial seed, later runs = weekly refresh.
+Reads the PREPARED parquet with DuckDB and upserts into Postgres. The
+Steam↔IGDB dedup/merge happens upstream in `prepare_seed_parquet`
+(games/seed/prepare.py); this command expects one row per canonical game,
+matching the contract in games/seed/schema.py. Idempotent: first run =
+initial seed, later runs = weekly refresh.
 
 Launcher-agnostic: the PaaS scheduler runs it with no arguments (source comes
 from PARQUET_SOURCE_URL); a Prefect flow could invoke it with `--source` later.

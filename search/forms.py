@@ -94,7 +94,13 @@ class RecruiterSearchForm(forms.Form):
         widget=TypeaheadSelectMultiple(
             url_name="search:genre_autocomplete", placeholder=_("Search genres…")
         ),
-        help_text=_("Matches games in any of the selected."),
+        # The data caveat is honest, not cosmetic: IGDB-only games currently
+        # carry no genre data (ROADMAP "Non-Steam facet coverage"), so this
+        # filter excludes credits on non-Steam games.
+        help_text=_(
+            "Matches games in any of the selected. Genre data currently covers "
+            "Steam-linked games only."
+        ),
     )
     countries = forms.MultipleChoiceField(
         choices=_country_choices,
@@ -108,7 +114,13 @@ class RecruiterSearchForm(forms.Form):
     # min 1, not 0: "0" reads as "I don't care about rating" but means "must
     # HAVE rating data" — leave the field blank to not filter on rating.
     min_rating = forms.IntegerField(
-        required=False, min_value=1, max_value=100, label=_("Min. rating (%)")
+        required=False,
+        min_value=1,
+        max_value=100,
+        label=_("Min. rating (%)"),
+        # Same honest caveat as genres: the current data carries ratings for
+        # Steam-linked games only, so any value here excludes non-Steam credits.
+        help_text=_("Rating data currently covers Steam-linked games only."),
     )
     year_from = forms.IntegerField(
         required=False, min_value=1970, max_value=2100, label=_("Worked since (year)")

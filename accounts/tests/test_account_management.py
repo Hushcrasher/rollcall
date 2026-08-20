@@ -86,6 +86,10 @@ def test_delete_page_shows_confirmation(client: Client, user: User) -> None:
     client.force_login(user)
     response = client.get(reverse("accounts:account_delete"))
     assert response.status_code == 200
+    # The page must warn about irreversibility and require an explicit POST —
+    # a bare 200 could be any page at all.
+    assert b"cannot be undone" in response.content
+    assert b'<form method="post"' in response.content
 
 
 def test_delete_removes_account_and_cascades_contributions(client: Client, user: User) -> None:

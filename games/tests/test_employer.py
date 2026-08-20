@@ -37,8 +37,38 @@ def test_game_employers_dedupes_a_company_with_multiple_roles(client: Client) ->
     assert response.content.count(f'data-id="{studio.pk}"'.encode()) == 1
 
 
+def test_game_employers_orders_developer_publisher_porting_supporting(client: Client) -> None:
+    """The quick-pick order is by role relevance, not by the enum strings'
+    alphabetical order (which would put porting before publisher)."""
+    game = Game.objects.create(title="Dark Souls", source=Game.Source.MANUAL)
+    porting = Company.objects.create(name="QLOC", source=Company.Source.MANUAL)
+    pub = Company.objects.create(name="Bandai Namco", source=Company.Source.MANUAL)
+    dev = Company.objects.create(name="FromSoftware", source=Company.Source.MANUAL)
+    GameCompany.objects.create(game=game, company=porting, role=GameCompany.Role.PORTING)
+    GameCompany.objects.create(game=game, company=pub, role=GameCompany.Role.PUBLISHER)
+    GameCompany.objects.create(game=game, company=dev, role=GameCompany.Role.DEVELOPER)
+
+    content = client.get(reverse("games:game_employers", kwargs={"pk": game.pk})).content
+
+    assert content.index(b"FromSoftware") < content.index(b"Bandai Namco") < content.index(b"QLOC")
+
+
 def test_company_create_requires_login(client: Client) -> None:
-    assert client.post(reverse("games:company_create"), {"name": "Virtuos"}).status_code == 302
+    response = client.post(reverse("games:company_create"), {"name": "Virtuos"})
+    assert response.status_code == 302
+    assert not Company.objects.filter(name="Virtuos").exists()  # nothing was written
+
+
+def test_company_create_rejects_an_overlong_name(client: Client) -> None:
+    # Company.name is varchar(300); an unchecked longer value would be a raw
+    # DataError 500. The endpoint must answer 400 like its "name required" case.
+    user = User.objects.create_user(email="m@example.com", password="x", display_name="M")
+    client.force_login(user)
+
+    response = client.post(reverse("games:company_create"), {"name": "V" * 301})
+
+    assert response.status_code == 400
+    assert Company.objects.count() == 0
 
 
 def test_company_create_makes_a_manual_company_and_returns_json(client: Client) -> None:

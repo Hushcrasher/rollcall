@@ -5,7 +5,10 @@ from .base import env
 
 DEBUG = True
 
-SECRET_KEY = env("DJANGO_SECRET_KEY", default="dev-only-insecure-key")
+# `or`, not just a default: .env.example ships `DJANGO_SECRET_KEY=` and a
+# verbatim `cp .env.example .env` makes env() return "" (present-but-empty
+# bypasses the default) — which would 500 every page instead of falling back.
+SECRET_KEY = env("DJANGO_SECRET_KEY", default="") or "dev-only-insecure-key"
 
 ALLOWED_HOSTS = ["*"]
 

@@ -28,9 +28,9 @@
 
 | Component | Choice | Why / notes |
 |---|---|---|
-| Hosting | **PaaS — Scalingo** (alt: Clever Cloud) | French/EU (GDPR file simplicity), git-push deploys, managed Postgres, scheduler. ~€30/mo. |
+| Hosting | **PaaS — Railway** (EU region; decision overrides the original Scalingo/Clever Cloud default) | Managed Postgres + Redis + cron, Dockerfile deploys. US-owned → EU region + signed DPA (see DEPLOY.md). |
 | Packaging | **Dockerfile** for prod, **docker compose** for local dev (app + Postgres) | Anti-lock-in: same image on any PaaS or a VPS. `docker compose up` = contributor onboarding. |
-| Object storage | **S3-compatible bucket** via `django-storages` — prefer **Scaleway Object Storage** (EU); **Cloudflare R2** acceptable | Avatars only in POC (game images served from IGDB/Steam CDNs, never stored). PaaS disk is ephemeral → bucket mandatory. Provider switch = 3 env vars. |
+| Object storage | **S3-compatible bucket** via `django-storages` — **Cloudflare R2** chosen (EU jurisdiction; SCCs/DPA to document) | Avatars only in POC (game images served from IGDB/Steam CDNs, never stored). PaaS disk is ephemeral → bucket mandatory. Provider switch = 3 env vars. |
 | Email | **Brevo** (alt: Postmark) | Transactional only: verification, reset, contact relay (Reply-To = sender), seed-failure alert. Never raw SMTP. |
 | Errors | **Sentry** (free tier) | Only observability beyond PaaS logs in POC. |
 | Rate limiting | **django-ratelimit** (IP-based on profiles/search) + DB-backed per-sender limit on contact relay (`contact_requests` table) | Anti-scraping & anti-spam, proportionate to POC. |
@@ -63,18 +63,9 @@ pytest, pytest-django, ruff   # dev
 # post-POC: django-allauth (Discord), djangorestframework
 ```
 
-## Environment variables (`.env.example`)
+## Environment variables
 
-```
-DJANGO_SECRET_KEY=
-DATABASE_URL=postgres://...
-PARQUET_SOURCE_URL=          # private; forks plug their own source
-IGDB_CLIENT_ID=              # fallback fetch (post-POC automation)
-IGDB_CLIENT_SECRET=
-S3_ENDPOINT_URL=
-S3_ACCESS_KEY_ID=
-S3_SECRET_ACCESS_KEY=
-S3_BUCKET_NAME=
-EMAIL_API_KEY=               # Brevo
-SENTRY_DSN=
-```
+The canonical, always-current list is **[.env.example](../.env.example)** —
+one commented entry per variable. This doc deliberately stops duplicating it
+(the two copies had already drifted: Brevo is SMTP `EMAIL_HOST_USER`/
+`EMAIL_HOST_PASSWORD`, not the `EMAIL_API_KEY` an earlier revision named).

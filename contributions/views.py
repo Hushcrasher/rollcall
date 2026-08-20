@@ -22,6 +22,7 @@ from django_ratelimit.core import is_ratelimited
 from django_ratelimit.exceptions import Ratelimited
 
 from accounts.forms import SignupForm
+from accounts.mixins import EmailVerifiedRequiredMixin
 from accounts.models import User
 from accounts.registration import create_and_login
 from contributions.forms import ContributionForm
@@ -30,20 +31,6 @@ from contributions.models import Contribution
 from games.igdb import IGDBClient
 from games.models import Game
 from search.services import search_games
-
-
-class EmailVerifiedRequiredMixin(LoginRequiredMixin):
-    """Bounce logged-in-but-unverified users to the verification notice."""
-
-    request: Any  # provided by the Django CBV this is mixed into
-
-    def dispatch(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
-        user = self.request.user
-        if user.is_authenticated and not user.is_email_verified:
-            messages.error(request, _("Please verify your email before adding credits."))
-            return redirect("accounts:verification_sent")
-        return super().dispatch(request, *args, **kwargs)
-
 
 # Named explicitly, like search.views.PeopleSearchView's _RATELIMIT_GROUP:
 # django-ratelimit derives an unnamed decorator's group from the view's module
@@ -267,6 +254,7 @@ class ContributionCreateView(
     model = Contribution
     form_class = ContributionForm
     template_name = "contributions/contribution_form.html"
+    verification_message = _("Please verify your email before adding credits.")
 
     def form_valid(self, form: ContributionForm) -> HttpResponse:
         form.instance.user = self.request.user

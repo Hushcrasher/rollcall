@@ -16,7 +16,7 @@ Documentation set for implementation (intended to be handed to Claude Code).
 3. Seed-owned columns are read-only in the app; the seed never writes platform-owned data (see `04`, §13).
 4. Internal IDs are the pivot; external IDs are nullable+unique.
 5. Account deletion must fully work in the POC: contributions cascade, vouches anonymized, JSON export available.
-6. Email verification required before creating a contribution.
+6. Email verification required before creating a contribution. *Scoped relaxation (2026-08-11): the declare funnel may write a `pending` row before verification — nothing unverified is ever **published**; `/credits/new/` keeps the full gate. See `01-DESIGN.md` §3.3.*
 7. No public negative signals of any kind (no down-votes, no public "disputed", no numeric trust scores).
 8. AGPL v3 license file in the first commit; secrets only in env vars, never in git history.
 9. Dormant schema (vouches, statuses, claimed_by, parent_game_id, aliases) ships in the initial migrations, with no UI.
@@ -26,7 +26,7 @@ Documentation set for implementation (intended to be handed to Claude Code).
 
 1. Written confirmation that IGDB/Twitch (and Steam-derived data) ToS cover this use for a Hushcrasher-backed public product.
 2. Parquet audit: `igdb_id` / `steam_appid` present; Steam↔IGDB mapping available (else dedup prep first).
-3. Accounts opened: PaaS (Scalingo or Clever Cloud), S3-compatible bucket (EU preferred), Brevo, Sentry.
+3. Accounts opened: PaaS, S3-compatible bucket, Brevo, Sentry. *(Chosen stack — see ROADMAP.md and DEPLOY.md: Railway + Cloudflare R2, EU regions + DPAs; this overrides the Scalingo/Scaleway defaults named in `02`/`03`.)*
 
 ## Suggested build order
 

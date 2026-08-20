@@ -33,6 +33,14 @@ def test_login_with_email_and_password(client: Client, user: User) -> None:
     assert response.wsgi_request.user.is_authenticated
 
 
+def test_login_ignores_email_case(client: Client, user: User) -> None:
+    response = client.post(
+        reverse("accounts:login"), {"username": "Member@Example.COM", "password": PASSWORD}
+    )
+    assert response.status_code == 302
+    assert response.wsgi_request.user.is_authenticated
+
+
 def test_login_redirects_to_own_profile(client: Client, user: User) -> None:
     response = client.post(
         reverse("accounts:login"), {"username": user.email, "password": PASSWORD}

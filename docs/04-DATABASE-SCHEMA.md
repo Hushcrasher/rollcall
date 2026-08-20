@@ -20,7 +20,7 @@ Extends Django's user (custom user model, email as username — **decide at proj
 
 | Column | Type | Constraints | Notes |
 |---|---|---|---|
-| email | citext/varchar | unique, not null | Login identifier. **Never displayed anywhere.** |
+| email | varchar | unique, not null; **case-insensitive**: stored lowercase (folded at signup/login/manager) + a `Lower(email)` unique constraint as DB backstop | Login identifier. **Never displayed anywhere.** |
 | password | varchar | not null | Django hashing. |
 | display_name | varchar(100) | not null | Free: real name or pseudonym. Never require real identity. |
 | slug | varchar | unique, not null | Public profile URL. Generated from display_name + suffix on collision. |

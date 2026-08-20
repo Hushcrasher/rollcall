@@ -17,6 +17,7 @@ from django.utils import timezone
 from django.utils.translation import gettext as _
 from django.views.generic import CreateView, FormView
 
+from accounts.mixins import EmailVerifiedRequiredMixin
 from accounts.models import User
 from contact.forms import ContactForm, ReportForm
 from contact.models import ContactRequest, Report
@@ -24,10 +25,13 @@ from contact.models import ContactRequest, Report
 _DEFAULT_RATE_LIMIT = 20
 
 
-class ContactView(LoginRequiredMixin, FormView):
+class ContactView(EmailVerifiedRequiredMixin, FormView):
     template_name = "contact/contact_form.html"
     form_class = ContactForm
     target: User
+    # The relay sends mail from our domain with Reply-To = the sender's
+    # address; verification is what proves they own it.
+    verification_message = _("Please verify your email before contacting members.")
 
     def dispatch(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         # 404 unless the target exists, is public, and is contactable.

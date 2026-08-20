@@ -8,6 +8,7 @@ import pytest
 from django.core import mail
 from django.test import Client
 from django.urls import reverse
+from django.utils import timezone
 
 from accounts.models import User
 from contact.models import ContactRequest
@@ -24,6 +25,7 @@ def sender() -> User:
         password="x",
         display_name="Recruiter",
         role=User.Role.RECRUITER,
+        email_verified_at=timezone.now(),  # the relay requires a verified sender
     )
 
 
@@ -40,6 +42,23 @@ def _url(target: User) -> str:
 
 def test_contact_requires_login(client: Client, target: User) -> None:
     assert client.get(_url(target)).status_code == 302
+
+
+def test_unverified_sender_cannot_use_the_relay(client: Client, target: User) -> None:
+    """The relay sends outbound email with a sender-controlled Reply-To, so it
+    sits behind the same email-verified gate as contributions (docs/01 §3.4's
+    "first anti-spam line") — an address the sender never proved they own must
+    not become a Reply-To on mail from our domain."""
+    unverified = User.objects.create_user(
+        email="anon@example.com", password="x", display_name="Anon"
+    )
+    client.force_login(unverified)
+
+    response = client.post(_url(target), MESSAGE)
+
+    assert len(mail.outbox) == 0
+    assert ContactRequest.objects.count() == 0
+    assert response.status_code == 302  # bounced to the verification notice
 
 
 def test_sending_relays_an_email_with_reply_to_sender(

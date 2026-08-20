@@ -1,5 +1,6 @@
-"""Production settings — the wiring that cannot be exercised by running the app
-in dev, and whose absence is invisible from the outside."""
+"""Settings wiring that cannot be exercised by running the app normally, and
+whose absence is invisible from the outside — prod's required env vars, and
+dev's tolerance of a verbatim `cp .env.example .env`."""
 
 import importlib
 import sys
@@ -11,6 +12,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.utils.module_loading import import_string
 
 _PROD = "config.settings.prod"
+_DEV = "config.settings.dev"
 
 
 @pytest.fixture(autouse=True)
@@ -33,12 +35,28 @@ def _unimport_prod(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     monkeypatch.delenv("S3_BUCKET_NAME", raising=False)
     monkeypatch.delenv("EMAIL_HOST_PASSWORD", raising=False)
     sys.modules.pop(_PROD, None)
+    sys.modules.pop(_DEV, None)
     yield
     sys.modules.pop(_PROD, None)
+    sys.modules.pop(_DEV, None)
 
 
 def _import_prod() -> ModuleType:
     return importlib.import_module(_PROD)
+
+
+def test_dev_secret_key_falls_back_when_present_but_empty(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """.env.example ships `DJANGO_SECRET_KEY=` (present, empty), and django-environ
+    returns "" for a present-but-empty variable — bypassing env()'s default. A
+    verbatim `cp .env.example .env` must not turn every dev page into a 500
+    ("The SECRET_KEY setting must not be empty")."""
+    monkeypatch.setenv("DJANGO_SECRET_KEY", "")
+
+    dev = importlib.import_module(_DEV)
+
+    assert dev.SECRET_KEY  # a non-empty dev fallback, not ""
 
 
 def test_prod_refuses_to_start_without_redis(monkeypatch: pytest.MonkeyPatch) -> None:
