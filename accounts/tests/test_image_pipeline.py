@@ -63,16 +63,44 @@ def test_gif_is_rejected() -> None:
 
 def test_oversize_upload_is_rejected_before_decode(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(images, "MAX_UPLOAD_BYTES", 100)
-    with pytest.raises(ValidationError):
-        images.process_image(_upload(), max_side=2560)
+    # Bytes that are both over the cap AND undecodable garbage — if the size
+    # check ran after (or didn't gate) decode, this would fail with the "not a
+    # valid image" message instead, proving the size check truly runs first.
+    upload = SimpleUploadedFile("t.jpg", b"x" * 200, content_type="application/octet-stream")
+    with pytest.raises(ValidationError, match="10 MB"):
+        images.process_image(upload, max_side=2560)
 
 
 def test_decompression_bomb_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
-    # A real >40MP fixture would bloat the repo; shrinking the guard exercises
-    # the identical code path (Pillow raises inside open() past 2x the limit).
+    # Our own pre-load gate (MAX_IMAGE_PIXELS) must reject a canvas over the cap
+    # on its own, independent of Pillow's global guard — which only hard-raises
+    # past 2x its threshold (see test_pillow_hard_raise_is_translated for that
+    # branch). A real >40MP fixture would bloat the repo, so the cap is
+    # shrunk instead; a 64x64 (4096px) image stays well under Pillow's own
+    # 40,000,000-pixel default, so only our pre-load check can catch this.
+    monkeypatch.setattr(images, "MAX_IMAGE_PIXELS", 1000)
+    with pytest.raises(ValidationError):
+        images.process_image(_upload(size=(64, 64)), max_side=2560)
+
+
+def test_pillow_hard_raise_is_translated(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Pillow's own DecompressionBombError — raised inside Image.open() once a
+    # header-declared size exceeds 2x Image.MAX_IMAGE_PIXELS — must still be
+    # caught and translated to a ValidationError, independent of our own
+    # pre-load MAX_IMAGE_PIXELS gate (untouched here).
     monkeypatch.setattr(images.Image, "MAX_IMAGE_PIXELS", 1000)
     with pytest.raises(ValidationError):
         images.process_image(_upload(size=(64, 64)), max_side=2560)
+
+
+def test_upload_with_unknown_size_is_rejected() -> None:
+    # An upload whose size Django couldn't determine must fail closed, not
+    # silently skip the cap. Content is a perfectly valid, decodable image —
+    # the only defect being tested is the missing/None size itself.
+    upload = _upload()
+    upload.size = None  # ty: ignore[invalid-assignment]
+    with pytest.raises(ValidationError, match="10 MB"):
+        images.process_image(upload, max_side=2560)
 
 
 def test_exif_is_destroyed() -> None:
