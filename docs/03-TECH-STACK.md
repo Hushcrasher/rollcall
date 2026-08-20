@@ -11,7 +11,7 @@
 | Framework | **Django 5.x** | Batteries included: ORM, migrations, auth, **auto-generated admin** (recruiter approval + report triage for free), CSRF/session security. The product is exactly Django's home turf. |
 | API layer | None in POC | Server-rendered views. If/when a public API is needed: Django REST Framework endpoints beside existing views, no rewrite. |
 | Auth | **Django auth** (email+password, email verification, password reset) | Email verification required before creating contributions. No auth SaaS (breaks self-hosting/AGPL spirit). Post-POC: `django-allauth` for Discord OAuth (the industry's network). |
-| Templates/front | **Django templates + htmx** (+ optionally Alpine.js for micro-interactions) | No SPA. Native SEO for profile/game pages, session auth, half the work. CSS: keep it simple (vanilla or a light utility framework — implementer's choice, not architectural). |
+| Templates/front | **Django templates + htmx** (+ optionally Alpine.js for micro-interactions) | No SPA. Native SEO for profile/game pages, session auth, half the work. CSS: Pico CSS v2 classless, vendored (chosen 2026-08-20) + one functional-only app.css; still not architectural — swapping it stays cheap. |
 | i18n | Django i18n from day one, `en` only shipped | Cheap discipline now, painful retrofit later. |
 
 ## Data

@@ -130,6 +130,18 @@ Goal: legally and operationally ready for real users. Buildable pieces done TDD 
 - [ ] ⚠️ Weekly `seed_games` cron — after the ToS + parquet prerequisites clear
 - [x] Fallback documented (DEPLOY.md): ship "For recruiters" + contact relay first if the schedule slips
 
+## Phase 8 — Mobile-first surface ✅ (spec 2026-08-20)
+
+Goal: a styled, mobile-first site without custom design — Pico CSS v2 classless.
+
+- [x] Pico CSS v2 classless vendored; `app.css` = functional layout only (dark mode fixed)
+- [x] Nav: ROLLCALL wordmark, `Add your credit` primary CTA (declare funnel for anonymous)
+- [x] Home: filters first for everyone; worker pitch = one-line banner; `#results` anchor
+- [x] Latest-credits feed (active credits of public profiles only)
+- [x] Credit dates display as MM/YYYY sitewide
+- [x] About page (`/about/`) — mission, data provenance, AGPL, safety
+- [x] English copy pass (canonical CTA, year-filter label)
+
 ## Post-roadmap additions
 
 - [x] **Dev email backend** — prints a clean, copy-friendly body so console verification/reset links aren't corrupted by quoted-printable wrapping
