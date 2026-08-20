@@ -69,6 +69,9 @@ A contribution = **(person, game, optional employer company, discipline, free-te
   - `open_to_work` — default **false**. Pure market signal, active declaration, shown as a badge, filterable in recruiter search. Distinct from `contactable`: someone employed can stay reachable without broadcasting availability to their current employer.
 - Signup consent copy must state clearly: *"Your profile and credits will be public and accessible to recruiters — that is the point of the platform."*
 - The `contactable` toggle must be easy to find on the profile page (assumed default vs dark pattern = ease of exit).
+- **Work gallery** (added 2026-08-20, spec `docs/superpowers/specs/2026-08-20-profile-gallery-design.md`): a profile carries a "Work" gallery, up to 12 images with an optional caption each, newest first, shown after the credits list. Managed from profile edit, not the profile page itself. Verified accounts only — the same email-verification gate as creating a contribution.
+- **Every uploaded image goes through one hardened server-side pipeline** (same spec), gallery and avatar alike: re-encoded to WebP, EXIF/GPS metadata stripped, SVG kept structurally impossible (the check reads the decoded format, never the filename or declared header), 10 MB and 40 MP caps enforced before the image is decoded, random filenames. No raw upload is ever stored.
+- Account deletion removes the gallery's image files, not just the DB rows; the personal-data JSON export (§3.7) lists the portfolio.
 
 ### 3.5 Trust / vouching (schema only — NOT in POC)
 

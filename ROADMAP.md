@@ -142,6 +142,17 @@ Goal: a styled, mobile-first site without custom design — Pico CSS v2 classles
 - [x] About page (`/about/`) — mission, data provenance, AGPL, safety
 - [x] English copy pass (canonical CTA, year-filter label)
 
+## Phase 9 — Profile gallery & upload hardening ✅ (spec 2026-08-20)
+
+Goal: artists can show work; every upload goes through one hardened pipeline.
+
+- [x] `accounts/images.py`: re-encode to WebP, EXIF stripped, SVG/GIF impossible, 10 MB + 40 MP caps, UUID names
+- [x] `ProfileImage` (migration 0007): 12 max, captions, newest first; admin registered
+- [x] Upload/delete views — verified-only, rate-limited (10/h), owner-only delete
+- [x] "Work" section on profiles (after credits); grid layout in app.css
+- [x] Avatar routed through the same pipeline (512px)
+- [x] GDPR: deletion removes files; JSON export lists the portfolio
+
 ## Post-roadmap additions
 
 - [x] **Dev email backend** — prints a clean, copy-friendly body so console verification/reset links aren't corrupted by quoted-printable wrapping

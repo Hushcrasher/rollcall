@@ -268,7 +268,8 @@ class AccountView(LoginRequiredMixin, TemplateView):
 
 class AccountDeleteView(LoginRequiredMixin, TemplateView):
     """Confirm, then hard-delete: contributions cascade, vouches emitted are
-    anonymized (FK rules), and the avatar object is removed (GDPR §14)."""
+    anonymized (FK rules), and the avatar and portfolio image/thumbnail files
+    are removed (GDPR §14)."""
 
     template_name = "accounts/account_delete.html"
 

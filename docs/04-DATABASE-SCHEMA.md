@@ -230,3 +230,18 @@ The seed command may write ONLY: `games` `[source]` columns + `source`/`last_syn
 | Contacts sent/received | contact_requests | SET NULL both directions | Yes |
 | Reports filed | reports.reporter_id | SET NULL | No |
 | Avatar file | S3 bucket | Delete object | N/A |
+| Portfolio images | profile_images | CASCADE (row), image + thumbnail files deleted explicitly | Yes (list) |
+
+## 15. `profile_images` — profile "Work" gallery (migration `accounts/0007`)
+
+Portfolio pieces shown on the profile after credits (docs/01-DESIGN.md §3.4). Both files are outputs of the hardened intake pipeline (`accounts/images.py`) — raw uploads never reach storage.
+
+| Column | Type | Constraints | Notes |
+|---|---|---|---|
+| user_id | → users | not null, **on delete CASCADE** | Owner. `related_name="portfolio_images"`. |
+| image | varchar | not null | Storage key. Pipeline output: re-encoded WebP, EXIF/GPS stripped, random (UUID) filename. |
+| thumbnail | varchar | not null | Same pipeline, second pass at a smaller `max_side`. |
+| caption | varchar(140) | not null, default `''` | Free text, optional. |
+| created_at | timestamptz | not null | Sort key — gallery renders newest first. |
+
+**12-image cap is app-enforced, not a DB constraint**: the create view locks the user row (`select_for_update`) and counts existing rows before inserting, closing the race where two concurrent uploads at 11 images both pass a check-then-create and land a 13th.
