@@ -171,3 +171,18 @@ def test_you_cannot_delete_someone_elses_image(client: Client) -> None:
     response = client.post(reverse("accounts:portfolio_delete", args=[stored.pk]))
     assert response.status_code == 404
     assert owner.portfolio_images.count() == 1  # ty: ignore[unresolved-attribute]
+
+
+def test_profile_shows_the_work_section(client: Client) -> None:
+    user = _user()
+    _image(user, caption="Boss fight concept")
+    body = client.get(reverse("accounts:profile", args=[user.slug])).content.decode()
+    assert "Work" in body
+    assert "Boss fight concept" in body
+
+
+def test_profile_without_images_has_no_work_section(client: Client) -> None:
+    user = _user()
+    body = client.get(reverse("accounts:profile", args=[user.slug])).content.decode()
+    main = body[body.index("<main") : body.index("</main>")]
+    assert "portfolio-grid" not in main

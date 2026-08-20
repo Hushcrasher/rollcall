@@ -81,6 +81,20 @@
     {% endfor %}
   </section>
 
+  {% if portfolio_images %}
+    <section>
+      <h2>{% translate "Work" %}</h2>
+      <ul class="portfolio-grid">
+        {% for pimg in portfolio_images %}
+          <li>
+            <a href="{{ pimg.image.url }}"><img src="{{ pimg.thumbnail.url }}" alt="{{ pimg.caption }}" loading="lazy"></a>
+            {% if pimg.caption %}<p class="muted">{{ pimg.caption }}</p>{% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endif %}
+
   {% if profile_user.github_login %}
     <section hx-get="{% url 'accounts:github_activity' profile_user.slug %}"
              hx-trigger="load" hx-swap="outerHTML">
