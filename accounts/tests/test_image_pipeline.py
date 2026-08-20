@@ -79,8 +79,20 @@ def test_decompression_bomb_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None
     # shrunk instead; a 64x64 (4096px) image stays well under Pillow's own
     # 40,000,000-pixel default, so only our pre-load check can catch this.
     monkeypatch.setattr(images, "MAX_IMAGE_PIXELS", 1000)
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValidationError, match="dimensions"):
         images.process_image(_upload(size=(64, 64)), max_side=2560)
+
+
+def test_oversized_canvas_is_rejected_before_load(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Header declares 300x300; pixel data is cut. Pre-load rejection reports
+    # dimensions; a post-load check would hit OSError("truncated") and report
+    # the format message instead — so the message pins the ordering.
+    monkeypatch.setattr(images, "MAX_IMAGE_PIXELS", 1000)
+    buffer = BytesIO()
+    Image.new("RGB", (300, 300), "red").save(buffer, format="PNG")
+    upload = SimpleUploadedFile("t.png", buffer.getvalue()[:120], content_type="image/png")
+    with pytest.raises(ValidationError, match="dimensions"):
+        images.process_image(upload, max_side=2560)
 
 
 def test_pillow_hard_raise_is_translated(monkeypatch: pytest.MonkeyPatch) -> None:
