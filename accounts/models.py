@@ -300,3 +300,33 @@ class GitHubYearlyContribution(models.Model):
 
     def __str__(self) -> str:
         return f"{self.user_id} {self.year}: {self.total_commits} commits"  # ty: ignore[unresolved-attribute]
+
+
+MAX_PORTFOLIO_IMAGES = 12
+
+
+class ProfileImage(models.Model):
+    """Portfolio piece (spec 2026-08-20-profile-gallery). Both files are
+    pipeline outputs (accounts/images.py) — raw uploads never reach storage."""
+
+    objects: ClassVar[models.Manager["ProfileImage"]] = models.Manager()
+
+    user = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.CASCADE,
+        related_name="portfolio_images",
+        verbose_name=_("user"),
+    )
+    image = models.ImageField(_("image"), upload_to="portfolio/")
+    thumbnail = models.ImageField(_("thumbnail"), upload_to="portfolio/thumbs/")
+    caption = models.CharField(_("caption"), max_length=140, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = _("profile image")
+        verbose_name_plural = _("profile images")
+
+    def __str__(self) -> str:
+        user: Any = self.user  # FK descriptor is opaque to the type checker
+        return f"{user.display_name}: {self.caption or self.image.name}"
