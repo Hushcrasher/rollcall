@@ -9,8 +9,11 @@
 
 /* The classless Pico build has no .outline/.secondary classes, and bare
    buttons default to solid primary — which would make Log out compete with
-   the nav CTA. De-emphasize it to a link-weight control instead. */
-nav form button { background: none; border: none; color: var(--pico-primary); }
+   the nav CTA. De-emphasize it to link weight. The attribute selector is
+   load-bearing: Pico styles this element via [type=submit] (specificity
+   0,1,0), which outranks any pure type-selector chain. Only visible in
+   rendered CSS — no pytest asserts computed styles. */
+nav form button[type=submit] { background: none; border: none; color: var(--pico-primary); }
 .results, .nav-suggest {
   position: absolute; z-index: 100; left: 0; top: 100%;
   min-width: 20rem; max-width: 90vw; max-height: 20rem; overflow-y: auto;
