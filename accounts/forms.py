@@ -2,6 +2,7 @@ from typing import Any
 
 from django import forms
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
+from django.core.files.uploadedfile import UploadedFile
 from django.utils.translation import gettext_lazy as _
 
 from accounts.github import extract_login
@@ -80,6 +81,14 @@ class ProfileForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         if self.instance and self.instance.pk:
             self.fields["github_url"].initial = str(self.instance.github_login)
+
+    def clean_avatar(self) -> Any:
+        avatar = self.cleaned_data.get("avatar")
+        # Only fresh uploads re-encode: an unchanged avatar arrives as the
+        # stored FieldFile, and clearing arrives as False — pass both through.
+        if isinstance(avatar, UploadedFile):
+            return process_image(avatar, max_side=512).image
+        return avatar
 
     def clean_github_url(self) -> str:
         raw = self.cleaned_data.get("github_url", "").strip()

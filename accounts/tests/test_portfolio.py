@@ -186,3 +186,32 @@ def test_profile_without_images_has_no_work_section(client: Client) -> None:
     body = client.get(reverse("accounts:profile", args=[user.slug])).content.decode()
     main = body[body.index("<main") : body.index("</main>")]
     assert "portfolio-grid" not in main
+
+
+def _jpeg_with_exif(name: str = "face.jpg") -> SimpleUploadedFile:
+    buffer = BytesIO()
+    img = Image.new("RGB", (900, 900), "green")
+    tags = Image.Exif()
+    tags[0x010F] = "TestCam"
+    img.save(buffer, format="JPEG", exif=tags)
+    return SimpleUploadedFile(name, buffer.getvalue(), content_type="image/jpeg")
+
+
+def test_avatar_goes_through_the_pipeline(client: Client) -> None:
+    """Same intake as the gallery (spec §2): re-encoded, EXIF gone, 512px cap.
+    The old bare-ImageField path stored original bytes, GPS included."""
+    user = _user()
+    client.force_login(user)
+    response = client.post(
+        reverse("accounts:profile_edit"),
+        {"display_name": "Artist", "avatar": _jpeg_with_exif()},
+    )
+    assert response.status_code == 302
+    user.refresh_from_db()
+    # avatar is a FieldFile at runtime; the type checker sees the ImageField.
+    avatar: Any = user.avatar
+    assert avatar.name.endswith(".webp")
+    data = avatar.read()
+    assert b"TestCam" not in data
+    out = Image.open(BytesIO(data))
+    assert max(out.size) <= 512
