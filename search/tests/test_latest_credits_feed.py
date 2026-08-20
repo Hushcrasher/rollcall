@@ -75,3 +75,10 @@ def test_feed_is_newest_first_and_capped_at_ten(client: Client) -> None:
     assert "Person 10" in body  # newest
     assert "Person 00" not in body  # 11th-newest fell off
     assert body.index("Person 10") < body.index("Person 01")
+
+
+def test_result_card_credit_dates_render_mm_yyyy(client: Client) -> None:
+    _credit("a@example.com", "Ada Artist")
+    design = Discipline.objects.get(name="Design")
+    body = client.get(reverse("home"), {"discipline": str(design.pk)}).content.decode()
+    assert "08/2024" in body and "03/2025" in body

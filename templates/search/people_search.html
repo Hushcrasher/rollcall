@@ -127,7 +127,7 @@
               <li>
                 <a href="{% url 'games:game' c.game.slug %}">{{ c.game.title }}</a>
                 — {{ c.job_title }} <em>({{ c.discipline.name }})</em>
-                <span class="dates">{{ c.start_date|date:"Y" }}–{% if c.end_date %}{{ c.end_date|date:"Y" }}{% else %}{% translate "present" %}{% endif %}</span>
+                <span class="dates">{{ c.start_date|date:"m/Y" }}–{% if c.end_date %}{{ c.end_date|date:"m/Y" }}{% else %}{% translate "present" %}{% endif %}</span>
               </li>
             {% endfor %}
           </ul>
