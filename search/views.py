@@ -16,6 +16,7 @@ from django_ratelimit.core import is_ratelimited
 from django_ratelimit.decorators import ratelimit
 from django_ratelimit.exceptions import Ratelimited
 
+from contributions.models import Contribution
 from games.igdb import IGDBClient
 from games.models import Engine, Genre
 from search.forms import RecruiterSearchForm
@@ -99,6 +100,17 @@ class PeopleSearchView(TemplateView):
                 page=self.request.GET.get("page"),
             )
             context["searched"] = True
+        if not self.request.GET:
+            # The bare front door only: a search (valid or not) replaces the
+            # feed. Guards are the feature — only publishable rows render
+            # (docs/00 #7), and only for people who are findable at all.
+            context["latest_credits"] = (
+                Contribution.objects.filter(
+                    status=Contribution.Status.ACTIVE, user__profile_public=True
+                )
+                .select_related("user", "game")
+                .order_by("-created_at")[:10]
+            )
         return context
 
 

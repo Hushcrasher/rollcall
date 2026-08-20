@@ -172,4 +172,26 @@
       {% endif %}
     </section>
   {% endif %}
+
+  {% if latest_credits %}
+    <section>
+      <h2>{% translate "Latest credits" %}</h2>
+      {% comment %}
+        Sentence fragmented around the two links — acceptable while
+        LANGUAGES = [en] only. No timestamps beyond the credit's own dates:
+        "2 hours ago" would advertise activity patterns (spec §3).
+      {% endcomment %}
+      <ul>
+        {% for c in latest_credits %}
+          <li>
+            <a href="{% url 'accounts:profile' c.user.slug %}">{{ c.user.display_name }}</a>
+            {% translate "added a credit on" %}
+            <a href="{% url 'games:game' c.game.slug %}">{{ c.game.title }}</a>:
+            {{ c.job_title }}
+            ({{ c.start_date|date:"m/Y" }} – {% if c.end_date %}{{ c.end_date|date:"m/Y" }}{% else %}{% translate "present" %}{% endif %})
+          </li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endif %}
 {% endblock %}
