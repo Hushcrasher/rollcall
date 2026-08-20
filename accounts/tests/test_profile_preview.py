@@ -36,8 +36,14 @@ def test_preview_hides_every_owner_control(client: Client, user: User) -> None:
     body = client.get(user.get_absolute_url() + "?preview=member").content
     assert b"Edit my profile" not in body
     assert b"View as member" not in body
-    assert b"Add a credit" not in body
     assert b"Back to my profile" in body
+
+    # The nav (present on every authenticated page) always carries "Add your
+    # credit", so the owner-control check must scope to <main> to still prove
+    # anything about the profile page itself.
+    main = body.decode()
+    main = main[main.index("<main") : main.index("</main>")]
+    assert "Add your credit" not in main
 
 
 def test_preview_hides_credit_edit_and_delete_links(client: Client, user: User) -> None:

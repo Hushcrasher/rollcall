@@ -123,7 +123,7 @@ class RecruiterSearchForm(forms.Form):
         help_text=_("Rating data currently covers Steam-linked games only."),
     )
     year_from = forms.IntegerField(
-        required=False, min_value=1970, max_value=2100, label=_("Worked since (year)")
+        required=False, min_value=1970, max_value=2100, label=_("Worked on a game since (year)")
     )
     open_to_work = forms.BooleanField(required=False, label=_("Open to work only"))
 
