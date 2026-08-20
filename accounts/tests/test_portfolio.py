@@ -102,6 +102,17 @@ def test_the_thirteenth_image_is_rejected(client: Client) -> None:
     assert user.portfolio_images.count() == MAX_PORTFOLIO_IMAGES  # ty: ignore[unresolved-attribute]
 
 
+def test_the_twelfth_image_lands(client: Client) -> None:
+    # Pins the boundary the 13th-image test can't: a good upload at exactly
+    # 11 existing images must still succeed, not be caught by an off-by-one.
+    user = _user()
+    client.force_login(user)
+    for _i in range(MAX_PORTFOLIO_IMAGES - 1):
+        _image(user)
+    client.post(reverse("accounts:portfolio_add"), {"image": _png_upload()})
+    assert user.portfolio_images.count() == MAX_PORTFOLIO_IMAGES  # ty: ignore[unresolved-attribute]
+
+
 def test_a_rejected_file_stores_nothing(client: Client) -> None:
     user = _user()
     client.force_login(user)
@@ -119,6 +130,24 @@ def test_upload_is_rate_limited(client: Client, settings: Any) -> None:
         client.post(reverse("accounts:portfolio_add"), {"image": _png_upload()})
     response = client.post(reverse("accounts:portfolio_add"), {"image": _png_upload()})
     assert response.status_code == 403
+
+
+def test_rate_limit_is_per_user_not_shared(client: Client, settings: Any) -> None:
+    # Pins key="user": a regression to key="ip" would let one user's uploads
+    # exhaust another's quota (or a shared IP get blocked as one).
+    settings.RATELIMIT_ENABLE = True
+    cache.clear()
+    user_a = _user()
+    client.force_login(user_a)
+    for _i in range(10):
+        client.post(reverse("accounts:portfolio_add"), {"image": _png_upload()})
+
+    user_b = _user(email="other@example.com")
+    other_client = Client()
+    other_client.force_login(user_b)
+    response = other_client.post(reverse("accounts:portfolio_add"), {"image": _png_upload()})
+    assert response.status_code == 302
+    assert user_b.portfolio_images.count() == 1  # ty: ignore[unresolved-attribute]
 
 
 def test_delete_removes_row_and_both_files(client: Client) -> None:

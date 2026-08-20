@@ -10,6 +10,7 @@ from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ObjectDoesNotExist
+from django.db import transaction
 from django.db.models import Q, QuerySet
 from django.http import Http404, HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -216,9 +217,6 @@ class PortfolioAddView(EmailVerifiedRequiredMixin, View):
     verification_message = _("Please verify your email before adding images.")
 
     def post(self, request: AuthedHttpRequest, *args: object, **kwargs: object) -> HttpResponse:
-        if request.user.portfolio_images.count() >= MAX_PORTFOLIO_IMAGES:  # ty: ignore[unresolved-attribute]
-            messages.error(request, _("You can show up to 12 images."))
-            return redirect("accounts:profile_edit")
         form = PortfolioImageForm(request.POST, request.FILES)
         if not form.is_valid():
             for field_errors in form.errors.values():
@@ -226,12 +224,20 @@ class PortfolioAddView(EmailVerifiedRequiredMixin, View):
                     messages.error(request, error)
             return redirect("accounts:profile_edit")
         processed = form.cleaned_data["image"]
-        ProfileImage.objects.create(
-            user=request.user,
-            image=processed.image,
-            thumbnail=processed.thumbnail,
-            caption=form.cleaned_data["caption"],
-        )
+        with transaction.atomic():
+            # Locks the user row for the duration of the check + create: two
+            # overlapping uploads at 11 images must not both pass
+            # check-then-create and land a 13th.
+            User.objects.select_for_update().get(pk=request.user.pk)
+            if request.user.portfolio_images.count() >= MAX_PORTFOLIO_IMAGES:  # ty: ignore[unresolved-attribute]
+                messages.error(request, _("You can show up to 12 images."))
+                return redirect("accounts:profile_edit")
+            ProfileImage.objects.create(
+                user=request.user,
+                image=processed.image,
+                thumbnail=processed.thumbnail,
+                caption=form.cleaned_data["caption"],
+            )
         messages.success(request, _("Image added."))
         return redirect("accounts:profile_edit")
 
