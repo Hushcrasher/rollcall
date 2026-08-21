@@ -86,7 +86,7 @@ Copyright (C) 2026 Hushcrasher.
 Rollcall is free software: you can redistribute it and/or modify it under the
 terms of the GNU Affero General Public License, version 3, as published by the
 Free Software Foundation. See [LICENSE](LICENSE). Source:
-<https://github.com/Micro-SAS/rollcall>.
+<https://github.com/Hushcrasher/rollcall>.
 
 **What the licence covers — and what it does not.** The AGPL covers the
 *software*: this code, its templates and its design. It does not cover, and
