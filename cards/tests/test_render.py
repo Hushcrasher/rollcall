@@ -64,3 +64,21 @@ def test_coverage_check() -> None:
 def test_non_latin_name_renders_the_fallback_card() -> None:
     data = CardData(kind="profile", title="山田 太郎", subtitle="Tools Programmer")
     assert render(data) == render(fallback_card())
+
+
+def test_wordmark_is_two_stacked_lines_in_the_mono_face() -> None:
+    from cards.render import wordmark_lines
+
+    assert [text for text, _font in wordmark_lines()] == ["ROLL", "CALL"]
+    assert {font.getname()[0] for _text, font in wordmark_lines()} == {"JetBrains Mono"}
+
+
+def test_card_still_renders_and_centres_with_the_stacked_wordmark() -> None:
+    im = _png(CardData(kind="profile", title="Sasha Haddad", subtitle="Tools Programmer"))
+    assert im.size == (WIDTH, HEIGHT)
+    rows = [
+        y
+        for y in range(HEIGHT)
+        if any(im.getpixel((x, y)) != (255, 255, 255) for x in range(0, WIDTH, 4))
+    ]
+    assert abs(rows[0] - (HEIGHT - 1 - rows[-1])) <= 6

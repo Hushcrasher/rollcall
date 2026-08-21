@@ -2,6 +2,15 @@
    bar for edits here: positioning, flex/grid, widths, spacing. No colors,
    fonts, radii or shadows; unavoidable colors use Pico variables. */
 
+/* The wordmark: ROLL over CALL. Monospace is the mechanism, not decoration —
+   two four-glyph lines are the same width by construction. The font-family
+   here is the one aesthetic rule in this file, mandated by the owner on
+   2026-08-21 (spec 2026-08-21-search-chrome §1). System stack, nothing vendored. */
+.wordmark {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  display: inline-block; line-height: .95; letter-spacing: .04em;
+}
+
 /* Nav search + autocomplete dropdowns (base.html, contribution forms). */
 .nav-search, .autocomplete { position: relative; display: inline-block; }
 .nav-search { flex: 1; min-width: 0; }
