@@ -1,6 +1,7 @@
 """Contribution form — game required in the POC, optional employer company,
-discipline, free job title, and month/year dates (docs/01-DESIGN.md §3.3)."""
+discipline, free job title, and MM/YYYY dates (docs/01-DESIGN.md §3.3)."""
 
+from datetime import date
 from typing import Any
 
 from django import forms
@@ -11,23 +12,41 @@ from games.models import Game
 
 
 class MonthInput(forms.DateInput):
-    """Native month picker — the browser submits 'YYYY-MM'."""
+    """A text box, not the native month picker: the picker renders in the
+    browser's locale ("février 2026"), and the site's date format is MM/YYYY
+    everywhere (spec 2026-08-21-credit-form-v2 §3)."""
 
-    input_type = "month"
+    input_type = "text"
 
     def __init__(self, attrs: dict[str, Any] | None = None) -> None:
-        super().__init__(attrs=attrs, format="%Y-%m")
+        base = {
+            "inputmode": "numeric",
+            "placeholder": "MM/YYYY",
+            "pattern": "[0-9]{2}/[0-9]{4}",
+            "autocomplete": "off",
+        }
+        super().__init__(attrs={**base, **(attrs or {})}, format="%m/%Y")
 
 
 class MonthYearField(forms.DateField):
     """Stores month/year precision as a DATE with day forced to 01 (native SQL
-    range/overlap ops matter for the future vouching system)."""
+    range/overlap ops matter for the future vouching system). Accepts MM/YYYY
+    and, for older clients and tests, the legacy YYYY-MM."""
 
     widget = MonthInput
+    default_error_messages = {"invalid": _("Enter a month as MM/YYYY, e.g. 08/2024.")}
 
     def __init__(self, **kwargs: Any) -> None:
-        kwargs.setdefault("input_formats", ["%Y-%m"])
+        kwargs.setdefault("input_formats", ["%m/%Y", "%Y-%m"])
         super().__init__(**kwargs)
+
+    def prepare_value(self, value: Any) -> Any:
+        # BoundField.value() calls this directly (it does not go through the
+        # widget), so an edit form's initial `date` must be re-formatted here
+        # to display as MM/YYYY rather than the ORM's raw date object.
+        if isinstance(value, date):
+            return value.strftime("%m/%Y")
+        return value
 
 
 class ContributionForm(forms.ModelForm):
