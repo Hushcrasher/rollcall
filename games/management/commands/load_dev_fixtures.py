@@ -6,14 +6,16 @@ them a few hundred games, companies, users and contributions in one shot
 idempotent (get_or_create everywhere) — safe to re-run.
 
 DEV ONLY: creates accounts with the password "devpassword" and a superuser
-admin@example.com / "admin". Never run against a production database.
+admin@example.com / "admin". Those credentials are public in an open-source
+repo, so the command refuses to run unless DEBUG is on.
 """
 
 import random
 from datetime import date
 from typing import Any
 
-from django.core.management.base import BaseCommand, CommandParser
+from django.conf import settings
+from django.core.management.base import BaseCommand, CommandError, CommandParser
 from django.utils import timezone
 
 from accounts.models import User
@@ -90,6 +92,9 @@ class Command(BaseCommand):
         parser.add_argument("--contributions", type=int, default=150)
 
     def handle(self, *args: Any, **options: Any) -> None:
+        # The known superuser is this command's most dangerous side effect, so
+        # its guard runs before anything is written.
+        self._create_admin()
         rng = random.Random(42)
 
         genres = [Genre.objects.get_or_create(name=name)[0] for name in GENRES]
@@ -104,7 +109,6 @@ class Command(BaseCommand):
         n_contribs = self._create_contributions(
             rng, options["contributions"], users, games, companies, disciplines
         )
-        self._create_admin()
 
         self.stdout.write(
             self.style.SUCCESS(
@@ -249,6 +253,15 @@ class Command(BaseCommand):
         return created_count
 
     def _create_admin(self) -> None:
+        # admin@example.com / "admin" is published with the source; DEBUG is the
+        # only signal separating a contributor's box from a real deployment, so
+        # fail closed rather than create the pair anywhere else.
+        if not settings.DEBUG:
+            raise CommandError(
+                "load_dev_fixtures is DEV ONLY: it creates the superuser "
+                "admin@example.com with the password 'admin'. Refusing to run "
+                "with DEBUG=False."
+            )
         if not User.objects.filter(email="admin@example.com").exists():
             User.objects.create_superuser(
                 email="admin@example.com",

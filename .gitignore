@@ -27,3 +27,9 @@ htmlcov/
 .DS_Store
 .idea/
 .vscode/
+
+# Agent tooling — local state, never published. `.claude/launch.json` stays
+# tracked: contributors use it.
+.superpowers/
+.claude/worktrees/
+.claude/settings.local.json

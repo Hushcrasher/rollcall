@@ -2,9 +2,11 @@
 and stay idempotent (docs/02-ARCHITECTURE.md §6)."""
 
 import random
+from typing import Any
 
 import pytest
 from django.core.management import call_command
+from django.core.management.base import CommandError
 from django_countries.fields import Country
 
 from accounts.models import User
@@ -13,6 +15,26 @@ from games.management.commands.load_dev_fixtures import CITIES, COUNTRY_CODES, C
 from games.models import Company, Game
 
 pytestmark = pytest.mark.django_db
+
+
+@pytest.fixture(autouse=True)
+def _debug_on(settings: Any) -> None:
+    """The command refuses to run outside DEBUG (it creates a known superuser)
+    and test settings are DEBUG=False, so every run here has to opt in. The
+    guard's own test flips it back."""
+    settings.DEBUG = True
+
+
+def test_refuses_to_create_the_dev_superuser_outside_debug(settings: Any) -> None:
+    """admin@example.com / "admin" is a published credential pair once the repo
+    is public; DEBUG is the only thing separating a contributor's box from a
+    real database, so the command must fail closed rather than create it."""
+    settings.DEBUG = False
+
+    with pytest.raises(CommandError):
+        call_command("load_dev_fixtures", games=1, users=1, contributions=1)
+
+    assert not User.objects.filter(email="admin@example.com").exists()
 
 
 def test_load_dev_fixtures_is_idempotent() -> None:
