@@ -151,11 +151,12 @@ class CompanyAlias(models.Model):
 
 
 # Steam's public store asset for an app — the same 460x215 "header" the store
-# pages use. One constant, so a CDN move is a one-line change (the legacy
-# cdn.cloudflare.steamstatic.com/steam/apps/<appid>/header.jpg still redirects).
-STEAM_CAPSULE_URL = (
-    "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/{appid}/header.jpg"
-)
+# pages use. One constant, so a CDN move is a one-line change. Measured
+# 2026-08-21: the `cloudflare.`-prefixed hosts (e.g. shared.cloudflare.
+# steamstatic.com) answer an uncached 301 to this host; a real app id here
+# serves `image/jpeg` with a 10-year cache; an unknown id 404s, which is what
+# the templates' `onerror` guard relies on.
+STEAM_CAPSULE_URL = "https://shared.steamstatic.com/store_item_assets/steam/apps/{appid}/header.jpg"
 
 
 class Game(models.Model):

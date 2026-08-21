@@ -41,7 +41,7 @@ def test_game_page_renders_the_derived_capsule_with_the_guards(client: Client) -
     assert STEAM_CAPSULE_URL.format(appid=620) in tag.group(0)
     assert 'referrerpolicy="no-referrer"' in tag.group(0)
     assert 'onerror="this.remove()"' in tag.group(0)
-    assert 'loading="lazy"' in tag.group(0)
+    assert 'loading="lazy"' not in tag.group(0)
 
 
 def test_game_page_without_any_image_has_no_capsule_tag(client: Client) -> None:
@@ -67,7 +67,12 @@ def test_profile_credit_line_shows_a_thumbnail_only_when_there_is_a_url(client: 
         )
     body = client.get(reverse("accounts:profile", args=[user.slug])).content.decode()
     assert body.count('class="capsule-sm"') == 1
-    assert STEAM_CAPSULE_URL.format(appid=620) in body
+    tag = re.search(r'<img class="capsule-sm"[^>]*>', body)
+    assert tag, body
+    assert STEAM_CAPSULE_URL.format(appid=620) in tag.group(0)
+    assert 'referrerpolicy="no-referrer"' in tag.group(0)
+    assert 'onerror="this.remove()"' in tag.group(0)
+    assert 'loading="lazy"' in tag.group(0)
 
 
 def test_company_game_list_shows_thumbnails(client: Client) -> None:
@@ -75,6 +80,8 @@ def test_company_game_list_shows_thumbnails(client: Client) -> None:
 
     studio = Company.objects.create(name="Studio", source=Company.Source.MANUAL)
     game = Game.objects.create(title="With", source=Game.Source.MANUAL, steam_appid=620)
+    bare = Game.objects.create(title="Bare", source=Game.Source.MANUAL)
     GameCompany.objects.create(game=game, company=studio, role=GameCompany.Role.DEVELOPER)
+    GameCompany.objects.create(game=bare, company=studio, role=GameCompany.Role.DEVELOPER)
     body = client.get(reverse("games:company", args=[studio.slug])).content.decode()
-    assert 'class="capsule-sm"' in body
+    assert body.count('class="capsule-sm"') == 1
