@@ -13,8 +13,9 @@ class EmailVerifiedRequiredMixin(LoginRequiredMixin):
     """Bounce logged-in-but-unverified users to the verification notice.
 
     Guards the surfaces the email-verified rule (docs/00 non-negotiable #6,
-    docs/01 §3.4 "first anti-spam line") protects: creating credits, and the
-    contact relay — outbound mail carrying a sender-controlled Reply-To.
+    docs/01 §3.4 "first anti-spam line") protects: creating credits, the
+    contact relay — outbound mail carrying a sender-controlled Reply-To — and
+    portfolio uploads, which put attacker-chosen bytes in the media bucket.
     Views set `verification_message` to say what verifying unlocks.
     """
 

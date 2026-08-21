@@ -1,7 +1,7 @@
 from typing import Any
 
 from django import forms
-from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
+from django.contrib.auth.forms import AuthenticationForm, UserChangeForm, UserCreationForm
 from django.core.files.uploadedfile import UploadedFile
 from django.utils.translation import gettext_lazy as _
 
@@ -49,7 +49,31 @@ class RecruiterApplicationForm(forms.ModelForm):
         fields = ["full_name", "company_name", "work_email", "linkedin_url", "message"]
 
 
-class ProfileForm(forms.ModelForm):
+class AvatarCleanMixin:
+    """Sends the avatar through the hardened intake (accounts/images.py).
+
+    The spec's invariant is that every *stored* avatar is a pipeline output,
+    so this belongs to the field, not to one form: any form exposing `avatar`
+    mixes it in, staff-facing ones included.
+    """
+
+    cleaned_data: dict[str, Any]  # provided by the ModelForm this is mixed into
+
+    def clean_avatar(self) -> Any:
+        avatar = self.cleaned_data.get("avatar")
+        # Only fresh uploads re-encode: an unchanged avatar arrives as the
+        # stored FieldFile, and clearing arrives as False — pass both through.
+        if isinstance(avatar, UploadedFile):
+            return process_image(avatar, max_side=512).image
+        return avatar
+
+
+class AdminUserChangeForm(AvatarCleanMixin, UserChangeForm):
+    """Django's stock admin form would write the raw bytes: the pipeline is
+    not optional because the poster happens to be staff."""
+
+
+class ProfileForm(AvatarCleanMixin, forms.ModelForm):
     """The profile fields + the three visibility booleans (docs/01-DESIGN.md §3.4),
     plus an optional GitHub handle (stored parsed as a login)."""
 
@@ -81,14 +105,6 @@ class ProfileForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         if self.instance and self.instance.pk:
             self.fields["github_url"].initial = str(self.instance.github_login)
-
-    def clean_avatar(self) -> Any:
-        avatar = self.cleaned_data.get("avatar")
-        # Only fresh uploads re-encode: an unchanged avatar arrives as the
-        # stored FieldFile, and clearing arrives as False — pass both through.
-        if isinstance(avatar, UploadedFile):
-            return process_image(avatar, max_side=512).image
-        return avatar
 
     def clean_github_url(self) -> str:
         raw = self.cleaned_data.get("github_url", "").strip()

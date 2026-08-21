@@ -1,8 +1,12 @@
+from typing import Any
+
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.db.models import QuerySet
+from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
+from .forms import AdminUserChangeForm
 from .http import AuthedHttpRequest
 from .models import (
     GitHubSnapshot,
@@ -15,6 +19,9 @@ from .models import (
 
 @admin.register(User)
 class UserAdmin(DjangoUserAdmin):
+    # Not Django's default: the change form exposes `avatar`, and every stored
+    # avatar must be a pipeline output whoever posted it (spec §2).
+    form = AdminUserChangeForm
     ordering = ("email",)
     list_display = ("email", "display_name", "role", "email_verified_at", "is_staff")
     list_filter = ("role", "is_staff", "profile_public", "open_to_work")
@@ -105,6 +112,17 @@ class GitHubYearlyContributionAdmin(admin.ModelAdmin):
 
 @admin.register(ProfileImage)
 class ProfileImageAdmin(admin.ModelAdmin):
-    list_display = ["user", "caption", "created_at"]
+    """Thumbnails are listed (spec §4): a reported profile's images have to be
+    judgeable from the changelist, without opening each row."""
+
+    list_display = ["thumb", "user", "caption", "created_at"]
     list_select_related = ["user"]
     search_fields = ["user__display_name", "user__email", "caption"]
+
+    @admin.display(description=_("thumbnail"))
+    def thumb(self, obj: ProfileImage) -> str:
+        # FieldFile at runtime; ty sees the ImageField (house bridge).
+        thumbnail: Any = obj.thumbnail
+        # Empty alt: the caption is its own column, so the image is decorative
+        # here — and a caption is optional anyway.
+        return format_html('<img src="{}" width="80" alt="">', thumbnail.url)

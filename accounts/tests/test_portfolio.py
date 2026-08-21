@@ -163,6 +163,23 @@ def test_delete_removes_row_and_both_files(client: Client) -> None:
     assert not image_storage.exists(thumb_name)
 
 
+def test_a_queryset_delete_removes_both_files_too(client: Client) -> None:
+    """The cleanup hangs off post_delete, not off the delete view: rows also
+    die by cascade and from the admin, and those paths must not leak files."""
+    user = _user()
+    client.force_login(user)
+    client.post(reverse("accounts:portfolio_add"), {"image": _png_upload()})
+    stored = user.portfolio_images.get()  # ty: ignore[unresolved-attribute]
+    storage, image_name, thumb_name = (
+        stored.image.storage,
+        stored.image.name,
+        stored.thumbnail.name,
+    )
+    ProfileImage.objects.filter(user=user).delete()
+    assert not storage.exists(image_name)
+    assert not storage.exists(thumb_name)
+
+
 def test_you_cannot_delete_someone_elses_image(client: Client) -> None:
     owner = _user()
     other = _user(email="other@example.com")
@@ -222,17 +239,17 @@ def test_account_deletion_removes_portfolio_files(client: Client) -> None:
     removes rows; this pins the files."""
     user = _user()
     client.force_login(user)
+    # Two, not one: the deletion path walks every cascaded row, and a loop that
+    # stops at the first would pass a single-image test.
     client.post(reverse("accounts:portfolio_add"), {"image": _png_upload()})
-    stored = user.portfolio_images.get()  # ty: ignore[unresolved-attribute]
-    storage, image_name, thumb_name = (
-        stored.image.storage,
-        stored.image.name,
-        stored.thumbnail.name,
-    )
+    client.post(reverse("accounts:portfolio_add"), {"image": _png_upload("second.png")})
+    images = list(user.portfolio_images.all())  # ty: ignore[unresolved-attribute]
+    assert len(images) == 2
+    storage = images[0].image.storage
+    names = [name for stored in images for name in (stored.image.name, stored.thumbnail.name)]
     client.post(reverse("accounts:account_delete"))
     assert not User.objects.filter(pk=user.pk).exists()
-    assert not storage.exists(image_name)
-    assert not storage.exists(thumb_name)
+    assert not any(storage.exists(name) for name in names)
 
 
 def test_export_includes_the_portfolio(client: Client) -> None:

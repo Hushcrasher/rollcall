@@ -14,7 +14,7 @@
 
   <section>
     <h2>{% translate "Work" %}</h2>
-    <p class="muted">{% translate "Show your work — up to 12 images on your profile, newest first." %}</p>
+    <p class="muted">{% blocktranslate with n=max_portfolio_images %}Show your work — up to {{ n }} images on your profile, newest first.{% endblocktranslate %}</p>
     {% if portfolio_images %}
       <ul class="portfolio-grid">
         {% for pimg in portfolio_images %}

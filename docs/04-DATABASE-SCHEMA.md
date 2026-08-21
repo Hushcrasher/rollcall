@@ -230,7 +230,7 @@ The seed command may write ONLY: `games` `[source]` columns + `source`/`last_syn
 | Contacts sent/received | contact_requests | SET NULL both directions | Yes |
 | Reports filed | reports.reporter_id | SET NULL | No |
 | Avatar file | S3 bucket | Delete object | N/A |
-| Portfolio images | profile_images | CASCADE (row), image + thumbnail files deleted explicitly | Yes (list) |
+| Portfolio images | profile_images | CASCADE (row); image + thumbnail files deleted by a `post_delete` receiver, so the admin and cascade paths clean up too | Yes (list) |
 
 ## 15. `profile_images` — profile "Work" gallery (migration `accounts/0007`)
 
@@ -243,5 +243,7 @@ Portfolio pieces shown on the profile after credits (docs/01-DESIGN.md §3.4). B
 | thumbnail | varchar | not null | Same pipeline, second pass at a smaller `max_side`. |
 | caption | varchar(140) | not null, default `''` | Free text, optional. |
 | created_at | timestamptz | not null | Sort key — gallery renders newest first. |
+
+**Files are deleted by a `post_delete` receiver** (`accounts.models.delete_profile_image_files`), not by the delete view: rows die three ways — the owner's delete button, the account-deletion cascade, and the admin — and only the receiver covers all three.
 
 **12-image cap is app-enforced, not a DB constraint**: the create view locks the user row (`select_for_update`) and counts existing rows before inserting, closing the race where two concurrent uploads at 11 images both pass a check-then-create and land a 13th.

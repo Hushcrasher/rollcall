@@ -10,7 +10,7 @@ result, and it keeps static typing precise.
 
 from typing import Any
 
-from accounts.models import User
+from accounts.models import ProfileImage, User
 from contact.models import ContactRequest
 from contributions.models import Contribution, Vouch
 
@@ -73,6 +73,6 @@ def build_personal_data_export(user: User) -> dict[str, Any]:
                 "created_at": _iso(image.created_at),
                 "file": image.image.name,
             }
-            for image in user.portfolio_images.all()  # ty: ignore[unresolved-attribute]
+            for image in ProfileImage.objects.filter(user=user)
         ],
     }

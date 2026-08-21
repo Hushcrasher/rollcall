@@ -94,7 +94,9 @@ prod hasn't launched.
     verify your email before adding images."; rejects the 13th image with
     "You can show up to 12 images."
   - `POST /profile/images/<pk>/delete/` (`portfolio_delete`) — owner check by
-    filtering on `request.user`, deletes DB row **and both files**.
+    filtering on `request.user`, deletes the DB row **and both files** — the
+    files via a `post_delete` receiver on `ProfileImage`, not in the view, so
+    the cascade and admin deletion paths clean up on the same code.
   - Both POST-only with CSRF, redirecting back to `profile_edit`; no htmx
     needed.
 - **Rate limit**: `10/h` per user on `portfolio_add`, django-ratelimit with

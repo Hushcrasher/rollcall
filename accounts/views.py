@@ -205,13 +205,17 @@ class ProfileEditView(LoginRequiredMixin, UpdateView):
         context = super().get_context_data(**kwargs)
         context["portfolio_images"] = self.request.user.portfolio_images.all()
         context["portfolio_form"] = PortfolioImageForm()
+        context["max_portfolio_images"] = MAX_PORTFOLIO_IMAGES
         return context
 
 
 # Named group, house rule: an unnamed decorator derives its group from the
 # view's qualname, so a rename would silently move the counter.
+_PORTFOLIO_RATELIMIT_GROUP = "portfolio_add"
+
+
 @method_decorator(
-    ratelimit(group="portfolio_add", key="user", rate="10/h", method="POST", block=True),
+    ratelimit(group=_PORTFOLIO_RATELIMIT_GROUP, key="user", rate="10/h", method="POST", block=True),
     name="post",
 )
 class PortfolioAddView(EmailVerifiedRequiredMixin, View):
@@ -230,8 +234,11 @@ class PortfolioAddView(EmailVerifiedRequiredMixin, View):
             # overlapping uploads at 11 images must not both pass
             # check-then-create and land a 13th.
             User.objects.select_for_update().get(pk=request.user.pk)
-            if request.user.portfolio_images.count() >= MAX_PORTFOLIO_IMAGES:  # ty: ignore[unresolved-attribute]
-                messages.error(request, _("You can show up to 12 images."))
+            if ProfileImage.objects.filter(user=request.user).count() >= MAX_PORTFOLIO_IMAGES:
+                messages.error(
+                    request,
+                    _("You can show up to %(n)d images.") % {"n": MAX_PORTFOLIO_IMAGES},
+                )
                 return redirect("accounts:profile_edit")
             ProfileImage.objects.create(
                 user=request.user,
@@ -248,12 +255,8 @@ class PortfolioDeleteView(LoginRequiredMixin, View):
         self, request: AuthedHttpRequest, pk: int, *args: object, **kwargs: object
     ) -> HttpResponse:
         stored = get_object_or_404(ProfileImage, pk=pk, user=request.user)
-        # FieldFile at runtime; ty sees the ImageField (same bridge as the
-        # avatar in AccountDeleteView). Row deletion doesn't remove files.
-        image: Any = stored.image
-        image.delete(save=False)
-        thumbnail: Any = stored.thumbnail
-        thumbnail.delete(save=False)
+        # Both files go with the row — accounts.models.delete_profile_image_files
+        # is on post_delete, so every deletion path cleans up, this one included.
         stored.delete()
         messages.success(request, _("Image removed."))
         return redirect("accounts:profile_edit")
@@ -268,8 +271,9 @@ class AccountView(LoginRequiredMixin, TemplateView):
 
 class AccountDeleteView(LoginRequiredMixin, TemplateView):
     """Confirm, then hard-delete: contributions cascade, vouches emitted are
-    anonymized (FK rules), and the avatar and portfolio image/thumbnail files
-    are removed (GDPR §14)."""
+    anonymized (FK rules), and the avatar file is removed here. Portfolio
+    image/thumbnail files go with their cascaded rows via the post_delete
+    receiver in accounts.models (GDPR §14)."""
 
     template_name = "accounts/account_delete.html"
 
@@ -278,12 +282,9 @@ class AccountDeleteView(LoginRequiredMixin, TemplateView):
         # avatar is a FieldFile at runtime; the type checker sees the ImageField.
         avatar: Any = user.avatar
         if avatar:
-            avatar.delete(save=False)  # FK deletion doesn't remove files
-        for stored in user.portfolio_images.all():  # ty: ignore[unresolved-attribute]
-            image: Any = stored.image
-            image.delete(save=False)
-            thumbnail: Any = stored.thumbnail
-            thumbnail.delete(save=False)
+            # A field on the row being deleted, so nothing cascades it away —
+            # unlike the portfolio files, which their own rows' receiver takes.
+            avatar.delete(save=False)
         logout(request)
         user.delete()
         messages.success(request, _("Your account and all your credits were deleted."))

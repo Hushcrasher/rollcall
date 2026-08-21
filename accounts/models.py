@@ -13,6 +13,8 @@ from django.contrib.postgres.indexes import GinIndex
 from django.core.validators import RegexValidator
 from django.db import models
 from django.db.models.functions import Lower
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.text import slugify
@@ -330,3 +332,19 @@ class ProfileImage(models.Model):
     def __str__(self) -> str:
         user: Any = self.user  # FK descriptor is opaque to the type checker
         return f"{user.display_name}: {self.caption or self.image.name}"
+
+
+@receiver(post_delete, sender=ProfileImage)
+def delete_profile_image_files(
+    sender: type[ProfileImage], instance: ProfileImage, **kwargs: Any
+) -> None:
+    """Deleting a row never deletes its stored files, and rows die three ways:
+    the owner's delete button, the account-deletion cascade, and the admin. The
+    receiver is the single cleanup point so no caller has to remember (GDPR
+    §14). `save=False` — the row is already gone; saving would resurrect it."""
+    image: Any = instance.image  # FieldFile at runtime; ty sees the ImageField
+    if image:
+        image.delete(save=False)
+    thumbnail: Any = instance.thumbnail
+    if thumbnail:
+        thumbnail.delete(save=False)
