@@ -20,7 +20,9 @@ from PIL import Image, UnidentifiedImageError
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 # SVG is script-capable XML and must stay impossible; GIF/animation is out of
 # scope (spec). The check reads the *decoded* format, never name or headers.
-ALLOWED_FORMATS = {"JPEG", "PNG", "WEBP"}
+# MPO is a multi-frame JPEG container some phone cameras write; only frame 0
+# is ever read below (no .seek()), so it re-encodes exactly like a plain JPEG.
+ALLOWED_FORMATS = {"JPEG", "PNG", "WEBP", "MPO"}
 WEBP_QUALITY = 82
 THUMBNAIL_SIDE = 400
 

@@ -163,6 +163,23 @@ def test_png_and_webp_are_accepted_inputs(fmt: str, name: str) -> None:
     assert Image.open(BytesIO(processed.image.read())).format == "WEBP"
 
 
+def test_mpo_wrapped_jpegs_from_phone_cameras_are_accepted() -> None:
+    # Samsung/iPhone photos are sometimes multi-frame MPO containers; Pillow
+    # reports source.format == "MPO", which a plain JPEG allow-list rejects
+    # even though the user just took a normal photo. Only frame 0 survives
+    # the re-encode — there is no multi-frame WebP output.
+    buffer = BytesIO()
+    frame0 = Image.new("RGB", (64, 64), "red")
+    frame1 = Image.new("RGB", (64, 64), "blue")
+    frame0.save(buffer, format="MPO", append_images=[frame1])
+    upload = SimpleUploadedFile("t.jpg", buffer.getvalue(), content_type="image/jpeg")
+    processed = images.process_image(upload, max_side=2560)
+    out = Image.open(BytesIO(processed.image.read()))
+    assert out.format == "WEBP"
+    pixel = out.getpixel((0, 0))
+    assert pixel[:3] == (255, 0, 0)  # ty: ignore[not-subscriptable]  # frame 0 (red), not frame 1
+
+
 def test_a_malformed_chunk_past_the_header_is_rejected_not_a_500() -> None:
     # A valid IHDR followed by a truncated ancillary chunk (here pHYs, from
     # dpi=) makes Pillow's PNG plugin raise a bare ValueError deep inside
