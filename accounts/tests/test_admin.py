@@ -11,13 +11,14 @@ from typing import Any
 
 import pytest
 from django.contrib.admin.utils import flatten_fieldsets
+from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client
 from django.urls import reverse
 from PIL import Image
 
 from accounts.admin import UserAdmin
-from accounts.models import User
+from accounts.models import ProfileImage, User
 
 
 def test_all_editable_user_fields_are_reachable_in_admin() -> None:
@@ -70,3 +71,25 @@ def test_admin_avatar_upload_goes_through_the_pipeline(client: Client) -> None:
     data = avatar.read()
     assert b"TestCam" not in data
     assert max(Image.open(BytesIO(data)).size) <= 512
+
+
+@pytest.mark.django_db
+def test_profile_image_changelist_survives_an_empty_thumbnail(client: Client) -> None:
+    # Both files are always written by the upload pipeline, so this is
+    # unreachable through it — but FieldFile.url raises ValueError on an
+    # empty field, and a hand-made row (fixture, migration, admin shell)
+    # would otherwise crash the entire changelist, not just its own row.
+    staff = User.objects.create_superuser(
+        email="root2@example.com", password="x", display_name="Root"
+    )
+    member = User.objects.create_user(
+        email="member2@example.com", password="x", display_name="Member"
+    )
+    ProfileImage.objects.create(
+        user=member,
+        image=ContentFile(b"webp-bytes", name="a.webp"),
+        thumbnail="",
+    )
+    client.force_login(staff)
+    response = client.get(reverse("admin:accounts_profileimage_changelist"))
+    assert response.status_code == 200

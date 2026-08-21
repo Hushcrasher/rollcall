@@ -6,6 +6,7 @@ A polyglot payload, appended archive or crafted metadata does not survive a
 re-encode, and EXIF — GPS position included — is dropped because Pillow
 writes none unless asked."""
 
+import struct
 from io import BytesIO
 from typing import NamedTuple
 from uuid import uuid4
@@ -19,7 +20,9 @@ from PIL import Image, UnidentifiedImageError
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 # SVG is script-capable XML and must stay impossible; GIF/animation is out of
 # scope (spec). The check reads the *decoded* format, never name or headers.
-ALLOWED_FORMATS = {"JPEG", "PNG", "WEBP"}
+# MPO is a multi-frame JPEG container some phone cameras write; only frame 0
+# is ever read below (no .seek()), so it re-encodes exactly like a plain JPEG.
+ALLOWED_FORMATS = {"JPEG", "PNG", "WEBP", "MPO"}
 WEBP_QUALITY = 82
 THUMBNAIL_SIDE = 400
 
@@ -56,7 +59,7 @@ def process_image(
     uploaded: UploadedFile, *, max_side: int, thumbnail: bool = False
 ) -> ProcessedImage:
     """Validate and re-encode one upload; ValidationError on anything that is
-    not a plain JPEG/PNG/WebP within the caps."""
+    not a plain JPEG/PNG/WebP/MPO within the caps."""
     # Fail closed: an unreadable size is treated as over the cap, never skipped.
     if uploaded.size is None or uploaded.size > MAX_UPLOAD_BYTES:
         raise ValidationError(_("Images can be at most 10 MB."))
@@ -65,7 +68,11 @@ def process_image(
         source = Image.open(uploaded)  # ty: ignore[invalid-argument-type]
     except Image.DecompressionBombError as exc:
         raise ValidationError(_("This image's dimensions are too large.")) from exc
-    except (UnidentifiedImageError, OSError) as exc:
+    except (UnidentifiedImageError, OSError, ValueError, EOFError, struct.error) as exc:
+        # A well-formed IHDR followed by a malformed ancillary chunk (e.g. a
+        # truncated pHYs) makes Pillow's format plugins raise bare ValueError/
+        # EOFError/struct.error from inside Image.open() itself — none of
+        # which are OSError, so they used to escape as a 500.
         raise ValidationError(_("Upload a JPEG, PNG or WebP image.")) from exc
     if source.format not in ALLOWED_FORMATS:
         raise ValidationError(_("Upload a JPEG, PNG or WebP image."))
@@ -73,20 +80,23 @@ def process_image(
     # the header alone, so this runs before load() decodes any pixel data.
     if source.width * source.height > MAX_IMAGE_PIXELS:
         raise ValidationError(_("This image's dimensions are too large."))
-    if source.format == "JPEG":
+    if source.format in ("JPEG", "MPO"):
         # DCT-domain downscale, decided before any pixel is decoded: JPEG can be
         # unpacked at 1/2, 1/4 or 1/8 scale for free, so a phone photo headed for
         # a 512px avatar never materialises at full size. 2x max_side keeps a
         # margin above the target, so the real resize below never upsamples;
         # a no-op on anything already small enough, and on every other format.
+        # MPO is included: MpoImageFile subclasses JpegImageFile and draft()
+        # the same way.
         source.draft("RGB", (2 * max_side, 2 * max_side))
     try:
         source.load()
-    except OSError as exc:
-        raise ValidationError(_("Upload a JPEG, PNG or WebP image.")) from exc
-    encoded, resized = _encode(source, max_side)
-    return ProcessedImage(
-        image=encoded,
+        encoded, resized = _encode(source, max_side)
         # From the resized copy, not a second pass over the original.
-        thumbnail=_encode(resized, THUMBNAIL_SIDE)[0] if thumbnail else None,
-    )
+        thumb = _encode(resized, THUMBNAIL_SIDE)[0] if thumbnail else None
+    except (OSError, ValueError, EOFError, struct.error) as exc:
+        # Malformed pixel data past a valid header can raise any of these from
+        # load(), and convert() (inside _encode) can raise ValueError on
+        # exotic modes — all are "not a real image", never a 500.
+        raise ValidationError(_("Upload a JPEG, PNG or WebP image.")) from exc
+    return ProcessedImage(image=encoded, thumbnail=thumb)

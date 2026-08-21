@@ -81,7 +81,7 @@ The full list lives in [docs/00-README.md](docs/00-README.md).
 
 ## License
 
-[AGPL v3](LICENSE).
+[AGPL v3](LICENSE). Source: <https://github.com/Micro-SAS/rollcall>
 
 ## Attribution
 

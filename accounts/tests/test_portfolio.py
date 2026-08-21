@@ -12,9 +12,12 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.functional import Promise
 from PIL import Image
 
+from accounts.images import process_image as _real_process_image
 from accounts.models import MAX_PORTFOLIO_IMAGES, ProfileImage, User
+from accounts.views import PortfolioAddView
 
 pytestmark = pytest.mark.django_db
 
@@ -78,12 +81,20 @@ def test_upload_creates_reencoded_image_and_thumbnail(client: Client) -> None:
     assert stored.thumbnail.name.endswith(".webp")
 
 
+def test_verification_message_is_lazy() -> None:
+    # A class attribute set with plain gettext() resolves the active language
+    # once, at import time, and bakes that string into the class forever —
+    # invisible today with LANGUAGES=[en], but wrong the day a second
+    # language ships. gettext_lazy defers resolution to render time instead.
+    assert isinstance(PortfolioAddView.verification_message, Promise)
+
+
 def test_unverified_user_is_bounced_to_verification(client: Client) -> None:
     user = _user(verified=False)
     client.force_login(user)
-    response = client.post(reverse("accounts:portfolio_add"), {"image": _png_upload()})
-    assert response.status_code == 302
-    assert response.url == reverse("accounts:verification_sent")
+    response = client.post(reverse("accounts:portfolio_add"), {"image": _png_upload()}, follow=True)
+    assert response.redirect_chain == [(reverse("accounts:verification_sent"), 302)]
+    assert "Please verify your email before adding images." in response.content.decode()
     assert user.portfolio_images.count() == 0  # ty: ignore[unresolved-attribute]
 
 
@@ -93,13 +104,25 @@ def test_anonymous_is_sent_to_login(client: Client) -> None:
     assert reverse("accounts:login") in response.url
 
 
-def test_the_thirteenth_image_is_rejected(client: Client) -> None:
+def test_the_thirteenth_image_is_rejected(client: Client, monkeypatch: pytest.MonkeyPatch) -> None:
+    # The cheap advisory cap check must run before the form (and therefore
+    # before process_image's full decode + two WebP encodes): a user already
+    # at the cap should never pay for a decode that can only be discarded.
+    calls: list[object] = []
+
+    def spy(*args: object, **kwargs: object) -> Any:
+        calls.append((args, kwargs))
+        return _real_process_image(*args, **kwargs)  # ty: ignore[invalid-argument-type]
+
+    monkeypatch.setattr("accounts.forms.process_image", spy)
     user = _user()
     client.force_login(user)
     for _i in range(MAX_PORTFOLIO_IMAGES):
         _image(user)
-    client.post(reverse("accounts:portfolio_add"), {"image": _png_upload()})
+    response = client.post(reverse("accounts:portfolio_add"), {"image": _png_upload()}, follow=True)
     assert user.portfolio_images.count() == MAX_PORTFOLIO_IMAGES  # ty: ignore[unresolved-attribute]
+    assert calls == []
+    assert "You can show up to 12 images." in response.content.decode()
 
 
 def test_the_twelfth_image_lands(client: Client) -> None:
@@ -124,12 +147,18 @@ def test_a_rejected_file_stores_nothing(client: Client) -> None:
 def test_upload_is_rate_limited(client: Client, settings: Any) -> None:
     settings.RATELIMIT_ENABLE = True
     cache.clear()  # rate counters live in the cache
-    user = _user()
-    client.force_login(user)
-    for _i in range(10):
-        client.post(reverse("accounts:portfolio_add"), {"image": _png_upload()})
-    response = client.post(reverse("accounts:portfolio_add"), {"image": _png_upload()})
-    assert response.status_code == 403
+    try:
+        user = _user()
+        client.force_login(user)
+        for _i in range(10):
+            client.post(reverse("accounts:portfolio_add"), {"image": _png_upload()})
+        response = client.post(reverse("accounts:portfolio_add"), {"image": _png_upload()})
+        assert response.status_code == 403
+    finally:
+        # Leaves portfolio_add's own counters behind otherwise — harmless
+        # only because RATELIMIT_ENABLE=False elsewhere, not a reason to
+        # skip it, and not a reason to skip it on failure either.
+        cache.clear()
 
 
 def test_rate_limit_is_per_user_not_shared(client: Client, settings: Any) -> None:
@@ -194,7 +223,10 @@ def test_profile_shows_the_work_section(client: Client) -> None:
     user = _user()
     _image(user, caption="Boss fight concept")
     body = client.get(reverse("accounts:profile", args=[user.slug])).content.decode()
-    assert "Work" in body
+    # The bare substring "Work" also matches inside unrelated words/markup;
+    # the heading and grid class are what actually mark the section as present.
+    assert "<h2>Work</h2>" in body
+    assert "portfolio-grid" in body
     assert "Boss fight concept" in body
 
 

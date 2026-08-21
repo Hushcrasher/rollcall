@@ -15,6 +15,7 @@ from django.template.loader import render_to_string
 from django.urls import reverse_lazy
 from django.utils import timezone
 from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy as _lazy
 from django.views.generic import CreateView, FormView
 
 from accounts.mixins import EmailVerifiedRequiredMixin
@@ -30,8 +31,11 @@ class ContactView(EmailVerifiedRequiredMixin, FormView):
     form_class = ContactForm
     target: User
     # The relay sends mail from our domain with Reply-To = the sender's
-    # address; verification is what proves they own it.
-    verification_message = _("Please verify your email before contacting members.")
+    # address; verification is what proves they own it. Lazy: a class
+    # attribute evaluates at import time, and plain gettext() would bake in
+    # whatever language happened to be active then (accounts/mixins.py's
+    # base class attribute is lazy for the same reason).
+    verification_message = _lazy("Please verify your email before contacting members.")
 
     def dispatch(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         # 404 unless the target exists, is public, and is contactable.

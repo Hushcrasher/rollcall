@@ -7,9 +7,11 @@ import pytest
 from django.test import Client
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.functional import Promise
 
 from accounts.models import User
 from contributions.models import Contribution, Discipline
+from contributions.views import ContributionCreateView
 from games.models import Game
 
 pytestmark = pytest.mark.django_db
@@ -67,6 +69,14 @@ def test_unverified_user_is_blocked_from_creating(
     assert reverse("accounts:verification_sent") in get_response.url
     assert Contribution.objects.count() == 0  # POST created nothing
     assert post_response.status_code == 302
+
+
+def test_verification_message_is_lazy() -> None:
+    # A class attribute set with plain gettext() resolves the active language
+    # once, at import time, and bakes that string into the class forever —
+    # invisible today with LANGUAGES=[en], but wrong the day a second
+    # language ships. gettext_lazy defers resolution to render time instead.
+    assert isinstance(ContributionCreateView.verification_message, Promise)
 
 
 def test_verified_user_can_create_a_credit(

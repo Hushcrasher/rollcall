@@ -4,13 +4,9 @@ import pytest
 from django.test import Client
 from django.urls import reverse
 
+from conftest import header as _header
+
 pytestmark = pytest.mark.django_db
-
-
-def _header(body: str) -> str:
-    # people_search.html (rendered in <main> on this same page) has its own
-    # search input — scope to <header> so this only sees the nav box.
-    return body[: body.index("</header>")]
 
 
 def test_the_placeholder_names_all_three_things_it_matches(client: Client) -> None:

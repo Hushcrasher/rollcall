@@ -19,5 +19,13 @@
   <p><a href="https://github.com/Micro-SAS/rollcall">{% translate "Source code on GitHub" %}</a></p>
 
   <h2>{% translate "Contact and safety" %}</h2>
-  <p>{% blocktranslate %}Personal email addresses are never shown anywhere on Rollcall. Contact goes through a relay, and only reaches people who have allowed it. Signed-in members can report any profile or page from the footer.{% endblocktranslate %}</p>
+  {% comment %}
+    A link, not just prose pointing at the footer — the footer's own Report
+    link only renders for signed-in users (base.html), so an anonymous
+    reader had no way to reach it at all. ReportView is login-gated, but a
+    link that bounces to login is still more useful than telling a reader
+    to find it themselves (spec §5).
+  {% endcomment %}
+  {% url 'contact:report' as report_url %}
+  <p>{% blocktranslate %}Personal email addresses are never shown anywhere on Rollcall. Contact goes through a relay, and only reaches people who have allowed it. Signed-in members can <a href="{{ report_url }}">report</a> any profile or page.{% endblocktranslate %}</p>
 {% endblock %}

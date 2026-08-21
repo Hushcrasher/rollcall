@@ -2,12 +2,14 @@
 a user uploads goes through process_image — these tests are the security
 gate's contract. Pure module: no database."""
 
+import struct
 from io import BytesIO
 
 import pytest
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from PIL import Image
+from PIL.JpegImagePlugin import JpegImageFile
 
 from accounts import images
 
@@ -160,3 +162,86 @@ def test_png_and_webp_are_accepted_inputs(fmt: str, name: str) -> None:
     # ALLOWED_FORMATS lists three; only JPEG had coverage.
     processed = images.process_image(_upload(fmt=fmt, name=name), max_side=2560)
     assert Image.open(BytesIO(processed.image.read())).format == "WEBP"
+
+
+def test_the_jpeg_draft_fast_path_actually_runs(monkeypatch: pytest.MonkeyPatch) -> None:
+    # No fixture elsewhere in this file is larger than 2x max_side, so the
+    # DCT-domain downscale branch (source.draft(...)) never ran under test —
+    # a Pillow bump could silently disable it and nothing would fail. The
+    # final size alone wouldn't pin this: out.thumbnail() in _encode resizes
+    # to the target regardless of whether draft() ran first. Spying on the
+    # call is what actually proves the fast path was taken.
+    calls: list[tuple[str, tuple[int, int]]] = []
+    original_draft = JpegImageFile.draft
+
+    def spy_draft(self: JpegImageFile, mode: str, size: tuple[int, int]) -> None:
+        calls.append((mode, size))
+        original_draft(self, mode, size)
+
+    monkeypatch.setattr(JpegImageFile, "draft", spy_draft)
+    buffer = BytesIO()
+    Image.new("RGB", (2400, 2400), "red").save(buffer, format="JPEG")
+    upload = SimpleUploadedFile("t.jpg", buffer.getvalue(), content_type="image/jpeg")
+    processed = images.process_image(upload, max_side=512)
+    assert calls == [("RGB", (1024, 1024))]  # 2x max_side, per process_image
+    out = Image.open(BytesIO(processed.image.read()))
+    assert max(out.size) == 512
+
+
+def test_mpo_wrapped_jpegs_from_phone_cameras_are_accepted() -> None:
+    # Samsung/iPhone photos are sometimes multi-frame MPO containers; Pillow
+    # reports source.format == "MPO", which a plain JPEG allow-list rejects
+    # even though the user just took a normal photo. Only frame 0 survives
+    # the re-encode — there is no multi-frame WebP output.
+    buffer = BytesIO()
+    frame0 = Image.new("RGB", (64, 64), "red")
+    frame1 = Image.new("RGB", (64, 64), "blue")
+    frame0.save(buffer, format="MPO", append_images=[frame1])
+    upload = SimpleUploadedFile("t.jpg", buffer.getvalue(), content_type="image/jpeg")
+    processed = images.process_image(upload, max_side=2560)
+    out = Image.open(BytesIO(processed.image.read()))
+    assert out.format == "WEBP"
+    pixel = out.getpixel((0, 0))
+    assert pixel[:3] == (255, 0, 0)  # ty: ignore[not-subscriptable]  # frame 0 (red), not frame 1
+
+
+def test_the_mpo_draft_fast_path_actually_runs(monkeypatch: pytest.MonkeyPatch) -> None:
+    # MpoImageFile subclasses JpegImageFile and doesn't override draft(), so
+    # the same DCT-domain downscale should fire for MPO as for plain JPEG —
+    # but the guard checked source.format == "JPEG" literally, which is
+    # never true for an MPO container, so the fast path was silently skipped.
+    calls: list[tuple[str, tuple[int, int]]] = []
+    original_draft = JpegImageFile.draft
+
+    def spy_draft(self: JpegImageFile, mode: str, size: tuple[int, int]) -> None:
+        calls.append((mode, size))
+        original_draft(self, mode, size)
+
+    monkeypatch.setattr(JpegImageFile, "draft", spy_draft)
+    buffer = BytesIO()
+    frame0 = Image.new("RGB", (2400, 2400), "red")
+    frame1 = Image.new("RGB", (2400, 2400), "blue")
+    frame0.save(buffer, format="MPO", append_images=[frame1])
+    upload = SimpleUploadedFile("t.jpg", buffer.getvalue(), content_type="image/jpeg")
+    processed = images.process_image(upload, max_side=512)
+    assert calls == [("RGB", (1024, 1024))]  # 2x max_side, per process_image
+    out = Image.open(BytesIO(processed.image.read()))
+    assert max(out.size) == 512
+
+
+def test_a_malformed_chunk_past_the_header_is_rejected_not_a_500() -> None:
+    # A valid IHDR followed by a truncated ancillary chunk (here pHYs, from
+    # dpi=) makes Pillow's PNG plugin raise a bare ValueError deep inside
+    # Image.open() — neither UnidentifiedImageError nor OSError, so it used to
+    # escape process_image entirely and surface as a 500 instead of the i18n
+    # message. struct.error/EOFError are siblings of the same gap and are
+    # exercised together by the broadened handler.
+    buffer = BytesIO()
+    Image.new("RGB", (64, 64), "red").save(buffer, format="PNG", dpi=(72, 72))
+    data = bytearray(buffer.getvalue())
+    chunk_at = data.find(b"pHYs")
+    assert chunk_at != -1, "fixture must actually contain a pHYs chunk"
+    struct.pack_into(">I", data, chunk_at - 4, 4)  # declare a too-short length
+    upload = SimpleUploadedFile("t.png", bytes(data), content_type="image/png")
+    with pytest.raises(ValidationError, match="Upload a JPEG"):
+        images.process_image(upload, max_side=2560)

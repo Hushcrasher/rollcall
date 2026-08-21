@@ -3,8 +3,10 @@ feature: only active credits of public profiles, nothing else about the user
 (spec 2026-08-20-mobile-first-surface §3)."""
 
 from datetime import date
+from pathlib import Path
 
 import pytest
+from django.conf import settings
 from django.test import Client
 from django.urls import reverse
 
@@ -13,6 +15,8 @@ from contributions.models import Contribution, Discipline
 from games.models import Company, Game
 
 pytestmark = pytest.mark.django_db
+
+_TEMPLATE = Path(settings.BASE_DIR) / "templates" / "search" / "people_search.html"
 
 
 def _credit(
@@ -78,6 +82,40 @@ def test_feed_is_absent_once_a_search_ran(client: Client) -> None:
     design = Discipline.objects.get(name="Design")
     body = client.get(reverse("home"), {"discipline": str(design.pk)}).content.decode()
     assert "Latest credits" not in body
+
+
+def test_feed_survives_an_unrelated_tracking_param(client: Client) -> None:
+    # `?utm_source=...`/`?fbclid=...` on a tagged inbound link are not a
+    # search — the feed is keyed on RecruiterSearchForm's own filter fields,
+    # not on bare `bool(request.GET)`, so an unknown param must not swap the
+    # feed out for an empty results block, and must not bind the form either
+    # (a bound-but-empty form's clean() error would render alongside it).
+    _credit("a@example.com", "Ada Artist")
+    body = client.get(reverse("home"), {"utm_source": "newsletter"}).content.decode()
+    assert "Latest credits" in body
+    assert "Ada Artist" in body
+    assert "Pick at least one filter." not in body
+
+
+def test_feed_survives_a_bare_page_param(client: Client) -> None:
+    # `?page=2` alone (no real filter) is not a search either — same
+    # reasoning as the tracking-param case above, for the one other
+    # non-form key the view reads directly off request.GET.
+    _credit("a@example.com", "Ada Artist")
+    body = client.get(reverse("home"), {"page": "2"}).content.decode()
+    assert "Latest credits" in body
+    assert "Ada Artist" in body
+    assert "Pick at least one filter." not in body
+
+
+def test_the_feed_sentence_is_one_translation_unit_not_split_around_a_link() -> None:
+    """`{% translate "added a credit on" %}` sandwiched between the two links
+    fixes English word order in place. One {% blocktranslate %} keeps the
+    sentence whole, with only the two links' URLs as placeholders."""
+    source = _TEMPLATE.read_text()
+    assert '{% translate "added a credit on" %}' not in source
+    assert "{% blocktranslate" in source
+    assert "added a credit on" in source
 
 
 def test_feed_is_newest_first_and_capped_at_ten(client: Client) -> None:

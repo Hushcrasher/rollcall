@@ -61,10 +61,11 @@ Ordered checks, each failing with an i18n `ValidationError`:
    40 MP so oversized canvases raise instead of exhausting memory; the
    resulting `DecompressionBombError` is caught and translated to a user
    error.
-3. **Format allow-list from decoded bytes** — `{JPEG, PNG, WEBP}` read off
-   the parsed image, never the filename or `Content-Type`. **SVG is
-   deliberately impossible** (script-capable XML), as is GIF (animation is
-   out of scope) and everything exotic.
+3. **Format allow-list from decoded bytes** — `{JPEG, PNG, WEBP, MPO}` read
+   off the parsed image, never the filename or `Content-Type`. MPO is the
+   multi-frame JPEG container some phone cameras emit; only frame 0
+   survives the re-encode. **SVG is deliberately impossible** (script-capable
+   XML), as is GIF (animation is out of scope) and everything exotic.
 4. **Re-encode, always** — decode fully, convert mode as needed (alpha
    preserved), resize to `max_side` (gallery 2560px, avatar 512px, thumbnail
    400px), save as **WebP q≈82** to a fresh buffer. Re-encoding is the core

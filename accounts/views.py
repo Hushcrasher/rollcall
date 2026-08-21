@@ -20,6 +20,7 @@ from django.utils.decorators import method_decorator
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
 from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy as _lazy
 from django.views import View
 from django.views.decorators.http import require_POST
 from django.views.generic import CreateView, DetailView, FormView, TemplateView, UpdateView
@@ -219,9 +220,23 @@ _PORTFOLIO_RATELIMIT_GROUP = "portfolio_add"
     name="post",
 )
 class PortfolioAddView(EmailVerifiedRequiredMixin, View):
-    verification_message = _("Please verify your email before adding images.")
+    # Lazy: a class attribute evaluates at import time, and plain gettext()
+    # would bake in whatever language happened to be active then
+    # (accounts/mixins.py's base class attribute is lazy for the same reason).
+    verification_message = _lazy("Please verify your email before adding images.")
 
     def post(self, request: AuthedHttpRequest, *args: object, **kwargs: object) -> HttpResponse:
+        # Advisory only — cheap, unlocked, and purely to skip the expensive
+        # decode (full Pillow load + two WebP encodes) for a user already at
+        # the cap. The locked re-check below inside transaction.atomic() is
+        # the one that actually closes the concurrency race and must run
+        # regardless of this short-circuit.
+        if ProfileImage.objects.filter(user=request.user).count() >= MAX_PORTFOLIO_IMAGES:
+            messages.error(
+                request,
+                _("You can show up to %(n)d images.") % {"n": MAX_PORTFOLIO_IMAGES},
+            )
+            return redirect("accounts:profile_edit")
         form = PortfolioImageForm(request.POST, request.FILES)
         if not form.is_valid():
             for field_errors in form.errors.values():

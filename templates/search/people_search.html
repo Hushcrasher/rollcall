@@ -28,10 +28,13 @@
   {% if not user.is_authenticated %}
     {% comment %}
       One line, not the funnel: /declare/ carries the question and the game
-      form. Fragmented across three translate calls to keep the links —
-      acceptable while LANGUAGES = [en] only.
+      form. One blocktranslate, not three translate calls fragmented around
+      the link — a fragmented sentence can't be reordered for a language
+      that doesn't share English's word order. The link's URL is the only
+      placeholder; its own text stays inside the translatable string.
     {% endcomment %}
-    <p>{% translate "Worked on a game?" %} <a href="{% url 'contributions:declare' %}">{% translate "Add your credit" %}</a> — {% translate "no account needed to start." %}</p>
+    {% url 'contributions:declare' as declare_url %}
+    <p>{% blocktranslate %}Worked on a game? <a href="{{ declare_url }}">Add your credit</a> — no account needed to start.{% endblocktranslate %}</p>
   {% endif %}
 
   {% comment %}
@@ -179,16 +182,19 @@
     <section>
       <h2>{% translate "Latest credits" %}</h2>
       {% comment %}
-        Sentence fragmented around the two links — acceptable while
-        LANGUAGES = [en] only. No timestamps beyond the credit's own dates:
-        "2 hours ago" would advertise activity patterns (spec §3).
+        One blocktranslate, not a translate call sandwiched between two
+        links — a fragmented sentence can't be reordered for a language that
+        doesn't share English's word order. The two links' URLs are the only
+        placeholders; their own text stays inside the translatable string.
+        No timestamps beyond the credit's own dates: "2 hours ago" would
+        advertise activity patterns (spec §3).
       {% endcomment %}
       <ul>
         {% for c in latest_credits %}
+          {% url 'accounts:profile' c.user.slug as profile_url %}
+          {% url 'games:game' c.game.slug as game_url %}
           <li>
-            <a href="{% url 'accounts:profile' c.user.slug %}">{{ c.user.display_name }}</a>
-            {% translate "added a credit on" %}
-            <a href="{% url 'games:game' c.game.slug %}">{{ c.game.title }}</a>:
+            {% blocktranslate with user_name=c.user.display_name game_title=c.game.title %}<a href="{{ profile_url }}">{{ user_name }}</a> added a credit on <a href="{{ game_url }}">{{ game_title }}</a>{% endblocktranslate %}:
             {{ c.job_title }}
             ({{ c.start_date|date:"m/Y" }} – {% if c.end_date %}{{ c.end_date|date:"m/Y" }}{% else %}{% translate "present" %}{% endif %})
           </li>
