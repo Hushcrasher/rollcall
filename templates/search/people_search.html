@@ -155,6 +155,8 @@
         {% comment %}
           {% querystring %} is built in (Django 5.1+; this project is on 6.0): it keeps
           every current GET param, repeated values included, and overrides only `page`.
+          The `#results` suffix matches the form's action: paging on mobile must land
+          on the results, not above the whole filter stack.
 
           This block is {% comment %}, not {# … #}: that form is single-line only, so a
           multi-line one is not lexed as a comment — its text leaks into the HTML and
@@ -162,11 +164,11 @@
         {% endcomment %}
         <nav class="pagination" aria-label="{% translate 'Pagination' %}">
           {% if results_page.has_previous %}
-            <a href="{% querystring page=results_page.previous_page_number %}">{% translate "Previous" %}</a>
+            <a href="{% querystring page=results_page.previous_page_number %}#results">{% translate "Previous" %}</a>
           {% endif %}
           <span>{% blocktranslate with page=results_page.page_number pages=results_page.num_pages %}Page {{ page }} of {{ pages }}{% endblocktranslate %}</span>
           {% if results_page.has_next %}
-            <a href="{% querystring page=results_page.next_page_number %}">{% translate "Next" %}</a>
+            <a href="{% querystring page=results_page.next_page_number %}#results">{% translate "Next" %}</a>
           {% endif %}
         </nav>
       {% endif %}

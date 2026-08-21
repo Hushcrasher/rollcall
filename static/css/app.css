@@ -7,6 +7,23 @@
 .nav-search { flex: 1; min-width: 0; }
 .nav-search input { width: 100%; min-width: 0; margin-bottom: 0; }
 
+/* Pico lays `nav` and its `ul` groups out with `display:flex` and ships NO
+   wrapping and no nav media query, so on a narrow screen the logged-in bar
+   (brand + search + four items) overflows into itself. Wrapping is the fix,
+   and under 768px the search group takes a row of its own. `nav li` is
+   `inline-block` in Pico, which shrinks the search item to its content, so
+   that item is blocked out here too. Must stay AFTER `.nav-search`'s `flex`
+   shorthand above, which would otherwise reset the flex-basis set below.
+   Layout only — no test asserts computed styles. */
+nav, nav ul { flex-wrap: wrap; }
+nav [role=button] { white-space: nowrap; }
+.nav-search li { display: block; }
+@media (max-width: 767px) {
+  .nav-search { flex-basis: 100%; order: 1; }
+  /* Stacked rows double up the per-item vertical padding. */
+  nav { --pico-nav-element-spacing-vertical: .35rem; }
+}
+
 /* The classless Pico build has no .outline/.secondary classes, and bare
    buttons default to solid primary — which would make Log out compete with
    the nav CTA. De-emphasize it to link weight. The attribute selector is
@@ -65,4 +82,14 @@ nav form button[type=submit] { background: none; border: none; color: var(--pico
   list-style: none; padding: 0;
   display: grid; grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr)); gap: .6rem;
 }
+/* Pico declares `ul li{list-style:square}` on the item itself, which the
+   list-style inherited from the ul above cannot override. */
+.portfolio-grid li { list-style: none; }
 .portfolio-grid img { width: 100%; height: auto; display: block; }
+/* Same reasoning as the Log out button above: no .outline/.secondary exists
+   in the classless build, and a solid primary Delete under every thumbnail
+   would shout louder than the page's real actions. The attribute selector
+   is load-bearing — Pico styles the element via [type=submit] (0,1,0). */
+.portfolio-grid form button[type=submit] {
+  background: none; border: none; color: var(--pico-primary);
+}

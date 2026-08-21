@@ -87,7 +87,7 @@
       <ul class="portfolio-grid">
         {% for pimg in portfolio_images %}
           <li>
-            <a href="{{ pimg.image.url }}"><img src="{{ pimg.thumbnail.url }}" alt="{{ pimg.caption }}" loading="lazy"></a>
+            <a href="{{ pimg.image.url }}"><img src="{{ pimg.thumbnail.url }}" alt="{% if pimg.caption %}{{ pimg.caption }}{% else %}{% translate "Portfolio image" %}{% endif %}" loading="lazy"></a>
             {% if pimg.caption %}<p class="muted">{{ pimg.caption }}</p>{% endif %}
           </li>
         {% endfor %}

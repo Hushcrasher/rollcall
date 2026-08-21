@@ -87,8 +87,12 @@ semantics, not decoration):
   up` drops off the nav for anonymous visitors: the declare funnel *is* the
   signup path (docs/01 §3.3), and login page links keep the direct route
   reachable.
-- On mobile the nav stacks (Pico default). No hamburger menu — four items
-  don't need one.
+- On mobile the nav wraps to a second row, with the search group on its own
+  line. This is **not** a Pico default — Pico v2 lays `nav`/`nav ul` out with
+  `display:flex` and ships no `flex-wrap` and no nav media query at all, so
+  the bar would overflow into itself at 375px; `static/css/app.css` supplies
+  the wrapping (functional layout, within that file's rule). No hamburger
+  menu — four items don't need one.
 
 ## 2. Home page order (`people_search.html`)
 
