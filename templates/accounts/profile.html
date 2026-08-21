@@ -36,6 +36,29 @@
         <a href="{% url 'accounts:profile_edit' %}">{% translate "Edit my profile" %}</a>
         <a href="?preview=member">{% translate "View as member" %}</a>
       </p>
+      {% if profile_user.profile_public %}
+        <p class="share-row">
+          <span>{% translate "Share your profile:" %}</span>
+          <button type="button" data-copy="{{ share_url }}">{% translate "Copy link" %}</button>
+          <noscript><code>{{ share_url }}</code></noscript>
+          <a href="https://www.linkedin.com/sharing/share-offsite/?url={{ share_url|urlencode:'' }}" target="_blank" rel="noopener">LinkedIn</a> ·
+          <a href="https://bsky.app/intent/compose?text={{ share_text|urlencode:'' }}%20{{ share_url|urlencode:'' }}" target="_blank" rel="noopener">Bluesky</a> ·
+          <a href="https://twitter.com/intent/tweet?url={{ share_url|urlencode:'' }}&amp;text={{ share_text|urlencode:'' }}" target="_blank" rel="noopener">X</a> ·
+          <a href="{% url 'cards:profile' profile_user.slug %}" target="_blank" rel="noopener">{% translate "Preview your card" %}</a>
+        </p>
+        {% translate "Copied" as copied %}
+        <script>
+          document.querySelector(".share-row [data-copy]").addEventListener("click", function () {
+            var button = this, label = button.textContent;
+            navigator.clipboard.writeText(button.dataset.copy).then(function () {
+              button.textContent = "{{ copied|escapejs }}";
+              setTimeout(function () { button.textContent = label; }, 2000);
+            });
+          });
+        </script>
+      {% else %}
+        <p class="share-row">{% translate "Your profile is private — make it public to share it." %} <a href="{% url 'accounts:profile_edit' %}">{% translate "Change this" %}</a></p>
+      {% endif %}
     {% endif %}
 
     {% if profile_user.contactable %}

@@ -25,6 +25,10 @@ urlpatterns = [
     path("about/", TemplateView.as_view(template_name="about.html"), name="about"),
     # Accounts own the root: /signup, /login, /account, /u/<slug>/ … (SEO for
     # "who worked on X" wants clean profile URLs). Later phases add /games etc.
+    # cards first: its card.png suffix keeps its routes unambiguous against
+    # accounts'/games' own u/<slug>/ and g/<slug>/ patterns either way, but
+    # ordering it first documents that OG cards are a root-level concern too.
+    path("", include("cards.urls")),
     path("", include("accounts.urls")),
     path("", include("games.urls")),
     path("", include("contact.urls")),

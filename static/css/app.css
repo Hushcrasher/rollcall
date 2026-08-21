@@ -93,3 +93,17 @@ nav form button[type=submit] { background: none; border: none; color: var(--pico
 .portfolio-grid form button[type=submit] {
   background: none; border: none; color: var(--pico-primary);
 }
+
+/* Share row (profile.html, spec 2026-08-21-open-graph-cards) — a link-style
+   row, not a form: wrap the label, button, network links and preview link
+   on one baseline. */
+.share-row { display: flex; flex-wrap: wrap; gap: .5rem; align-items: baseline; }
+/* Pico makes buttons full-width by default (`width` is layout) — `margin`
+   here is the vertical gap a block-level button carries that inline
+   siblings on this row don't need. */
+.share-row button { width: auto; margin: 0; }
+/* Same reasoning as the Log out button above: Copy link would otherwise
+   render solid-primary and out-shout the row it sits in. The attribute
+   selector is load-bearing — Pico styles this element via [type=button]
+   (specificity 0,1,0), which a bare type-selector chain can't outrank. */
+.share-row button[type=button] { background: none; border: none; color: var(--pico-primary); }

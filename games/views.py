@@ -14,6 +14,7 @@ from django.shortcuts import get_object_or_404, render
 from django.views.decorators.http import require_POST
 from django.views.generic import DetailView
 
+from cards.data import card_url, game_card
 from contributions.models import Contribution
 from games.igdb import IGDBClient, IGDBError, import_igdb_game
 from games.models import Company, Game, GameCompany
@@ -34,6 +35,12 @@ class GameDetailView(DetailView):
         context["company_links"] = GameCompany.objects.filter(game=self.object).select_related(
             "company"
         )
+        card = game_card(self.object)
+        year = f" ({self.object.release_date.year})" if self.object.release_date else ""
+        context["og_title"] = f"{self.object.title}{year} · Rollcall"
+        context["og_url"] = self.request.build_absolute_uri(self.object.get_absolute_url())
+        context["og_image"] = card_url(self.request, "cards:game", card, self.object.slug)
+        context["meta_description"] = card.stats
         return context
 
 

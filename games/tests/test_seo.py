@@ -29,11 +29,9 @@ def test_robots_txt_keeps_content_pages_and_denies_private_areas(client: Client)
     grant/deny the paths it should still fails the test. This fails if a rule
     is dropped.
 
-    It does NOT currently pin the emission order of Allow vs. Disallow: that
-    used to matter when `Allow: /search/for-recruiters/` had to beat
-    `Disallow: /search/` under first-match parsers (`urllib.robotparser` among
-    them), but that carve-out was removed with the page, and no surviving
-    `Allow` prefix (`/u/`, `/g/`, `/c/`) overlaps any `Disallow` prefix.
+    The page-prefix rules asserted here don't depend on emission order — no
+    `Disallow` prefix overlaps `/u/`, `/g/` or `/c/`. The card rules do, and
+    are covered by the wildcard test below, which this parser cannot express.
     """
     body = client.get("/robots.txt").content.decode()
 
@@ -70,6 +68,25 @@ def test_robots_txt_closes_the_root_filter_trap(client: Client) -> None:
     parser = RobotFileParser()
     parser.parse(body.splitlines())
     assert parser.can_fetch("*", "/")  # the home page itself stays indexable
+
+
+def test_robots_txt_keeps_the_og_card_urls_out_of_the_filter_trap(client: Client) -> None:
+    """Every `og:image` URL carries `?v=<token>`, so `Disallow: /*?` matches it
+    for the wildcard-aware crawlers. The three card patterns must be present
+    AND longer than `/*?` (RFC 9309 §2.2.2 longest match) AND emitted first
+    (first-match parsers), or a card is a blocked, silently broken preview.
+
+    Asserted on the literal lines: `RobotFileParser` ignores wildcards, so it
+    cannot express `/*?` or `/u/*/card.png` either way.
+    """
+    lines = client.get("/robots.txt").content.decode().splitlines()
+    trap = "Disallow: /*?"
+
+    for path in ("/card.png", "/u/*/card.png", "/g/*/card.png"):
+        line = f"Allow: {path}"
+        assert line in lines
+        assert len(path) > len("/*?")  # longest match wins
+        assert lines.index(line) < lines.index(trap)  # first match wins
 
 
 def test_the_home_page_declares_itself_canonical(client: Client) -> None:

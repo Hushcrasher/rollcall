@@ -131,7 +131,10 @@ adds image composition for little gain and can wait). Type: **Inter** (SIL OFL
 | `footer` | Regular | 32 px | `#555555` |
 | `badge` | Bold | 32 px, plain text, right of the footer | `#0172AD` |
 
-60 px margins, 24 px vertical rhythm. No radius, no shadow, no gradient — the
+60 px side margins, 24 px vertical rhythm; the text block is **vertically
+centred** in the card (networks crop edges, and a top-aligned block leaves the
+lower half empty — validated on rendered samples, 2026-08-21). No radius, no
+shadow, no gradient — the
 card is the site's typographic voice, not a poster. (These values are the
 reviewable design; change them here, not in code comments.)
 

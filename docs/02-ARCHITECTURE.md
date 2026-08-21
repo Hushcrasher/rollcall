@@ -12,7 +12,8 @@ A **single Django monolith** (server-rendered) backed by **one managed PostgreSQ
                          │                                     │
  Users/Recruiters ──────▶│  Django monolith (Docker)           │
                          │   apps: accounts, games,            │
-                         │   contributions, search, contact    │
+                         │   contributions, search, contact,   │
+                         │   cards                             │
                          │        │            │               │
                          │        ▼            │               │
                          │  Managed Postgres   │               │
@@ -33,7 +34,7 @@ A **single Django monolith** (server-rendered) backed by **one managed PostgreSQ
 
 1. **The app's Postgres is autonomous.** The parquet is an upstream batch source. If the server hosting it goes down, the site runs normally; we just miss one refresh. **No application code path ever reads the parquet** — only the seed command does.
 2. **Stateful = managed & standard, stateless = containerized.** This is the anti-lock-in rule. Migration to any other PaaS or a VPS = Docker image + `pg_dump` + bucket sync ≈ half a day, rehearsable.
-3. **Monolith with clean internal modules** (`accounts`, `games`, `contributions`, `search`, `contact`). Search logic isolated in its own module so a dedicated engine could replace Postgres FTS later without a rewrite.
+3. **Monolith with clean internal modules** (`accounts`, `games`, `contributions`, `search`, `contact`, `cards`). Search logic isolated in its own module so a dedicated engine could replace Postgres FTS later without a rewrite. `cards` (added 2026-08-21, spec `docs/superpowers/specs/2026-08-21-open-graph-cards-design.md`) is cross-cutting the same way `search` is: it reads `accounts`/`games` models and `search.services.profile_summary()` to render Open Graph card images, and the `accounts`/`games` detail views call back into `cards.data` (`card_url`, `profile_card`/`game_card`) for their Open Graph overrides. The dependency runs both ways, but stays acyclic: `cards` imports models and services only, never views.
 4. **Source-owned vs platform-owned data.** Columns imported from the parquet/IGDB are read-only in the app and overwritten on each refresh (the seed script explicitly lists them). Everything else is never touched by the seed. Zero conflicts by construction.
 5. **Open-source-fork friendly.** The repo runs without Hushcrasher infrastructure: parquet URL and credentials are env vars; dev fixtures replace the parquet; no Prefect dependency; no proprietary auth service.
 

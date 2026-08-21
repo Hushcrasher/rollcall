@@ -41,6 +41,7 @@ from accounts.mixins import EmailVerifiedRequiredMixin
 from accounts.models import MAX_PORTFOLIO_IMAGES, ProfileImage, RecruiterApplication, User
 from accounts.registration import create_and_login
 from accounts.tokens import email_verification_token
+from cards.data import card_url, profile_card
 from contributions.models import Contribution
 
 logger = logging.getLogger(__name__)
@@ -181,6 +182,16 @@ class ProfileView(DetailView):
         # them, since _visible_users exempts the owner. Shown in the preview too.
         context["private_notice"] = is_self and not self.object.profile_public
         context["portfolio_images"] = self.object.portfolio_images.all()
+        card = profile_card(self.object)
+        context["og_title"] = f"{self.object.display_name} · Rollcall"
+        context["og_type"] = "profile"
+        context["og_url"] = self.request.build_absolute_uri(self.object.get_absolute_url())
+        context["og_image"] = card_url(self.request, "cards:profile", card, self.object.slug)
+        # Share row (owner only, spec §3): the canonical URL, no query string.
+        context["share_url"] = context["og_url"]
+        context["share_text"] = _("%(name)s on Rollcall") % {"name": self.object.display_name}
+        if card.stats:
+            context["meta_description"] = card.stats
         return context
 
 
