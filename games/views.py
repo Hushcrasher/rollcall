@@ -28,7 +28,14 @@ class GameDetailView(DetailView):
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
         context = super().get_context_data(**kwargs)
         context["contributions"] = (
-            Contribution.objects.filter(game=self.object, status=Contribution.Status.ACTIVE)
+            # profile_public=False makes the member invisible everywhere (docs/01
+            # §3.4) — this page included, or flipping the switch would still leave
+            # their name on every game they shipped. Same predicate as search.
+            Contribution.objects.filter(
+                game=self.object,
+                status=Contribution.Status.ACTIVE,
+                user__profile_public=True,
+            )
             .select_related("user", "company", "discipline")
             .order_by("discipline__sort_order", "-start_date")
         )
@@ -55,7 +62,14 @@ class CompanyDetailView(DetailView):
             "game"
         )
         context["contributions"] = (
-            Contribution.objects.filter(company=self.object, status=Contribution.Status.ACTIVE)
+            # profile_public=False makes the member invisible everywhere (docs/01
+            # §3.4) — this page included, or flipping the switch would still leave
+            # their name on every company they shipped. Same predicate as search.
+            Contribution.objects.filter(
+                company=self.object,
+                status=Contribution.Status.ACTIVE,
+                user__profile_public=True,
+            )
             .select_related("user", "game", "discipline")
             .order_by("-start_date")
         )
