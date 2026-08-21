@@ -6,6 +6,7 @@ from django.test import Client
 from django.urls import reverse
 
 from accounts.models import User
+from conftest import header as _header
 
 pytestmark = pytest.mark.django_db
 
@@ -16,10 +17,6 @@ def test_every_page_links_pico_then_app_css(client: Client) -> None:
     app = body.index("css/app.css")
     # Order matters: app.css must be able to override Pico.
     assert pico < app
-
-
-def _header(body: str) -> str:
-    return body[: body.index("</header>")]
 
 
 def test_anonymous_nav_leads_with_the_declare_cta(client: Client) -> None:

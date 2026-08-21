@@ -92,9 +92,9 @@ def test_verification_message_is_lazy() -> None:
 def test_unverified_user_is_bounced_to_verification(client: Client) -> None:
     user = _user(verified=False)
     client.force_login(user)
-    response = client.post(reverse("accounts:portfolio_add"), {"image": _png_upload()})
-    assert response.status_code == 302
-    assert response.url == reverse("accounts:verification_sent")
+    response = client.post(reverse("accounts:portfolio_add"), {"image": _png_upload()}, follow=True)
+    assert response.redirect_chain == [(reverse("accounts:verification_sent"), 302)]
+    assert "Please verify your email before adding images." in response.content.decode()
     assert user.portfolio_images.count() == 0  # ty: ignore[unresolved-attribute]
 
 
@@ -119,9 +119,10 @@ def test_the_thirteenth_image_is_rejected(client: Client, monkeypatch: pytest.Mo
     client.force_login(user)
     for _i in range(MAX_PORTFOLIO_IMAGES):
         _image(user)
-    client.post(reverse("accounts:portfolio_add"), {"image": _png_upload()})
+    response = client.post(reverse("accounts:portfolio_add"), {"image": _png_upload()}, follow=True)
     assert user.portfolio_images.count() == MAX_PORTFOLIO_IMAGES  # ty: ignore[unresolved-attribute]
     assert calls == []
+    assert "You can show up to 12 images." in response.content.decode()
 
 
 def test_the_twelfth_image_lands(client: Client) -> None:
@@ -152,6 +153,9 @@ def test_upload_is_rate_limited(client: Client, settings: Any) -> None:
         client.post(reverse("accounts:portfolio_add"), {"image": _png_upload()})
     response = client.post(reverse("accounts:portfolio_add"), {"image": _png_upload()})
     assert response.status_code == 403
+    # Leaves portfolio_add's own counters behind otherwise — harmless only
+    # because RATELIMIT_ENABLE=False elsewhere, not a reason to skip it.
+    cache.clear()
 
 
 def test_rate_limit_is_per_user_not_shared(client: Client, settings: Any) -> None:
@@ -216,7 +220,10 @@ def test_profile_shows_the_work_section(client: Client) -> None:
     user = _user()
     _image(user, caption="Boss fight concept")
     body = client.get(reverse("accounts:profile", args=[user.slug])).content.decode()
-    assert "Work" in body
+    # The bare substring "Work" also matches inside unrelated words/markup;
+    # the heading and grid class are what actually mark the section as present.
+    assert "<h2>Work</h2>" in body
+    assert "portfolio-grid" in body
     assert "Boss fight concept" in body
 
 
