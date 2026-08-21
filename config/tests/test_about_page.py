@@ -21,3 +21,11 @@ def test_footer_links_to_about(client: Client) -> None:
     body = client.get(reverse("home")).content.decode()
     footer = body[body.index("<footer") :]
     assert reverse("about") in footer
+
+
+def test_about_links_the_report_form(client: Client) -> None:
+    # ReportView is login-gated, but a link that bounces to login is still
+    # more useful than prose telling an anonymous reader to find it
+    # themselves (spec §5: "link to the report form").
+    body = client.get(reverse("about")).content.decode()
+    assert reverse("contact:report") in body
