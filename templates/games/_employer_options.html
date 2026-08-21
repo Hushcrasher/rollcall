@@ -2,8 +2,14 @@
 {% comment %}
   A select, developer first and preselected: the common case needs no click
   (spec 2026-08-21-credit-form-v2 §1). The two trailing options are the
-  escapes. {# #} can't span lines (Django strips only single-line comments,
-  see _employer_field.html) — {% comment %} is the multi-line form.
+  escapes; which one starts selected is `selected_id` (games.views
+  .game_employers documents the three `?selected=` states).
+
+  Written as a comment/endcomment block on purpose: Django's lexer only ever
+  strips a hash-style comment that fits on ONE line, so a multi-line one is
+  emitted verbatim — and this fragment is swapped straight into the page,
+  comment and all. Pinned by games/tests/test_employer.py's
+  test_employer_select_has_no_leaked_template_comment.
 {% endcomment %}
 <select id="employer-select" class="employer-select" aria-label="{% translate 'Employer' %}">
   {% for employer in employers %}

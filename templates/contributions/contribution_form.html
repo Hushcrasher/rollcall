@@ -70,6 +70,11 @@
       if (!select) return;
       function sync() {
         const hidden = document.getElementById(COMPANY_FIELD);
+        // `.chosen` exists to show a company the select cannot: one picked from
+        // the company search, or created out of it. Whenever the select drives
+        // the value — "__other" included — it already shows the choice itself,
+        // so a second line could only ever disagree with it.
+        field.querySelector(".chosen").textContent = "";
         if (select.value === "__other") {
           hidden.value = "";
           field.querySelector(".employer-search").hidden = false;
@@ -77,7 +82,6 @@
           return;
         }
         hidden.value = select.value;
-        field.querySelector(".chosen").textContent = select.options[select.selectedIndex].text;
         field.querySelector(".employer-search").hidden = true;
       }
       sync();
@@ -86,9 +90,11 @@
 
     // Load the picked game's studios as the employer select. reset=true wipes
     // any current employer selection (used when the game changes); reset=false
-    // is the initial page load, where the edit form's saved company (carried
-    // in data-selected) is passed through so game_employers can preselect it
-    // even if it isn't one of this game's credited studios.
+    // is the initial page load, where data-selected is forwarded verbatim as
+    // `?selected=` — a saved company pk, so game_employers preselects it even
+    // if it isn't one of this game's credited studios, or the `none` sentinel,
+    // so a credit saved without an employer keeps none (employer_id in
+    // contributions_extras.py documents the three states).
     function loadEmployers(gameId, reset) {
       const field = document.getElementById("employer-field");
       if (!field) return;

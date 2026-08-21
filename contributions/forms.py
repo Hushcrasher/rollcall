@@ -1,7 +1,6 @@
 """Contribution form — game required in the POC, optional employer company,
 discipline, free job title, and MM/YYYY dates (docs/01-DESIGN.md §3.3)."""
 
-from datetime import date
 from typing import Any
 
 from django import forms
@@ -23,6 +22,10 @@ class MonthInput(forms.DateInput):
             "inputmode": "numeric",
             "placeholder": "MM/YYYY",
             "pattern": "[0-9]{2}/[0-9]{4}",
+            # Without a title the browser's own `pattern` message is generic
+            # ("Please match the requested format"), which would contradict the
+            # server's "Enter a month as MM/YYYY, e.g. 08/2024." on the same box.
+            "title": _("MM/YYYY, e.g. 08/2024"),
             "autocomplete": "off",
         }
         super().__init__(attrs={**base, **(attrs or {})}, format="%m/%Y")
@@ -39,14 +42,6 @@ class MonthYearField(forms.DateField):
     def __init__(self, **kwargs: Any) -> None:
         kwargs.setdefault("input_formats", ["%m/%Y", "%Y-%m"])
         super().__init__(**kwargs)
-
-    def prepare_value(self, value: Any) -> Any:
-        # BoundField.value() calls this directly (it does not go through the
-        # widget), so an edit form's initial `date` must be re-formatted here
-        # to display as MM/YYYY rather than the ORM's raw date object.
-        if isinstance(value, date):
-            return value.strftime("%m/%Y")
-        return value
 
 
 class ContributionForm(forms.ModelForm):

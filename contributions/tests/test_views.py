@@ -160,6 +160,29 @@ def test_edit_page_carries_the_saved_company_for_the_js(
     assert f'data-selected="{company.pk}"'.encode() in response.content
 
 
+def test_edit_page_of_a_company_less_credit_asks_for_no_employer(
+    client: Client, verified_user: User, game: Game, discipline: Discipline
+) -> None:
+    """A credit saved without an employer must send the `none` sentinel, not
+    an empty `data-selected`: empty means "unknown", so the JS would load the
+    select with the developer preselected and `sync()` would write its pk into
+    the hidden field — saving a typo fix would stamp an employer the member
+    never entered (spec §1: the edit form never silently changes one)."""
+    Company.objects.create(name="Dev Studio", source=Company.Source.MANUAL)
+    contribution = Contribution.objects.create(
+        user=verified_user,
+        game=game,
+        discipline=discipline,
+        job_title="Freelance",
+        start_date=date(2020, 1, 1),
+    )
+    client.force_login(verified_user)
+
+    response = client.get(reverse("contributions:edit", kwargs={"pk": contribution.pk}))
+
+    assert b'data-selected="none"' in response.content
+
+
 def test_non_owner_cannot_edit(
     client: Client, verified_user: User, game: Game, discipline: Discipline
 ) -> None:

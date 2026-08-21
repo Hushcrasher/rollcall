@@ -158,6 +158,58 @@ def test_an_invalid_post_keeps_the_chosen_employer_in_data_selected(
     assert f'data-selected="{company.pk}"'.encode() in response.content
 
 
+def test_choosing_no_employer_survives_a_failed_post(client: Client, game: Game) -> None:
+    """`No employer / freelance` is a choice, not an absence: the re-render
+    must carry the `none` sentinel so the JS asks for the select with that
+    option selected. An empty `data-selected` would mean "unknown" and bring
+    back the developer-preselected default the member just rejected."""
+    _with_game(client, game)
+
+    response = client.post(
+        reverse("contributions:declare_details"),
+        {
+            "game": str(game.pk),
+            "company": "",
+            "discipline": str(Discipline.objects.get(name="Design").pk),
+            "job_title": "Level Designer",
+            "start_date": "not-a-date",
+            "end_date": "",
+        },
+    )
+
+    assert response.status_code == 200
+    assert b'data-selected="none"' in response.content
+
+
+def test_a_draft_that_chose_no_employer_re_renders_with_the_none_sentinel(
+    client: Client, game: Game
+) -> None:
+    """Step 2 revisited after a "Wrong game?" round trip that kept the draft:
+    `company: ""` in the draft records the member's choice, so the sentinel
+    must reach `data-selected` (an unbound form here — the bound-POST path is
+    covered above)."""
+    session = client.session
+    session[SESSION_KEY] = {"game": str(game.pk), "company": ""}
+    session.save()
+
+    response = client.get(reverse("contributions:declare_details"))
+
+    assert b'data-selected="none"' in response.content
+
+
+def test_step_two_straight_after_the_game_leaves_the_employer_unknown(
+    client: Client, game: Game
+) -> None:
+    """The other side of the contract: nothing has been asked yet, so
+    `data-selected` stays empty and the endpoint applies its
+    developer-first default."""
+    _with_game(client, game)
+
+    response = client.get(reverse("contributions:declare_details"))
+
+    assert b'data-selected=""' in response.content
+
+
 def test_a_deleted_game_redirects_to_the_question(client: Client, game: Game) -> None:
     """A game removed between steps 1 and 2 must not render "On ." or feed a
     broken /games//employers/ URL to the JS."""

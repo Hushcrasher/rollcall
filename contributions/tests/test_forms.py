@@ -95,5 +95,7 @@ def test_edit_form_shows_the_saved_month_as_mm_yyyy(game: Game, discipline: Disc
         user=user, game=game, discipline=discipline, job_title="Dev", start_date=date(2024, 8, 1)
     )
     bound = ContributionForm(instance=credit)["start_date"]
-    assert bound.value() == "08/2024"
+    # The rendered widget, not `bound.value()`: the field hands the widget the
+    # raw `date` and MonthInput's format (`%m/%Y`) is what turns it into text.
+    assert 'value="08/2024"' in str(bound)
     assert 'inputmode="numeric"' in str(bound) and 'placeholder="MM/YYYY"' in str(bound)

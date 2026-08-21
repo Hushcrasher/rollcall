@@ -61,6 +61,11 @@
       if (!select) return;
       function sync() {
         const hidden = document.getElementById(COMPANY_FIELD);
+        // `.chosen` exists to show a company the select cannot: one picked from
+        // the company search, or created out of it. Whenever the select drives
+        // the value — "__other" included — it already shows the choice itself,
+        // so a second line could only ever disagree with it.
+        field.querySelector(".chosen").textContent = "";
         if (select.value === "__other") {
           hidden.value = "";
           field.querySelector(".employer-search").hidden = false;
@@ -68,7 +73,6 @@
           return;
         }
         hidden.value = select.value;
-        field.querySelector(".chosen").textContent = select.options[select.selectedIndex].text;
         field.querySelector(".employer-search").hidden = true;
       }
       sync();
@@ -79,10 +83,12 @@
     // version reloads this when the game changes; here the game is fixed, so it
     // runs once. `.employer-search` stays hidden until "Another company…" is
     // picked from the select (applyEmployerSelect above reveals it).
-    // `data-selected` (the funnel draft's already-chosen company, or a
-    // freshly-posted one after a validation-error re-render — see
-    // employer_id in contributions_extras.py) is passed through so a bounced
-    // "Wrong game?" repick or a fixed-up resubmit doesn't lose the employer.
+    // `data-selected` (the funnel draft's already-chosen company, a
+    // freshly-posted one after a validation-error re-render, or the `none`
+    // sentinel when the member picked "No employer / freelance" — see
+    // employer_id in contributions_extras.py) is forwarded verbatim as
+    // `?selected=`, so a bounced "Wrong game?" repick or a fixed-up resubmit
+    // loses neither a chosen employer nor a deliberate lack of one.
     function loadEmployers() {
       const field = document.getElementById("employer-field");
       const url = field.dataset.employersUrl.replace(/0\/employers\/$/, GAME_PK + "/employers/");

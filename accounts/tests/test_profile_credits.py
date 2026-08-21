@@ -48,7 +48,7 @@ def test_profile_omits_non_active_credits(client: Client, user: User) -> None:
 
 def test_profile_credit_dates_render_mm_yyyy(client: Client) -> None:
     """Display rule (spec 2026-08-20 §4): credit ranges are numeric m/Y —
-    entry stays the native month picker; only rendering changes."""
+    entry is MM/YYYY text too (spec 2026-08-21 §3); this covers rendering."""
     user = User.objects.create_user(
         email="dates@example.com", password="x", display_name="Date Person"
     )
