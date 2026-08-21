@@ -13,7 +13,7 @@ def test_about_renders_the_four_sections(client: Client) -> None:
     assert "What this is" in body
     assert "Where the data comes from" in body
     assert "Open source" in body
-    assert "github.com/Micro-SAS/rollcall" in body
+    assert "github.com/Hushcrasher/rollcall" in body
     assert "AGPL" in body
 
 
