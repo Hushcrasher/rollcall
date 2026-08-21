@@ -35,7 +35,10 @@ class ProcessedImage(NamedTuple):
     thumbnail: ContentFile | None
 
 
-def _encode(source: Image.Image, max_side: int) -> ContentFile:
+def _encode(source: Image.Image, max_side: int) -> tuple[ContentFile, Image.Image]:
+    """Encode one WebP and hand back the resized image it was written from, so
+    the caller can derive a thumbnail from that instead of re-resizing the
+    full-size original — the peak of this module is one decoded bitmap."""
     out = source.copy()
     if out.mode not in ("RGB", "RGBA"):
         # P/LA can carry transparency; anything else flattens to RGB.
@@ -46,7 +49,7 @@ def _encode(source: Image.Image, max_side: int) -> ContentFile:
     out.info.clear()
     buffer = BytesIO()
     out.save(buffer, format="WEBP", quality=WEBP_QUALITY)
-    return ContentFile(buffer.getvalue(), name=f"{uuid4().hex}.webp")
+    return ContentFile(buffer.getvalue(), name=f"{uuid4().hex}.webp"), out
 
 
 def process_image(
@@ -70,11 +73,20 @@ def process_image(
     # the header alone, so this runs before load() decodes any pixel data.
     if source.width * source.height > MAX_IMAGE_PIXELS:
         raise ValidationError(_("This image's dimensions are too large."))
+    if source.format == "JPEG":
+        # DCT-domain downscale, decided before any pixel is decoded: JPEG can be
+        # unpacked at 1/2, 1/4 or 1/8 scale for free, so a phone photo headed for
+        # a 512px avatar never materialises at full size. 2x max_side keeps a
+        # margin above the target, so the real resize below never upsamples;
+        # a no-op on anything already small enough, and on every other format.
+        source.draft("RGB", (2 * max_side, 2 * max_side))
     try:
         source.load()
     except OSError as exc:
         raise ValidationError(_("Upload a JPEG, PNG or WebP image.")) from exc
+    encoded, resized = _encode(source, max_side)
     return ProcessedImage(
-        image=_encode(source, max_side),
-        thumbnail=_encode(source, THUMBNAIL_SIDE) if thumbnail else None,
+        image=encoded,
+        # From the resized copy, not a second pass over the original.
+        thumbnail=_encode(resized, THUMBNAIL_SIDE)[0] if thumbnail else None,
     )

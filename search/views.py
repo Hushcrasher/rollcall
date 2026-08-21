@@ -106,7 +106,11 @@ class PeopleSearchView(TemplateView):
             # (docs/00 #7), and only for people who are findable at all.
             context["latest_credits"] = (
                 Contribution.objects.filter(
-                    status=Contribution.Status.ACTIVE, user__profile_public=True
+                    status=Contribution.Status.ACTIVE,
+                    user__profile_public=True,
+                    # Contribution.game is nullable; the feed line links the
+                    # game, so a null one renders a link to nowhere.
+                    game__isnull=False,
                 )
                 .select_related("user", "game")
                 .order_by("-created_at")[:10]

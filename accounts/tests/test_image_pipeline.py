@@ -126,3 +126,37 @@ def test_resize_caps_the_longest_side() -> None:
     processed = images.process_image(_upload(size=(300, 100)), max_side=200)
     out = Image.open(BytesIO(processed.image.read()))
     assert max(out.size) == 200
+
+
+def test_thumbnail_side_is_pinned_and_independent_of_the_main_cap() -> None:
+    # The thumbnail is derived from the already-resized main image, so a bug
+    # there would silently ship a 2560px "thumbnail" on every gallery page.
+    processed = images.process_image(_upload(size=(1200, 900)), max_side=1000, thumbnail=True)
+    assert processed.thumbnail is not None
+    thumb = Image.open(BytesIO(processed.thumbnail.read()))
+    main = Image.open(BytesIO(processed.image.read()))
+    assert max(thumb.size) == images.THUMBNAIL_SIDE
+    assert max(main.size) == 1000  # the two caps are not the same number
+
+
+def test_no_thumbnail_is_written_unless_asked() -> None:
+    # The avatar path relies on this: one file, not two.
+    assert images.process_image(_upload(), max_side=512).thumbnail is None
+
+
+def test_transparency_survives_the_reencode() -> None:
+    # Flattening alpha to a black (or white) box would quietly ruin every
+    # transparent PNG a concept artist uploads.
+    buffer = BytesIO()
+    Image.new("RGBA", (64, 64), (255, 0, 0, 0)).save(buffer, format="PNG")
+    upload = SimpleUploadedFile("t.png", buffer.getvalue(), content_type="image/png")
+    out = Image.open(BytesIO(images.process_image(upload, max_side=2560).image.read()))
+    assert out.mode == "RGBA"
+    assert out.getchannel("A").getextrema()[1] == 0  # still fully transparent
+
+
+@pytest.mark.parametrize(("fmt", "name"), [("PNG", "t.png"), ("WEBP", "t.webp")])
+def test_png_and_webp_are_accepted_inputs(fmt: str, name: str) -> None:
+    # ALLOWED_FORMATS lists three; only JPEG had coverage.
+    processed = images.process_image(_upload(fmt=fmt, name=name), max_side=2560)
+    assert Image.open(BytesIO(processed.image.read())).format == "WEBP"

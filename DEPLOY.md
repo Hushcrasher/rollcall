@@ -1,7 +1,7 @@
 # Deploying Rollcall
 
 Target stack (chosen for this POC): **Railway** (app + Postgres + cron),
-**Cloudflare R2** (avatars), **Brevo** (email), **Sentry** (errors). The app is
+**Cloudflare R2** (user media), **Brevo** (email), **Sentry** (errors). The app is
 a plain Docker image, so none of this is locked in — the same image runs on any
 PaaS or a VPS.
 
@@ -25,13 +25,20 @@ PaaS or a VPS.
 6. The free `*.up.railway.app` subdomain (HTTPS included) is enough for the POC
    — **no custom domain required**.
 
-## 2. Cloudflare R2 — avatars
+## 2. Cloudflare R2 — user media
 
 1. Create an R2 bucket (choose the **EU jurisdiction** option).
 2. Create an R2 API token → set `S3_BUCKET_NAME`, `S3_ENDPOINT_URL`
    (`https://<accountid>.r2.cloudflarestorage.com`), `S3_ACCESS_KEY_ID`,
    `S3_SECRET_ACCESS_KEY`, `S3_REGION=auto`.
-3. When `S3_BUCKET_NAME` is set, prod uses R2 for media automatically.
+3. When `S3_BUCKET_NAME` is set, prod uses R2 for media automatically. The
+   bucket holds avatars (`avatars/`) and the profile gallery (`portfolio/`,
+   `portfolio/thumbs/`) — all of them pipeline-produced WebP, never raw
+   uploads.
+4. The app's 10 MB upload cap (`accounts/images.py`) is checked *after* the
+   request body has been received, so it bounds what gets stored, not what
+   gets transferred. The platform's own body limit is the first line — Railway
+   applies one; if you move off it, set an equivalent limit at the edge.
 
 ## 3. Brevo — transactional email
 

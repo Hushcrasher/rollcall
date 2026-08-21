@@ -122,7 +122,8 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 
 STORAGES: dict[str, dict[str, Any]] = {
-    # Media (avatars only in POC) goes to an S3 bucket in prod; local in dev.
+    # Media (avatars + portfolio images/thumbnails) goes to an S3 bucket in
+    # prod; local in dev.
     "default": {
         "BACKEND": "django.core.files.storage.FileSystemStorage",
     },

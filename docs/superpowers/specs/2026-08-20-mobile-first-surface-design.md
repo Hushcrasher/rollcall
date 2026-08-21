@@ -122,9 +122,13 @@ that, knowingly — the worker funnel keeps its own indexable page at
 Social proof and freshness on an otherwise empty first visit.
 
 - Query: `Contribution.objects.filter(status="active",
-  user__profile_public=True).select_related("user", "game",
-  "discipline").order_by("-created_at")[:10]`, computed in
+  user__profile_public=True, game__isnull=False).select_related("user",
+  "game", "discipline").order_by("-created_at")[:10]`, computed in
   `PeopleSearchView.get_context_data` only when no search ran.
+  `game__isnull=False` is a correctness clause, not an optimisation:
+  `Contribution.game` is nullable (its check constraint accepts a company
+  instead) and the feed line links the game, so a gameless row raises
+  `NoReverseMatch` on the home page.
 - Render (one `<li>`/entry, i18n via `blocktranslate`):
   `{display_name} added a credit on {game}: {job_title} (MM/YYYY – MM/YYYY)`
   — name links to the profile, game to the game page, `present` for open

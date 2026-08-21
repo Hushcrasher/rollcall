@@ -58,7 +58,7 @@ CSRF_COOKIE_SECURE = True
 SECURE_HSTS_SECONDS = 60 * 60 * 24 * 30  # raise once DNS/TLS is stable
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 
-# --- Media: S3-compatible bucket (avatars only in POC) -----------------------
+# --- Media: S3-compatible bucket (avatars + portfolio images) ----------------
 
 _s3_configured = env("S3_BUCKET_NAME", default=None)
 if _s3_configured:

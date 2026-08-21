@@ -10,7 +10,7 @@ from django.urls import reverse
 
 from accounts.models import User
 from contributions.models import Contribution, Discipline
-from games.models import Game
+from games.models import Company, Game
 
 pytestmark = pytest.mark.django_db
 
@@ -61,6 +61,18 @@ def test_feed_never_shows_private_profiles(client: Client) -> None:
     assert "Hidden Person" not in body
 
 
+def test_feed_skips_credits_without_a_game(client: Client) -> None:
+    """`Contribution.game` is nullable — the check constraint takes a company
+    instead. The feed line links the game, so a null one renders a link to
+    nowhere on the home page of a public site."""
+    credit = _credit("g@example.com", "Gameless Person")
+    studio = Company.objects.create(name="Studio", source=Company.Source.MANUAL)
+    Contribution.objects.filter(pk=credit.pk).update(game=None, company=studio)
+    response = client.get(reverse("home"))
+    assert response.status_code == 200
+    assert "Gameless Person" not in response.content.decode()
+
+
 def test_feed_is_absent_once_a_search_ran(client: Client) -> None:
     _credit("a@example.com", "Ada Artist")
     design = Discipline.objects.get(name="Design")
@@ -82,3 +94,6 @@ def test_result_card_credit_dates_render_mm_yyyy(client: Client) -> None:
     design = Discipline.objects.get(name="Design")
     body = client.get(reverse("home"), {"discipline": str(design.pk)}).content.decode()
     assert "08/2024" in body and "03/2025" in body
+    # The defect this fixed was `date:"M Y"`, which renders both forms' digits
+    # differently — without this the card could show BOTH and still pass.
+    assert "Aug 2024" not in body
