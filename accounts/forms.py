@@ -98,13 +98,19 @@ class ProfileForm(AvatarCleanMixin, forms.ModelForm):
             "avatar",
             "profile_public",
             "contactable",
+            "public_email",
             "open_to_work",
         ]
+        labels = {"public_email": _("Public contact email (optional)")}
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         if self.instance and self.instance.pk:
             self.fields["github_url"].initial = str(self.instance.github_login)
+
+    def clean_public_email(self) -> str:
+        # Same case-folding rule as the account email (SignupForm.clean_email).
+        return self.cleaned_data.get("public_email", "").strip().lower()
 
     def clean_github_url(self) -> str:
         raw = self.cleaned_data.get("github_url", "").strip()

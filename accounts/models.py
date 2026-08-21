@@ -95,6 +95,20 @@ class User(AbstractUser):
         default=True,
         help_text=_("Allow contact via the relay. The email itself is never exposed."),
     )
+    # A SEPARATE, opt-in address the member chooses to publish. The account
+    # `email` above is never rendered anywhere; this one renders on the public
+    # profile page only (spec 2026-08-21-public-contact-email). Lowercased on
+    # every write path, like `email`; deliberately not unique (a studio
+    # address may be shared).
+    public_email = models.EmailField(
+        _("public contact email"),
+        blank=True,
+        default="",
+        help_text=_(
+            "Shown on your public profile to anyone. Leave empty to be reachable "
+            "only through Rollcall messages."
+        ),
+    )
     open_to_work = models.BooleanField(
         _("open to work"),
         default=False,
