@@ -173,6 +173,15 @@ Goal: a recognisable mark, filters that fit one screen, one word for reaching so
 - [x] Banner trimmed to `Worked on a game? Add your credit` (still one translation unit)
 - [x] `Message` buttons replace `Contact` links on profiles and search cards
 
+## Phase 12 — Credit form v2 ✅ (spec 2026-08-21)
+
+Goal: the common credit takes three fields and no guesswork.
+
+- [x] Employer picker: the game's companies in a select, developer preselected; `No employer / freelance`; `Another company…` opens the search
+- [x] Optional `country` on each credit (migration 0004) — shown after the dates, exported
+- [x] `MM/YYYY` text inputs replace the locale-dependent native month picker (legacy `YYYY-MM` still accepted)
+- [ ] Follow-up: credit country as a recruiter filter ("worked in …")
+
 ## Post-roadmap additions
 
 - [x] **Dev email backend** — prints a clean, copy-friendly body so console verification/reset links aren't corrupted by quoted-printable wrapping
