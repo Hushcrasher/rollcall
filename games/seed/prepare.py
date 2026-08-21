@@ -15,7 +15,7 @@ Sources (real column names; adjust here if the upstream files change):
 - hushcrasher:   app_id, name, review_score (Steam positive %), reviews_steam,
                  genres[], game_engines[], developers[], publishers[],
                  steam_release_date, about_the_game
-- steamdb:       steam_appid, name, header_image, short_description
+- steam:         steam_appid, name, header_image, short_description
 - release_dates: igdb_id, date
 """
 
@@ -34,7 +34,7 @@ def _clean_names(expr: str, limit: int) -> str:
     )
 
 
-def _build_sql(igdb: str, hushcrasher: str, steamdb: str, release_dates: str) -> str:
+def _build_sql(igdb: str, hushcrasher: str, steam: str, release_dates: str) -> str:
     genres_ig = _clean_names("COALESCE(hc.genres, []::VARCHAR[])", 100)
     engines_ig = _clean_names(
         "COALESCE(NULLIF(ig.engine_names, []::VARCHAR[]), hc.game_engines, []::VARCHAR[])", 100
@@ -63,7 +63,7 @@ hc AS (
     QUALIFY row_number() OVER (PARTITION BY app_id ORDER BY reviews_steam DESC NULLS LAST) = 1
 ),
 sd AS (
-    SELECT * FROM read_parquet('{steamdb}')
+    SELECT * FROM read_parquet('{steam}')
     QUALIFY row_number() OVER (PARTITION BY steam_appid ORDER BY steam_appid) = 1
 ),
 linked AS (
@@ -121,14 +121,14 @@ SELECT * FROM steam_only
 
 
 def prepare_seed_parquet(
-    *, igdb: str, hushcrasher: str, steamdb: str, release_dates: str, out_path: str
+    *, igdb: str, hushcrasher: str, steam: str, release_dates: str, out_path: str
 ) -> int:
     """Join the source files and write the prepared parquet. Returns the row count."""
     con = duckdb.connect()
     try:
-        for source in (igdb, hushcrasher, steamdb, release_dates, out_path):
+        for source in (igdb, hushcrasher, steam, release_dates, out_path):
             configure_remote_access(con, source)
-        sql = _build_sql(igdb, hushcrasher, steamdb, release_dates)
+        sql = _build_sql(igdb, hushcrasher, steam, release_dates)
         con.execute(f"COPY ({sql}) TO '{out_path}' (FORMAT PARQUET)")
         row = con.execute(f"SELECT count(*) FROM read_parquet('{out_path}')").fetchone()
         return int(row[0]) if row else 0

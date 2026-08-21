@@ -31,7 +31,7 @@ _HC_COLS = [
     ("steam_release_date", "TIMESTAMP"),
     ("about_the_game", "VARCHAR"),
 ]
-_SD_COLS = [
+_STEAM_COLS = [
     ("steam_appid", "BIGINT"),
     ("name", "VARCHAR"),
     ("header_image", "VARCHAR"),
@@ -40,11 +40,11 @@ _SD_COLS = [
 _RD_COLS = [("igdb_id", "BIGINT"), ("date", "DATE")]
 
 
-def _run(tmp_path: Path, igdb: list, hc: list, sd: list, rd: list) -> list:  # noqa: ANN001
+def _run(tmp_path: Path, igdb: list, hc: list, steam: list, rd: list) -> list:  # noqa: ANN001
     paths = {
         "igdb": write_typed_parquet(tmp_path / "igdb.parquet", _IGDB_COLS, igdb),
         "hushcrasher": write_typed_parquet(tmp_path / "hc.parquet", _HC_COLS, hc),
-        "steamdb": write_typed_parquet(tmp_path / "sd.parquet", _SD_COLS, sd),
+        "steam": write_typed_parquet(tmp_path / "steam.parquet", _STEAM_COLS, steam),
         "release_dates": write_typed_parquet(tmp_path / "rd.parquet", _RD_COLS, rd),
     }
     out = str(tmp_path / "rollcall_games.parquet")
@@ -80,7 +80,7 @@ def test_linked_game_merges_igdb_identity_with_steam_data(tmp_path: Path) -> Non
                 "about_the_game": "x",
             }
         ],
-        sd=[
+        steam=[
             {
                 "steam_appid": 1145360,
                 "name": "Hades",
@@ -118,7 +118,7 @@ def test_igdb_game_without_steam_is_included_with_null_rating(tmp_path: Path) ->
             }
         ],
         hc=[],
-        sd=[],
+        steam=[],
         rd=[{"igdb_id": 500, "date": date(2022, 3, 1)}],
     )
     assert len(games) == 1
@@ -147,7 +147,7 @@ def test_steam_only_game_is_included(tmp_path: Path) -> None:
                 "about_the_game": "about",
             }
         ],
-        sd=[],
+        steam=[],
         rd=[],
     )
     assert len(games) == 1
@@ -207,7 +207,7 @@ def test_total_is_all_igdb_plus_unlinked_steam(tmp_path: Path) -> None:
                 "about_the_game": None,
             },
         ],
-        sd=[],
+        steam=[],
         rd=[],
     )
     # 2 IGDB games + 1 unlinked Steam game (appid 20); appid 10 is linked.
