@@ -6,6 +6,7 @@ A polyglot payload, appended archive or crafted metadata does not survive a
 re-encode, and EXIF — GPS position included — is dropped because Pillow
 writes none unless asked."""
 
+import struct
 from io import BytesIO
 from typing import NamedTuple
 from uuid import uuid4
@@ -65,7 +66,11 @@ def process_image(
         source = Image.open(uploaded)  # ty: ignore[invalid-argument-type]
     except Image.DecompressionBombError as exc:
         raise ValidationError(_("This image's dimensions are too large.")) from exc
-    except (UnidentifiedImageError, OSError) as exc:
+    except (UnidentifiedImageError, OSError, ValueError, EOFError, struct.error) as exc:
+        # A well-formed IHDR followed by a malformed ancillary chunk (e.g. a
+        # truncated pHYs) makes Pillow's format plugins raise bare ValueError/
+        # EOFError/struct.error from inside Image.open() itself — none of
+        # which are OSError, so they used to escape as a 500.
         raise ValidationError(_("Upload a JPEG, PNG or WebP image.")) from exc
     if source.format not in ALLOWED_FORMATS:
         raise ValidationError(_("Upload a JPEG, PNG or WebP image."))
@@ -82,11 +87,12 @@ def process_image(
         source.draft("RGB", (2 * max_side, 2 * max_side))
     try:
         source.load()
-    except OSError as exc:
-        raise ValidationError(_("Upload a JPEG, PNG or WebP image.")) from exc
-    encoded, resized = _encode(source, max_side)
-    return ProcessedImage(
-        image=encoded,
+        encoded, resized = _encode(source, max_side)
         # From the resized copy, not a second pass over the original.
-        thumbnail=_encode(resized, THUMBNAIL_SIDE)[0] if thumbnail else None,
-    )
+        thumb = _encode(resized, THUMBNAIL_SIDE)[0] if thumbnail else None
+    except (OSError, ValueError, EOFError, struct.error) as exc:
+        # Malformed pixel data past a valid header can raise any of these from
+        # load(), and convert() (inside _encode) can raise ValueError on
+        # exotic modes — all are "not a real image", never a 500.
+        raise ValidationError(_("Upload a JPEG, PNG or WebP image.")) from exc
+    return ProcessedImage(image=encoded, thumbnail=thumb)

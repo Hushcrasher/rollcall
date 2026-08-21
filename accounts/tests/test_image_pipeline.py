@@ -2,6 +2,7 @@
 a user uploads goes through process_image — these tests are the security
 gate's contract. Pure module: no database."""
 
+import struct
 from io import BytesIO
 
 import pytest
@@ -160,3 +161,21 @@ def test_png_and_webp_are_accepted_inputs(fmt: str, name: str) -> None:
     # ALLOWED_FORMATS lists three; only JPEG had coverage.
     processed = images.process_image(_upload(fmt=fmt, name=name), max_side=2560)
     assert Image.open(BytesIO(processed.image.read())).format == "WEBP"
+
+
+def test_a_malformed_chunk_past_the_header_is_rejected_not_a_500() -> None:
+    # A valid IHDR followed by a truncated ancillary chunk (here pHYs, from
+    # dpi=) makes Pillow's PNG plugin raise a bare ValueError deep inside
+    # Image.open() — neither UnidentifiedImageError nor OSError, so it used to
+    # escape process_image entirely and surface as a 500 instead of the i18n
+    # message. struct.error/EOFError are siblings of the same gap and are
+    # exercised together by the broadened handler.
+    buffer = BytesIO()
+    Image.new("RGB", (64, 64), "red").save(buffer, format="PNG", dpi=(72, 72))
+    data = bytearray(buffer.getvalue())
+    chunk_at = data.find(b"pHYs")
+    assert chunk_at != -1, "fixture must actually contain a pHYs chunk"
+    struct.pack_into(">I", data, chunk_at - 4, 4)  # declare a too-short length
+    upload = SimpleUploadedFile("t.png", bytes(data), content_type="image/png")
+    with pytest.raises(ValidationError, match="Upload a JPEG"):
+        images.process_image(upload, max_side=2560)
