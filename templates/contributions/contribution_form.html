@@ -60,8 +60,35 @@
       return document.querySelector("[name=csrfmiddlewaretoken]").value;
     }
 
-    // Load the picked game's studios as employer quick-picks. reset=true wipes
-    // any current employer selection (used when the game changes).
+    // Sync the just-loaded (or just-changed) #employer-select into the hidden
+    // COMPANY_FIELD: its value for a real option, cleared for "__other" (which
+    // reveals the search instead — __other is never a company id, so it must
+    // never reach the hidden field, let alone get posted). Re-run on "change"
+    // since the select is replaced wholesale on every loadEmployers() call.
+    function applyEmployerSelect(field) {
+      const select = field.querySelector("#employer-select");
+      if (!select) return;
+      function sync() {
+        const hidden = document.getElementById(COMPANY_FIELD);
+        if (select.value === "__other") {
+          hidden.value = "";
+          field.querySelector(".employer-search").hidden = false;
+          field.querySelector(".employer-search .autocomplete-input").focus();
+          return;
+        }
+        hidden.value = select.value;
+        field.querySelector(".chosen").textContent = select.options[select.selectedIndex].text;
+        field.querySelector(".employer-search").hidden = true;
+      }
+      sync();
+      select.addEventListener("change", sync);
+    }
+
+    // Load the picked game's studios as the employer select. reset=true wipes
+    // any current employer selection (used when the game changes); reset=false
+    // is the initial page load, where the edit form's saved company (carried
+    // in data-selected) is passed through so game_employers can preselect it
+    // even if it isn't one of this game's credited studios.
     function loadEmployers(gameId, reset) {
       const field = document.getElementById("employer-field");
       if (!field) return;
@@ -71,10 +98,13 @@
         field.querySelector(".employer-search").hidden = true;
         field.querySelector(".employer-search .results").innerHTML = "";
       }
-      const url = field.dataset.employersUrl.replace("/0/", "/" + gameId + "/");
+      const selected = reset ? "" : field.dataset.selected;
+      const url = field.dataset.employersUrl.replace("/0/", "/" + gameId + "/")
+        + (selected ? "?selected=" + selected : "");
       fetch(url).then((r) => r.text()).then((html) => {
         document.getElementById("employer-quickpicks").innerHTML = html;
         field.querySelector(".employer-hint").hidden = true;
+        applyEmployerSelect(field);
       });
     }
 
@@ -88,14 +118,6 @@
       wrapper.querySelector(".results").innerHTML = "";
       wrapper.querySelector(".autocomplete-input").value = "";
       if (wrapper.dataset.hidden === GAME_FIELD) loadEmployers(option.dataset.id, true);
-    });
-
-    // "Worked for another company?" → reveal the company search.
-    document.addEventListener("click", function (event) {
-      if (!event.target.closest(".employer-other-toggle")) return;
-      const search = document.querySelector("#employer-field .employer-search");
-      search.hidden = false;
-      search.querySelector(".autocomplete-input").focus();
     });
 
     // Create a company that isn't in our database (outsourcing studios etc.).

@@ -1,10 +1,14 @@
 {% load i18n %}
-{% for employer in employers %}
-  <button type="button" class="autocomplete-option"
-          data-id="{{ employer.id }}" data-label="{{ employer.name }}">
-    {{ employer.name }} <small>{{ employer.role }}</small>
-  </button>
-{% endfor %}
-<button type="button" class="employer-other-toggle">
-  {% translate "Worked for another company?" %}
-</button>
+{% comment %}
+  A select, developer first and preselected: the common case needs no click
+  (spec 2026-08-21-credit-form-v2 §1). The two trailing options are the
+  escapes. {# #} can't span lines (Django strips only single-line comments,
+  see _employer_field.html) — {% comment %} is the multi-line form.
+{% endcomment %}
+<select id="employer-select" class="employer-select" aria-label="{% translate 'Employer' %}">
+  {% for employer in employers %}
+    <option value="{{ employer.id }}"{% if employer.id == selected_id %} selected{% endif %}>{{ employer.name }} ({{ employer.role }})</option>
+  {% endfor %}
+  <option value=""{% if selected_id is None %} selected{% endif %}>{% translate "No employer / freelance" %}</option>
+  <option value="__other">{% translate "Another company…" %}</option>
+</select>

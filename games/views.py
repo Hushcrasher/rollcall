@@ -11,6 +11,7 @@ from typing import Any
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
+from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST
 from django.views.generic import DetailView
 
@@ -113,8 +114,14 @@ _EMPLOYER_ROLE_ORDER = [
 
 
 def game_employers(request: HttpRequest, pk: int) -> HttpResponse:
-    """The companies credited on this game — quick-picks for the employer field.
-    Deduplicated across roles; ordered developer → publisher → porting → support."""
+    """The companies credited on this game, as a <select>: developer first and
+    preselected (spec 2026-08-21-credit-form-v2 §1). Deduplicated across
+    roles; ordered developer → publisher → porting → support.
+
+    `?selected=<company pk>` (the edit form's saved company) is appended to
+    the list — as `_("current employer")` — when it isn't already one of the
+    game's studios, so editing a credit never silently drops the employer the
+    member actually recorded."""
     game = get_object_or_404(Game, pk=pk)
     employers: list[dict[str, Any]] = []
     seen: set[int] = set()
@@ -129,7 +136,33 @@ def game_employers(request: HttpRequest, pk: int) -> HttpResponse:
         employers.append(
             {"id": link.company.pk, "name": link.company.name, "role": link.get_role_display()}
         )
-    return render(request, "games/_employer_options.html", {"employers": employers})
+
+    selected = request.GET.get("selected")
+    if selected and selected.isdigit() and int(selected) not in seen:
+        company = Company.objects.filter(pk=selected).first()
+        if company is not None:
+            seen.add(company.pk)
+            employers.append(
+                {"id": company.pk, "name": company.name, "role": _("current employer")}
+            )
+
+    # Selection rule (spec §1): the saved company when it made it into the
+    # list above, else the first employer (developer-first ordering), else
+    # None — "No employer / freelance" is the only sane default with nothing
+    # to preselect. `__other` is never a candidate: it isn't a company id.
+    selected_id: int | None
+    if selected and selected.isdigit() and int(selected) in seen:
+        selected_id = int(selected)
+    elif employers:
+        selected_id = employers[0]["id"]
+    else:
+        selected_id = None
+
+    return render(
+        request,
+        "games/_employer_options.html",
+        {"employers": employers, "selected_id": selected_id},
+    )
 
 
 @require_POST

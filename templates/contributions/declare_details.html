@@ -48,11 +48,37 @@
     const COMPANY_FIELD = "{{ form.company.auto_id }}";
     const GAME_PK = "{{ game.pk }}";
 
-    // The employer quick-picks for the game chosen in step 1. The credit form's
+    // Sync the just-loaded (or just-changed) #employer-select into the hidden
+    // COMPANY_FIELD: its value for a real option, cleared for "__other" (which
+    // reveals the search instead — __other is never a company id, so it must
+    // never reach the hidden field, let alone get posted). Copied verbatim
+    // from contribution_form.html: the two templates already carry their own
+    // employer JS on purpose (_employer_field.html's comment), since here the
+    // game is fixed and loadEmployers() below runs once instead of reloading
+    // on a game change.
+    function applyEmployerSelect(field) {
+      const select = field.querySelector("#employer-select");
+      if (!select) return;
+      function sync() {
+        const hidden = document.getElementById(COMPANY_FIELD);
+        if (select.value === "__other") {
+          hidden.value = "";
+          field.querySelector(".employer-search").hidden = false;
+          field.querySelector(".employer-search .autocomplete-input").focus();
+          return;
+        }
+        hidden.value = select.value;
+        field.querySelector(".chosen").textContent = select.options[select.selectedIndex].text;
+        field.querySelector(".employer-search").hidden = true;
+      }
+      sync();
+      select.addEventListener("change", sync);
+    }
+
+    // The employer select for the game chosen in step 1. The credit form's
     // version reloads this when the game changes; here the game is fixed, so it
-    // runs once. `.employer-search` stays hidden until the toggle below reveals
-    // it — same as the credit form's version, so "Worked for another company?"
-    // isn't a no-op button sitting above an already-open search box.
+    // runs once. `.employer-search` stays hidden until "Another company…" is
+    // picked from the select (applyEmployerSelect above reveals it).
     function loadEmployers() {
       const field = document.getElementById("employer-field");
       const url = field.dataset.employersUrl.replace(/0\/employers\/$/, GAME_PK + "/employers/");
@@ -61,6 +87,7 @@
         .then((html) => {
           document.getElementById("employer-quickpicks").innerHTML = html;
           field.querySelector(".employer-hint").hidden = true;
+          applyEmployerSelect(field);
         });
     }
 
@@ -71,14 +98,6 @@
       document.querySelector("#employer-field .chosen").textContent = option.dataset.label;
       const results = document.querySelector("#employer-field .results");
       if (results) results.innerHTML = "";
-    });
-
-    // "Worked for another company?" → reveal the company search.
-    document.addEventListener("click", function (event) {
-      if (!event.target.closest(".employer-other-toggle")) return;
-      const search = document.querySelector("#employer-field .employer-search");
-      search.hidden = false;
-      search.querySelector(".autocomplete-input").focus();
     });
 
     loadEmployers();

@@ -12,7 +12,7 @@ from django.utils.functional import Promise
 from accounts.models import User
 from contributions.models import Contribution, Discipline
 from contributions.views import ContributionCreateView
-from games.models import Game
+from games.models import Company, Game
 
 pytestmark = pytest.mark.django_db
 
@@ -136,6 +136,28 @@ def test_owner_can_edit_their_credit(
 
     contribution.refresh_from_db()
     assert contribution.job_title == "New Title"
+
+
+def test_edit_page_carries_the_saved_company_for_the_js(
+    client: Client, verified_user: User, game: Game, discipline: Discipline
+) -> None:
+    """`#employer-field`'s `data-selected` is what the edit form's JS
+    (contribution_form.html) reads to ask `games:game_employers` to preselect
+    the saved company on load — even one no longer linked to the game."""
+    company = Company.objects.create(name="Indie Studio", source=Company.Source.MANUAL)
+    contribution = Contribution.objects.create(
+        user=verified_user,
+        game=game,
+        company=company,
+        discipline=discipline,
+        job_title="Old",
+        start_date=date(2020, 1, 1),
+    )
+    client.force_login(verified_user)
+
+    response = client.get(reverse("contributions:edit", kwargs={"pk": contribution.pk}))
+
+    assert f'data-selected="{company.pk}"'.encode() in response.content
 
 
 def test_non_owner_cannot_edit(
