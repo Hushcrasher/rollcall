@@ -27,6 +27,7 @@ CREDIT_FIELDS: tuple[str, ...] = (
     "job_title",
     "start_date",
     "end_date",
+    "country",
 )
 
 
