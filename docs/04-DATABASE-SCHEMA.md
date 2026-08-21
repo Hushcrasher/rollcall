@@ -64,7 +64,7 @@ On approval: set `users.role = 'recruiter'`. Managed entirely through Django adm
 | release_date | date | nullable | `[source]` |
 | parent_game_id | → games | nullable | **Dormant.** Remaster/edition/DLC link (mirrors IGDB parent/version). |
 | summary | text | nullable | `[source]` |
-| cover_url | varchar | nullable | `[source]` Full URL on IGDB/Steam CDN. **We never store images.** |
+| cover_url | varchar | nullable | `[source]` Full URL on IGDB/Steam CDN. **We never store images.** Also the preferred capsule source for pages — see `Game.capsule_url`, docs/01-DESIGN.md §3.1. |
 | igdb_rating | numeric(5,2) | nullable | `[source]` IGDB user rating. |
 | igdb_aggregated_rating | numeric(5,2) | nullable | `[source]` Critics. |
 | steam_positive_pct | numeric(5,2) | nullable | `[source]` % positive reviews — powers the "rating > 70%" filter. |
