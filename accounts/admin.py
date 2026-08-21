@@ -123,6 +123,11 @@ class ProfileImageAdmin(admin.ModelAdmin):
     def thumb(self, obj: ProfileImage) -> str:
         # FieldFile at runtime; ty sees the ImageField (house bridge).
         thumbnail: Any = obj.thumbnail
+        # Unreachable through the upload pipeline (both files are always
+        # written), but a hand-made row must not crash the whole changelist —
+        # FieldFile.url raises ValueError when the field is empty.
+        if not thumbnail:
+            return ""
         # Empty alt: the caption is its own column, so the image is decorative
         # here — and a caption is optional anyway.
         return format_html('<img src="{}" width="80" alt="">', thumbnail.url)
