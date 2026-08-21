@@ -79,9 +79,29 @@ profiles, credits) in one command. See [CONTRIBUTING.md](CONTRIBUTING.md)
 
 The full list lives in [docs/00-README.md](docs/00-README.md).
 
-## License
+## License and copyright
 
-[AGPL v3](LICENSE). Source: <https://github.com/Micro-SAS/rollcall>
+Copyright (C) 2026 Hushcrasher SAS.
+
+Rollcall is free software: you can redistribute it and/or modify it under the
+terms of the GNU Affero General Public License as published by the Free
+Software Foundation, either version 3 of the License, or (at your option) any
+later version. See [LICENSE](LICENSE). Source:
+<https://github.com/Hushcrasher/rollcall>.
+
+**What the licence covers — and what it does not.** The AGPL covers the
+*software*: this code, its templates and its design. It does not cover, and
+this repository does not contain, any data of the production service: the game
+catalog Hushcrasher assembles, and everything users submit — credits, profiles,
+images, contact requests. That data lives in a private database operated solely
+by Hushcrasher, under the Terms of Service and Privacy Policy published on the
+service; users own their contributions. Anyone may run their own instance of
+this software — with their own database.
+
+**Contributions** are accepted under the [DCO](CONTRIBUTING.md): contributors
+keep the copyright on their work and license it under the same terms
+(AGPL-3.0-or-later).
+There is no CLA and no copyright assignment.
 
 ## Attribution
 
