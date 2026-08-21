@@ -190,6 +190,17 @@ Goal: a game looks like a game — on its page and on every credit line.
 - [x] Capsule on the game page; 92×43 thumbnails on profile credit lines and company game lists; `no-referrer`, hidden on load error
 - [ ] Follow-up: capsules in search result cards (measure page weight first)
 
+## Phase 14 — Public contact email ✅ (spec 2026-08-21)
+
+Goal: a member can publish a contact address without exposing the account email that logs them in.
+
+- [x] `public_email` field on `User` (migration `accounts/0008`): opt-in, blank by default, case-folded on every write path (settings form and admin alike, via a shared mixin) — separate from and independent of the account `email`, deliberately not unique
+- [x] Renders as a `mailto:` link on the member's own public profile page only — to anonymous visitors and members alike — and nowhere else: not in cards, feeds, search-result cards, game or company pages, the sitemap, exports to third parties, or logs; a private profile still 404s for everyone but its owner
+- [x] Owner sees a "Shown publicly" note next to the address, but only while their profile actually is public — a private profile's owner sees the address without the (otherwise false) note
+- [x] The account email stays private and the relay stays the default contact channel; this is a second, narrower channel a member chooses to open
+- [x] Policy texts amended for the new rule (docs/00 #1, `CLAUDE.md`'s first hard rule, docs/01-DESIGN.md §3.4/§3.6, docs/04-DATABASE-SCHEMA.md §1, `privacy.html`, `about.html`)
+- [x] Negative tests: the address appears nowhere but the profile page (feed, search, game page, company page, sitemap, card PNG, profile meta tags, the contact relay's outbound mail) — plus the export sweep and account-deletion/no-email test zones re-run clean
+
 ## Post-roadmap additions
 
 - [x] **Dev email backend** — prints a clean, copy-friendly body so console verification/reset links aren't corrupted by quoted-printable wrapping

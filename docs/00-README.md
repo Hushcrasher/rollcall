@@ -11,7 +11,7 @@ Documentation set for implementation (intended to be handed to Claude Code).
 
 ## Non-negotiables (if in doubt, these win)
 
-1. Personal emails are **never** displayed or exposed anywhere. Contact only via relay (Reply-To pattern).
+1. The **account** email is never displayed or exposed anywhere. A member may publish a *separate* contact address on their profile (opt-in, settings); it appears only on the public profile page — never in cards, feeds, search results, game pages, exports to third parties, or logs. Contact otherwise only via relay (Reply-To pattern). *(Amended 2026-08-21, spec 2026-08-21-public-contact-email.)*
 2. The app's Postgres is autonomous; **no application code reads the parquet** — only the seed management command.
 3. Seed-owned columns are read-only in the app; the seed never writes platform-owned data (see `04`, §13).
 4. Internal IDs are the pivot; external IDs are nullable+unique.

@@ -29,3 +29,10 @@ def test_about_links_the_report_form(client: Client) -> None:
     # themselves (spec §5: "link to the report form").
     body = client.get(reverse("about")).content.decode()
     assert reverse("contact:report") in body
+
+
+def test_about_page_states_the_public_address_rule(client: Client) -> None:
+    """Amended rule (spec 2026-08-21-public-contact-email): account emails
+    stay private; a member may choose to publish a separate address."""
+    body = client.get(reverse("about")).content.decode()
+    assert "choose to publish" in body.lower()

@@ -27,5 +27,5 @@
     to find it themselves (spec §5).
   {% endcomment %}
   {% url 'contact:report' as report_url %}
-  <p>{% blocktranslate %}Personal email addresses are never shown anywhere on Rollcall. Contact goes through a relay, and only reaches people who have allowed it. Signed-in members can <a href="{{ report_url }}">report</a> any profile or page.{% endblocktranslate %}</p>
+  <p>{% blocktranslate %}Account email addresses are never shown anywhere on Rollcall; members may choose to publish a separate contact address on their profile. Contact otherwise goes through a relay, and only reaches people who have allowed it. Signed-in members can <a href="{{ report_url }}">report</a> any profile or page.{% endblocktranslate %}</p>
 {% endblock %}

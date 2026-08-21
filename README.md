@@ -68,8 +68,9 @@ profiles, credits) in one command. See [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## Non-negotiable product rules
 
-1. Personal emails are never displayed or exposed anywhere — contact happens
-   only through a relay (Reply-To pattern).
+1. The account email is never displayed or exposed anywhere. A member may
+   publish a separate, opt-in contact address on their public profile page
+   only; contact otherwise happens through a relay (Reply-To pattern).
 2. No public negative signals of any kind (no down-votes, no public "disputed"
    labels, no numeric trust scores).
 3. The app's Postgres is autonomous; no application code reads the parquet —

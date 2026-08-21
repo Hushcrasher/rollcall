@@ -23,7 +23,9 @@ def test_public_profile_is_visible_to_anonymous(client: Client) -> None:
 
 
 def test_email_never_appears_on_the_profile(client: Client) -> None:
-    """Non-negotiable #1: personal emails are never exposed anywhere."""
+    """Non-negotiable #1 (amended 2026-08-21): the account email is never
+    exposed anywhere — this user has no opt-in `public_email` set, which is a
+    separate field covered by accounts/tests/test_public_email.py."""
     user = User.objects.create_user(
         email="secret@example.com", password="x", display_name="Hidden Email"
     )
