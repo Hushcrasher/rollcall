@@ -9,7 +9,7 @@ private first.
 **Do not open a public issue for a security or privacy problem.**
 
 Use GitHub's private vulnerability reporting on this repository
-(<https://github.com/Micro-SAS/rollcall> — "Security" tab → "Report a
+(<https://github.com/Hushcrasher/rollcall> — "Security" tab → "Report a
 vulnerability"). If that is unavailable to you, contact the maintainers
 privately through their GitHub profiles.
 

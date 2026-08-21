@@ -34,7 +34,7 @@ Goal: a Django skeleton that runs, with license, CI and containers in place.
 - [x] `.env.example` with every secret/endpoint; `.gitignore` excludes `.env`
 - [x] README with transparency paragraph (AGPL code / private Hushcrasher DB) + CONTRIBUTING with DCO
 - [x] Initial commit — **LICENSE included in it** (AGPL v3: code only; user data stays private under Hushcrasher)
-- [x] Repo created on GitHub (`Micro-SAS/rollcall`) and pushed
+- [x] Repo created on GitHub (`Micro-SAS/rollcall`; transferred to `Hushcrasher/rollcall` on 2026-08-21) and pushed
 
 ## Phase 1 — Database schema & fixtures ✅
 
