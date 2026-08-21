@@ -153,6 +153,17 @@ Goal: artists can show work; every upload goes through one hardened pipeline.
 - [x] Avatar routed through the same pipeline (512px)
 - [x] GDPR: deletion removes files; JSON export lists the portfolio
 
+## Phase 10 — Open Graph cards ✅ (spec 2026-08-21)
+
+Goal: a Rollcall link previews richly wherever it is pasted; sharing a profile is one click.
+
+- [x] `cards` app: pure Pillow renderer (Inter, OFL), `CardData` = the only fields a card may show
+- [x] `/u/<slug>/card.png` (public profiles only), `/g/<slug>/card.png`, `/card.png` — cached 1 h, rate-limited, `?v=` token
+- [x] `og:*` / `twitter:card` tags on every page; profile and game overrides; no tag ever carries an email
+- [x] `profile_summary()` in `search/services.py` — one career aggregate for search cards and OG cards
+- [x] Owner-only share row: copy link, LinkedIn / Bluesky / X, card preview
+- [ ] v2: Noto fallback chain for non-Latin names (v1 renders the neutral card)
+
 ## Post-roadmap additions
 
 - [x] **Dev email backend** — prints a clean, copy-friendly body so console verification/reset links aren't corrupted by quoted-printable wrapping

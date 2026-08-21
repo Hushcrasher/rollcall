@@ -12,6 +12,7 @@
 | API layer | None in POC | Server-rendered views. If/when a public API is needed: Django REST Framework endpoints beside existing views, no rewrite. |
 | Auth | **Django auth** (email+password, email verification, password reset) | Email verification required before creating contributions. No auth SaaS (breaks self-hosting/AGPL spirit). Post-POC: `django-allauth` for Discord OAuth (the industry's network). |
 | Templates/front | **Django templates + htmx** (+ optionally Alpine.js for micro-interactions) | No SPA. Native SEO for profile/game pages, session auth, half the work. CSS: Pico CSS v2 classless, vendored (chosen 2026-08-20) + one functional-only app.css; still not architectural — swapping it stays cheap. |
+| Open Graph cards | **Pillow**, pure Python, no DB/request in the render path (chosen 2026-08-21, spec `docs/superpowers/specs/2026-08-21-open-graph-cards-design.md`) | Server-rendered 1200×630 PNGs for profile/game/site link previews — text only, no illustration. Pillow ships no usable font, so **Inter** (SIL Open Font License 1.1) is vendored under `cards/fonts/` (`Inter-Regular.ttf`, `Inter-Bold.ttf`, `OFL.txt`) rather than pulled at request time. |
 | i18n | Django i18n from day one, `en` only shipped | Cheap discipline now, painful retrofit later. |
 
 ## Data
@@ -56,6 +57,7 @@ duckdb                # seed command only
 django-storages[s3]
 django-ratelimit
 django-htmx           # convenience middleware/helpers
+pillow                # Open Graph card rendering (cards app)
 whitenoise            # static files from the container
 sentry-sdk
 gunicorn
