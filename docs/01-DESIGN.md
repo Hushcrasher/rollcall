@@ -18,7 +18,7 @@ It addresses two industry problems:
 
 - **Truth comes from workers, validated by peers** — not from official credits. Declarations are visible by default; confirmation is a bonus, not a gate.
 - **Being findable IS the service** (IMDb model). All public profiles are visible to everyone, including recruiters. No separate "searchable by recruiters" opt-in.
-- **Never expose personal emails.** All contact goes through a relay.
+- **Never expose the account email.** A member may publish a *separate* opt-in contact address on their public profile (spec 2026-08-21-public-contact-email); all other contact goes through a relay.
 - **No public shaming.** No negative votes, no public "disputed" labels, no public reliability scores. Disputes are handled privately via reports and moderation.
 - **The app's Postgres database is autonomous.** External sources (Hushcrasher parquet, IGDB) feed it via batch; no runtime dependency on them.
 - **Keep doors open in the schema, keep the POC small in UI.** Several columns/tables exist from day one with no UI ("dormant").
