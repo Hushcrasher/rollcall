@@ -59,7 +59,7 @@ def process_image(
     uploaded: UploadedFile, *, max_side: int, thumbnail: bool = False
 ) -> ProcessedImage:
     """Validate and re-encode one upload; ValidationError on anything that is
-    not a plain JPEG/PNG/WebP within the caps."""
+    not a plain JPEG/PNG/WebP/MPO within the caps."""
     # Fail closed: an unreadable size is treated as over the cap, never skipped.
     if uploaded.size is None or uploaded.size > MAX_UPLOAD_BYTES:
         raise ValidationError(_("Images can be at most 10 MB."))
@@ -80,12 +80,14 @@ def process_image(
     # the header alone, so this runs before load() decodes any pixel data.
     if source.width * source.height > MAX_IMAGE_PIXELS:
         raise ValidationError(_("This image's dimensions are too large."))
-    if source.format == "JPEG":
+    if source.format in ("JPEG", "MPO"):
         # DCT-domain downscale, decided before any pixel is decoded: JPEG can be
         # unpacked at 1/2, 1/4 or 1/8 scale for free, so a phone photo headed for
         # a 512px avatar never materialises at full size. 2x max_side keeps a
         # margin above the target, so the real resize below never upsamples;
         # a no-op on anything already small enough, and on every other format.
+        # MPO is included: MpoImageFile subclasses JpegImageFile and draft()
+        # the same way.
         source.draft("RGB", (2 * max_side, 2 * max_side))
     try:
         source.load()

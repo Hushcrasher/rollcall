@@ -147,15 +147,18 @@ def test_a_rejected_file_stores_nothing(client: Client) -> None:
 def test_upload_is_rate_limited(client: Client, settings: Any) -> None:
     settings.RATELIMIT_ENABLE = True
     cache.clear()  # rate counters live in the cache
-    user = _user()
-    client.force_login(user)
-    for _i in range(10):
-        client.post(reverse("accounts:portfolio_add"), {"image": _png_upload()})
-    response = client.post(reverse("accounts:portfolio_add"), {"image": _png_upload()})
-    assert response.status_code == 403
-    # Leaves portfolio_add's own counters behind otherwise — harmless only
-    # because RATELIMIT_ENABLE=False elsewhere, not a reason to skip it.
-    cache.clear()
+    try:
+        user = _user()
+        client.force_login(user)
+        for _i in range(10):
+            client.post(reverse("accounts:portfolio_add"), {"image": _png_upload()})
+        response = client.post(reverse("accounts:portfolio_add"), {"image": _png_upload()})
+        assert response.status_code == 403
+    finally:
+        # Leaves portfolio_add's own counters behind otherwise — harmless
+        # only because RATELIMIT_ENABLE=False elsewhere, not a reason to
+        # skip it, and not a reason to skip it on failure either.
+        cache.clear()
 
 
 def test_rate_limit_is_per_user_not_shared(client: Client, settings: Any) -> None:

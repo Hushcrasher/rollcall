@@ -205,6 +205,30 @@ def test_mpo_wrapped_jpegs_from_phone_cameras_are_accepted() -> None:
     assert pixel[:3] == (255, 0, 0)  # ty: ignore[not-subscriptable]  # frame 0 (red), not frame 1
 
 
+def test_the_mpo_draft_fast_path_actually_runs(monkeypatch: pytest.MonkeyPatch) -> None:
+    # MpoImageFile subclasses JpegImageFile and doesn't override draft(), so
+    # the same DCT-domain downscale should fire for MPO as for plain JPEG —
+    # but the guard checked source.format == "JPEG" literally, which is
+    # never true for an MPO container, so the fast path was silently skipped.
+    calls: list[tuple[str, tuple[int, int]]] = []
+    original_draft = JpegImageFile.draft
+
+    def spy_draft(self: JpegImageFile, mode: str, size: tuple[int, int]) -> None:
+        calls.append((mode, size))
+        original_draft(self, mode, size)
+
+    monkeypatch.setattr(JpegImageFile, "draft", spy_draft)
+    buffer = BytesIO()
+    frame0 = Image.new("RGB", (2400, 2400), "red")
+    frame1 = Image.new("RGB", (2400, 2400), "blue")
+    frame0.save(buffer, format="MPO", append_images=[frame1])
+    upload = SimpleUploadedFile("t.jpg", buffer.getvalue(), content_type="image/jpeg")
+    processed = images.process_image(upload, max_side=512)
+    assert calls == [("RGB", (1024, 1024))]  # 2x max_side, per process_image
+    out = Image.open(BytesIO(processed.image.read()))
+    assert max(out.size) == 512
+
+
 def test_a_malformed_chunk_past_the_header_is_rejected_not_a_500() -> None:
     # A valid IHDR followed by a truncated ancillary chunk (here pHYs, from
     # dpi=) makes Pillow's PNG plugin raise a bare ValueError deep inside
