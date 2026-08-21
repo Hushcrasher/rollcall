@@ -9,6 +9,7 @@ import pytest
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from PIL import Image
+from PIL.JpegImagePlugin import JpegImageFile
 
 from accounts import images
 
@@ -161,6 +162,30 @@ def test_png_and_webp_are_accepted_inputs(fmt: str, name: str) -> None:
     # ALLOWED_FORMATS lists three; only JPEG had coverage.
     processed = images.process_image(_upload(fmt=fmt, name=name), max_side=2560)
     assert Image.open(BytesIO(processed.image.read())).format == "WEBP"
+
+
+def test_the_jpeg_draft_fast_path_actually_runs(monkeypatch: pytest.MonkeyPatch) -> None:
+    # No fixture elsewhere in this file is larger than 2x max_side, so the
+    # DCT-domain downscale branch (source.draft(...)) never ran under test —
+    # a Pillow bump could silently disable it and nothing would fail. The
+    # final size alone wouldn't pin this: out.thumbnail() in _encode resizes
+    # to the target regardless of whether draft() ran first. Spying on the
+    # call is what actually proves the fast path was taken.
+    calls: list[tuple[str, tuple[int, int]]] = []
+    original_draft = JpegImageFile.draft
+
+    def spy_draft(self: JpegImageFile, mode: str, size: tuple[int, int]) -> None:
+        calls.append((mode, size))
+        original_draft(self, mode, size)
+
+    monkeypatch.setattr(JpegImageFile, "draft", spy_draft)
+    buffer = BytesIO()
+    Image.new("RGB", (2400, 2400), "red").save(buffer, format="JPEG")
+    upload = SimpleUploadedFile("t.jpg", buffer.getvalue(), content_type="image/jpeg")
+    processed = images.process_image(upload, max_side=512)
+    assert calls == [("RGB", (1024, 1024))]  # 2x max_side, per process_image
+    out = Image.open(BytesIO(processed.image.read()))
+    assert max(out.size) == 512
 
 
 def test_mpo_wrapped_jpegs_from_phone_cameras_are_accepted() -> None:
