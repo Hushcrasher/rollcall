@@ -81,11 +81,12 @@ The full list lives in [docs/00-README.md](docs/00-README.md).
 
 ## License and copyright
 
-Copyright (C) 2026 Hushcrasher.
+Copyright (C) 2026 Hushcrasher SAS.
 
 Rollcall is free software: you can redistribute it and/or modify it under the
-terms of the GNU Affero General Public License, version 3, as published by the
-Free Software Foundation. See [LICENSE](LICENSE). Source:
+terms of the GNU Affero General Public License as published by the Free
+Software Foundation, either version 3 of the License, or (at your option) any
+later version. See [LICENSE](LICENSE). Source:
 <https://github.com/Hushcrasher/rollcall>.
 
 **What the licence covers — and what it does not.** The AGPL covers the
@@ -98,7 +99,8 @@ service; users own their contributions. Anyone may run their own instance of
 this software — with their own database.
 
 **Contributions** are accepted under the [DCO](CONTRIBUTING.md): contributors
-keep the copyright on their work and license it under the same AGPL v3 terms.
+keep the copyright on their work and license it under the same terms
+(AGPL-3.0-or-later).
 There is no CLA and no copyright assignment.
 
 ## Attribution

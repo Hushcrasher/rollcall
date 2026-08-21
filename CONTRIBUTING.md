@@ -12,7 +12,7 @@ git commit -s -m "feat: my change"
 ```
 
 The `Signed-off-by:` trailer certifies you have the right to submit the code
-under the project's license (AGPL v3). **CI enforces this on every PR commit**
+under the project's license (AGPL v3 or, at your option, any later version). **CI enforces this on every PR commit**
 — an unsigned commit fails the `dco` check.
 
 ## Getting started
