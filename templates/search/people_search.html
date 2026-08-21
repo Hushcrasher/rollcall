@@ -28,11 +28,15 @@
   {% if not user.is_authenticated %}
     {% comment %}
       One line, not the funnel: /declare/ carries the question and the game
-      form. Two independent phrases, not one sentence split around a link —
-      the question stands on its own and "Add your credit" is the link's own
-      text, so each can translate as its own unit without a reordering risk.
+      form. One blocktranslate, not two translate calls fragmented around
+      the link — a fragmented sentence can't be reordered for a language
+      that doesn't share English's word order. The link's URL is the only
+      placeholder; its own text stays inside the translatable string. (#6;
+      the trailing qualifier clause is gone per spec 2026-08-21-search-chrome
+      §3, but the sentence is still one unit.)
     {% endcomment %}
-    <p>{% translate "Worked on a game?" %} <a href="{% url 'contributions:declare' %}">{% translate "Add your credit" %}</a></p>
+    {% url 'contributions:declare' as declare_url %}
+    <p>{% blocktranslate %}Worked on a game? <a href="{{ declare_url }}">Add your credit</a>{% endblocktranslate %}</p>
   {% endif %}
 
   {% comment %}
