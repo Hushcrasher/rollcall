@@ -85,7 +85,6 @@ class RecruiterSearchForm(forms.Form):
         widget=TypeaheadSelectMultiple(
             url_name="search:engine_autocomplete", placeholder=_("Search engines…")
         ),
-        help_text=_("Matches games using any of the selected."),
     )
     genres = forms.ModelMultipleChoiceField(
         queryset=Genre.objects.all(),
@@ -96,11 +95,8 @@ class RecruiterSearchForm(forms.Form):
         ),
         # The data caveat is honest, not cosmetic: IGDB-only games currently
         # carry no genre data (ROADMAP "Non-Steam facet coverage"), so this
-        # filter excludes credits on non-Steam games.
-        help_text=_(
-            "Matches games in any of the selected. Genre data currently covers "
-            "Steam-linked games only."
-        ),
+        # filter excludes credits on non-Steam games. Surfaced once, in the
+        # template's shared footnote, not per field (spec 2026-08-21-search-chrome §2).
     )
     countries = forms.MultipleChoiceField(
         choices=_country_choices,
@@ -109,7 +105,6 @@ class RecruiterSearchForm(forms.Form):
         widget=TypeaheadSelectMultiple(
             url_name="search:country_autocomplete", placeholder=_("Search countries…")
         ),
-        help_text=_("Where the person is — any of the selected."),
     )
     # min 1, not 0: "0" reads as "I don't care about rating" but means "must
     # HAVE rating data" — leave the field blank to not filter on rating.
@@ -119,8 +114,8 @@ class RecruiterSearchForm(forms.Form):
         max_value=100,
         label=_("Min. rating (%)"),
         # Same honest caveat as genres: the current data carries ratings for
-        # Steam-linked games only, so any value here excludes non-Steam credits.
-        help_text=_("Rating data currently covers Steam-linked games only."),
+        # Steam-linked games only — surfaced in the template's shared footnote
+        # (spec 2026-08-21-search-chrome §2), not repeated here per field.
     )
     year_from = forms.IntegerField(
         required=False, min_value=1970, max_value=2100, label=_("Worked on a game since (year)")
@@ -140,6 +135,14 @@ class RecruiterSearchForm(forms.Form):
         list and that guard fails loudly.
         """
         return [self["engines"], self["genres"], self["countries"]]
+
+    def game_fields(self) -> list[forms.BoundField]:
+        """Row 1 — what they worked on (spec 2026-08-21-search-chrome §2)."""
+        return [self["engines"], self["genres"], self["min_rating"]]
+
+    def person_fields(self) -> list[forms.BoundField]:
+        """Row 2 — who they are."""
+        return [self["discipline"], self["countries"], self["year_from"], self["open_to_work"]]
 
     def clean(self) -> dict[str, Any]:
         cleaned = super().clean()

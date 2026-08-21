@@ -164,16 +164,18 @@ def test_chip_remove_control_names_its_value(client: Client) -> None:
 
 
 def test_typeahead_input_has_a_real_label(client: Client) -> None:
-    """A <legend> is the accessible name of *every* control in its fieldset —
-    which is how the old list announced its help text 249 times. One label, one
-    input, and the help text attached once via aria-describedby."""
+    """The countries control sits inside a <fieldset><legend> (the "About the
+    person" row, spec 2026-08-21-search-chrome §2), but that legend only names
+    the GROUP — countries keeps its own <label for>, unlike the old checkbox
+    list where the legend was the only accessible name 249 checkboxes shared.
+    No more aria-describedby: the per-field help text that used to attach here
+    is gone, folded into the page's single data-caveat footnote."""
     content = _search(client, "")
 
     assert '<label for="id_countries">' in content
     assert 'id="id_countries"' in content
-    assert 'aria-describedby="id_countries_helptext"' in content
-    assert 'id="id_countries_helptext"' in content
-    assert "<legend>" not in content
+    assert "aria-describedby" not in content
+    assert "<legend>" in content
 
 
 def test_unknown_country_code_renders_no_chip(client: Client) -> None:
