@@ -88,11 +88,24 @@ def test_feed_survives_an_unrelated_tracking_param(client: Client) -> None:
     # `?utm_source=...`/`?fbclid=...` on a tagged inbound link are not a
     # search — the feed is keyed on RecruiterSearchForm's own filter fields,
     # not on bare `bool(request.GET)`, so an unknown param must not swap the
-    # feed out for an empty results block.
+    # feed out for an empty results block, and must not bind the form either
+    # (a bound-but-empty form's clean() error would render alongside it).
     _credit("a@example.com", "Ada Artist")
     body = client.get(reverse("home"), {"utm_source": "newsletter"}).content.decode()
     assert "Latest credits" in body
     assert "Ada Artist" in body
+    assert "Pick at least one filter." not in body
+
+
+def test_feed_survives_a_bare_page_param(client: Client) -> None:
+    # `?page=2` alone (no real filter) is not a search either — same
+    # reasoning as the tracking-param case above, for the one other
+    # non-form key the view reads directly off request.GET.
+    _credit("a@example.com", "Ada Artist")
+    body = client.get(reverse("home"), {"page": "2"}).content.decode()
+    assert "Latest credits" in body
+    assert "Ada Artist" in body
+    assert "Pick at least one filter." not in body
 
 
 def test_the_feed_sentence_is_one_translation_unit_not_split_around_a_link() -> None:

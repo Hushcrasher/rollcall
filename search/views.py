@@ -83,8 +83,6 @@ class PeopleSearchView(TemplateView):
 
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
         context = super().get_context_data(**kwargs)
-        form = RecruiterSearchForm(self.request.GET or None)
-        context["form"] = form
         # Keyed on whether one of the form's own filter fields is present at
         # all, not bare `bool(request.GET)` and not the fields' truthiness —
         # `?discipline=` (a real, if blank, filter submission) must still
@@ -95,6 +93,11 @@ class PeopleSearchView(TemplateView):
         # on request.GET as a whole.
         base_fields = RecruiterSearchForm.base_fields  # ty: ignore[unresolved-attribute]  (metaclass-added attr)
         searched = any(field in self.request.GET for field in base_fields)
+        # Bound only when searched: otherwise an unrelated param binds the
+        # form too, and its "pick at least one filter" clean() error renders
+        # alongside the feed for a page where no field was ever touched.
+        form = RecruiterSearchForm(self.request.GET if searched else None)
+        context["form"] = form
         if searched and form.is_valid():
             cleaned = form.cleaned_data
             context["results_page"] = recruiter_search(
