@@ -14,7 +14,6 @@ Two unrelated kinds of search live here:
 from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any
 
 from django.contrib.postgres.search import TrigramSimilarity
 from django.core.paginator import Paginator
@@ -72,6 +71,51 @@ def search_people(query: str, limit: int = 20) -> QuerySet[User]:
         .filter(Q(similarity__gt=_SIMILARITY_THRESHOLD) | Q(display_name__icontains=stripped))
         .order_by("-similarity", "display_name")[:limit]
     )
+
+
+@dataclass(frozen=True)
+class ProfileSummary:
+    """Career-wide aggregate over ACTIVE credits — shared by the search cards
+    and the OG cards so the two never disagree."""
+
+    credits_count: int
+    games_count: int
+    first_year: int
+    last_year: int | None  # None = an open end exists, i.e. "present"
+
+    @property
+    def years_label(self) -> str:
+        return f"{self.first_year}–{self.last_year if self.last_year else _('present')}"
+
+
+def profile_summaries(user_ids: list[int]) -> dict[int, ProfileSummary]:
+    rows = (
+        Contribution.objects.filter(status=Contribution.Status.ACTIVE, user_id__in=user_ids)
+        .values("user_id")
+        .annotate(
+            credits_count=Count("id"),
+            games_count=Count("game", distinct=True),
+            first_start=Min("start_date"),
+            last_end=Max("end_date"),
+            open_count=Count("id", filter=Q(end_date__isnull=True)),
+        )
+    )
+    summaries: dict[int, ProfileSummary] = {}
+    for row in rows:
+        # open_count > 0 is what "present" means. Max(end_date) can't answer it:
+        # SQL MAX ignores NULLs, so an ongoing credit is invisible to it.
+        still_active = row["open_count"] > 0
+        summaries[row["user_id"]] = ProfileSummary(
+            credits_count=row["credits_count"],
+            games_count=row["games_count"],
+            first_year=row["first_start"].year,
+            last_year=None if still_active else row["last_end"].year,
+        )
+    return summaries
+
+
+def profile_summary(user: User) -> ProfileSummary | None:
+    return profile_summaries([user.pk]).get(user.pk)
 
 
 @dataclass(frozen=True)
@@ -222,21 +266,7 @@ def _assemble_results(users: list[User], credits: QuerySet[Contribution]) -> lis
         by_user[credit.user_id].append(credit)
 
     # Career-wide aggregates: ALL active credits, not just the matching ones.
-    # Row values are Any — .values().annotate() rows are opaque to ty.
-    stats: dict[int, dict[str, Any]] = {
-        row["user_id"]: row
-        for row in Contribution.objects.filter(
-            status=Contribution.Status.ACTIVE, user_id__in=user_ids
-        )
-        .values("user_id")
-        .annotate(
-            credits_count=Count("id"),
-            games_count=Count("game", distinct=True),
-            first_start=Min("start_date"),
-            last_end=Max("end_date"),
-            open_count=Count("id", filter=Q(end_date__isnull=True)),
-        )
-    }
+    summaries = profile_summaries(user_ids)
 
     # Engine repartition over distinct (game, engine) pairs, career-wide: three
     # credits on one Unreal game are one Unreal game, not three.
@@ -257,22 +287,18 @@ def _assemble_results(users: list[User], credits: QuerySet[Contribution]) -> lis
     results: list[PersonResult] = []
     for user in users:
         # Indexed, not .get(): `users` came from the active-credit queryset, so
-        # every one of them has a stats row. A miss is a bug, not a blank card.
-        row = stats[user.pk]
+        # every one of them has a summary. A miss is a bug, not a blank card.
+        summary = summaries[user.pk]
         matching = by_user.get(user.pk, [])
-        # open_count > 0 is what "present" means. Max(end_date) can't answer it:
-        # SQL MAX ignores NULLs, so an ongoing credit is invisible to it.
-        still_active = row["open_count"] > 0
         results.append(
             PersonResult(
                 user=user,
                 matching_credits=matching[:MATCHING_CREDITS_SHOWN],
                 matching_credits_total=len(matching),
-                credits_count=row["credits_count"],
-                games_count=row["games_count"],
-                first_year=row["first_start"].year,
-                # Not still_active ⇒ every credit has an end_date ⇒ last_end is set.
-                last_year=None if still_active else row["last_end"].year,
+                credits_count=summary.credits_count,
+                games_count=summary.games_count,
+                first_year=summary.first_year,
+                last_year=summary.last_year,
                 engine_shares=_percentage_shares(engine_counts.get(user.pk, {})),
             )
         )
