@@ -46,7 +46,7 @@ cheap to fix. The bones are excellent; the front door is broken.
 3. **Defuse the `.env.example` secret-key trap** (S2-2): make
    [dev.py:8](../../config/settings/dev.py) fall back on an *empty*
    `DJANGO_SECRET_KEY`, or ship the example with a dev default. One line.
-4. **Decide the non-Steam facet story before launch** (S2-3): 57% of the real
+4. **Decide the non-Steam facet story before launch** (S2-3): 57% of the full
    catalog has no rating and no genre data, so the `min_rating` and genre
    filters silently exclude every non-Steam credit while docs/01 promises IGDB
    ratings cover them. Either wire ratings/genres into the upstream export, or
@@ -143,7 +143,7 @@ Fix:         dev.py: `SECRET_KEY = env("DJANGO_SECRET_KEY", default="") or
 Confidence:  high (reproduced)
 ```
 
-### [S2] games/seed/prepare.py:80-81 — with the real data, the rating and genre facets exclude 57% of the catalog; docs/01 §3.6 promises otherwise
+### [S2] games/seed/prepare.py:80-81 — with the full catalog, the rating and genre facets exclude 57% of it; docs/01 §3.6 promises otherwise
 ```
 Evidence:    prepare.py:80-81 hardcodes `NULL::DOUBLE AS igdb_rating` (both
              branches) and prepare.py:38 takes genres from the Steam-side file
@@ -170,7 +170,7 @@ Fix:         Short term, truth in docs/UI: note on the rating/genre fields
              docs/01 §3.6. Real fix: add rating/genre names to the upstream
              IGDB export and wire them through prepare.py (the schema and
              seed already accept them).
-Confidence:  high on the data and mechanism (measured); the "real parquet"
+Confidence:  high on the data and mechanism (measured); the prepared parquet
              on this machine is presumed representative of production.
 ```
 
@@ -257,9 +257,9 @@ Why wrong:   ROADMAP/DEPLOY are correct and honest (EU region of a US
              of them a user-facing legal page, assert the older, stronger
              claim.
 Consequence: A privacy-conscious user (this product's core audience) reads
-             "We host in the EU" and is told something counsel has not vetted
-             and the infrastructure does not straightforwardly deliver; a new
-             contributor reads docs/02 §5 and provisions the wrong stack.
+             "We host in the EU" and gets a stronger claim than the
+             infrastructure straightforwardly delivers; a new contributor
+             reads docs/02 §5 and provisions the wrong stack.
 Fix:         One sweep: update docs/02 §5, docs/03 infra table, README stack
              line, docs/01 §3.7 to "EU region on US-owned providers, DPAs
              signed"; soften privacy.html to "hosted in the EU region of our
@@ -289,18 +289,16 @@ Confidence:  high
 ```
 Evidence:    `COPY . .` (Dockerfile:16 context); no .dockerignore exists
              (checked). A maintainer's working tree contains `.env` (secrets)
-             and data/hushcrasher.parquet, data/steamdb.parquet,
-             data/rollcall_games.parquet (the private data the .gitignore
-             carefully keeps out of git).
+             and the local parquets under `data/` (the private data the
+             .gitignore carefully keeps out of git).
 Why wrong:   .gitignore does not apply to docker build contexts. The privacy
              boundary docs/02 §6 draws ("parquet URL, credentials, and DB
              dumps are private") holds in git and breaks in any locally built
              image.
 Consequence: One `docker build` on the maintainer's machine followed by a
-             push to any registry ships Hushcrasher's private catalog and the
-             .env secrets in an image layer. It also explains why the broken
-             collectstatic step (S2-1) went unnoticed locally: a copied .env
-             or cache can mask it.
+             push to any registry would carry those files in an image layer.
+             It also explains why the broken collectstatic step (S2-1) went
+             unnoticed locally: a copied .env or cache can mask it.
 Fix:         A .dockerignore mirroring .gitignore's data/, *.parquet, .env,
              .venv, media/, plus .git.
 Confidence:  high on mechanism; no evidence an image has actually been pushed.
@@ -577,10 +575,10 @@ concentrated in S2-1 and S2-2.
    Settle: one test deploy, or check Railway's build-args behavior for
    Dockerfile builds.
 2. **Is the local `data/` representative of the production parquet?** The
-   57%-no-facets measurement (S2-3) ran on this machine's
-   rollcall_games.parquet. If a newer upstream export carries ratings/genres
-   for IGDB rows, the finding shrinks to a doc fix. Settle: DESCRIBE the
-   parquet in the private R2 bucket.
+   57%-no-facets measurement (S2-3) ran on the prepared parquet on this
+   machine. If a newer upstream export carries ratings/genres for IGDB rows,
+   the finding shrinks to a doc fix. Settle: DESCRIBE the parquet in the
+   private R2 bucket.
 3. **GitHub block "prefer stale" promise**: the spec says any refresh error
    should prefer serving stale data; `_record_status` flips the snapshot to
    ERROR while keeping old fields (accounts/github.py:310-319). Whether the

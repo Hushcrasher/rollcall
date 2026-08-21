@@ -6,7 +6,7 @@ data lives; upload the result to R2 and point PARQUET_SOURCE_URL at it.
 
 Expects, under --source-dir:
   igdb/igdb_games.parquet, igdb/igdb_release_dates.parquet,
-  hushcrasher.parquet, steamdb.parquet
+  hushcrasher.parquet, steam.parquet
 """
 
 from pathlib import Path
@@ -34,7 +34,7 @@ class Command(BaseCommand):
             "igdb": source / "igdb" / "igdb_games.parquet",
             "release_dates": source / "igdb" / "igdb_release_dates.parquet",
             "hushcrasher": source / "hushcrasher.parquet",
-            "steamdb": source / "steamdb.parquet",
+            "steam": source / "steam.parquet",
         }
         missing = [str(p) for p in files.values() if not p.exists()]
         if missing:
@@ -44,7 +44,7 @@ class Command(BaseCommand):
         count = prepare_seed_parquet(
             igdb=str(files["igdb"]),
             hushcrasher=str(files["hushcrasher"]),
-            steamdb=str(files["steamdb"]),
+            steam=str(files["steam"]),
             release_dates=str(files["release_dates"]),
             out_path=options["out"],
         )

@@ -1,5 +1,10 @@
 name: CI
 
+# No job here writes to the repo; without this the token inherits the org
+# default, which is often read+write.
+permissions:
+  contents: read
+
 on:
   push:
     branches: [main]

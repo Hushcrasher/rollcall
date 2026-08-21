@@ -111,7 +111,7 @@ Rationale for inclusion: candidate motivation depends on believing the recruiter
 - No data about non-registered people in the DB (guaranteed by "no credits import").
 - Report/flag page in the POC (host status / DSA diligence). No public accusatory user-generated content anywhere by design.
 - **Code license: AGPL v3** from commit 1 (deters closed SaaS forks; Mastodon/Forgejo precedent). Users own their data; platform gets a non-exclusive license via ToS. Do NOT promise an open data license now (irreversible, tension with right to erasure).
-- **Blocking legal task before the seed:** written verification that IGDB/Twitch ToS allow this use (local copy, distinct public product, backed by a company — Hushcrasher signs). Same check for Steam-derived data. Passing through the parquet changes nothing legally.
+- **Before the seed runs:** data agreements in place for each source the operator loads. The seed reads the operator's prepared parquet; see `04-DATABASE-SCHEMA.md` §13 for the write surface.
 
 ## 4. POC scope (final)
 

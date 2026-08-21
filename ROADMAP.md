@@ -12,7 +12,7 @@
 
 These do not block Phases 0–1, but **must be resolved before coding the seed** (Phase 2):
 
-- [~] ⚠️ ToS clearance: **IGDB/Twitch confirmed 2026-08-04** (product owner) — they cover this use (Hushcrasher-backed public product). Steam-derived data still to confirm separately.
+- [x] IGDB/Twitch data agreement confirmed 2026-08-04.
 - [ ] ⚠️ Parquet audit: `igdb_id` / `steam_appid` present; Steam↔IGDB mapping available (else dedup prep is the first data task)
 - [~] ⚠️ Accounts opened (chosen stack overrides docs' Scalingo/Scaleway defaults): **Railway** (PaaS — account created), **Cloudflare R2** (storage — bucket TODO), **Brevo** (account created; DNS/domain auth deferred to Phase 7), **Sentry** (TODO). None needed before Phase 7. GDPR: Railway + R2 are US → pick EU regions + sign DPAs.
 
@@ -50,11 +50,11 @@ Goal: the **complete** schema from [docs/04-DATABASE-SCHEMA.md](docs/04-DATABASE
 - [x] **Dev fixtures**: `manage.py load_dev_fixtures` — 300 fake games, 50 companies, 40 profiles, 150 contributions; deterministic & idempotent
 - [x] Tests (20): CHECK constraints, cascades/anonymization on account deletion, vouch uniqueness, trigram search, fixtures idempotency
 
-## Phase 2 — Seed pipeline ✅ (engine built; ⚠️ real-parquet wiring still gated)
+## Phase 2 — Seed pipeline ✅ (engine built; ⚠️ prepared-parquet wiring pending)
 
 Goal: `python manage.py seed_games` — idempotent weekly refresh, DuckDB → Postgres.
 
-Built test-first against a **documented assumed parquet schema** (`games/seed/schema.py`) — the contract a fork or the real Hushcrasher parquet must match. Pointing it at the real source later = adjust column names in `schema.py` + clear the prerequisites above.
+Built test-first against a **documented assumed parquet schema** (`games/seed/schema.py`) — the contract a fork or the operator's prepared parquet must match. Pointing it at the operator's source later = adjust column names in `schema.py` + clear the prerequisites above.
 
 - [x] DuckDB reads the parquet (local path, or HTTP/S3 via httpfs, `PARQUET_SOURCE_URL`), constant memory (`fetchmany` streaming)
 - [x] Steam↔IGDB dedup/merge in SQL — now lives in the **prepare step** (`games/seed/prepare.py`, `prepare_seed_parquet`); `pipeline.py` is a straight reader of the prepared parquet
@@ -63,7 +63,7 @@ Built test-first against a **documented assumed parquet schema** (`games/seed/sc
 - [x] Genres/engines/game_companies link tables populated + reset from source each run
 - [x] Failure handling: logs + optional email alert (`SEED_ALERT_EMAIL`); launcher-agnostic (`--source` arg for Prefect later)
 - [x] **Tests on dedup** (non-negotiable zone #1): IGDB-only, Steam-only, both-linked merge, dedup-within — plus upsert idempotency/write-surface and end-to-end command tests (23 seed tests)
-- [ ] ⚠️ Adjust `schema.py` column names to the real parquet + wire `PARQUET_SOURCE_URL` in prod (after ToS + audit clear)
+- [ ] ⚠️ Adjust `schema.py` column names to the operator's prepared parquet + wire `PARQUET_SOURCE_URL` in prod
 - [ ] ⚠️ Schedule the weekly `seed_games` job on the PaaS (Phase 7 deploy)
 
 ## Phase 3 — Accounts ✅
@@ -127,7 +127,7 @@ Goal: legally and operationally ready for real users. Buildable pieces done TDD 
 - [x] Legal pages: ToS (non-exclusive data license, no open-data promise, AGPL) + privacy (GDPR rights, EU hosting) — POC drafts, flagged for counsel review
 - [ ] ⚠️ **Execute the deploy** (Railway/R2/Brevo/Sentry accounts) — manual; see [DEPLOY.md](DEPLOY.md)
 - [ ] ⚠️ **Rehearse one Postgres backup restore** before launch — manual
-- [ ] ⚠️ Weekly `seed_games` cron — after the ToS + parquet prerequisites clear
+- [ ] ⚠️ Weekly `seed_games` cron — after the prepared parquet is in place
 - [x] Fallback documented (DEPLOY.md): ship "For recruiters" + contact relay first if the schedule slips
 
 ## Phase 8 — Mobile-first surface ✅ (spec 2026-08-20)
@@ -167,11 +167,13 @@ Goal: artists can show work; every upload goes through one hardened pipeline.
 
 - [x] **Project review fixes** (2026-08-12, from `docs/reviews/2026-08-12-project-review.md`): fresh-clone Docker build repaired (collectstatic placeholder `REDIS_URL` + a CI `docker build` job + `.dockerignore` keeping `.env`/parquets out of image layers); dev settings tolerate a verbatim `cp .env.example .env`; **emails are case-folded** at signup/login/manager with a `Lower(email)` unique constraint (migration `accounts/0006`); **the contact relay requires a verified sender** (behavior change — `EmailVerifiedRequiredMixin` moved to `accounts/mixins.py`, reused by contributions and contact); `igdb_import` over an existing game no longer wipes its Steam columns; employer quick-picks ordered dev→pub→porting→support; `company_create` rejects over-long names; DCO checked in CI on PRs; OSS scaffolding added (SECURITY.md, CODE_OF_CONDUCT.md, issue/PR templates, root CLAUDE.md); hosting story aligned across docs (Railway + R2, EU regions + DPAs).
 
+- [x] **Public-release prep** (2026-08-21): `load_dev_fixtures` **and** `seed_demo_people` now **refuse to run outside `DEBUG`** (behavior change — `admin@example.com` / `admin` and `demoN@example.com` / `demopass` become published credential pairs the moment the repo is public, and DEBUG is the only signal separating a contributor's box from a live database; both guards run before any row is written). Both documented onboarding paths keep working: `compose.yml` and `manage.py` both default to `config.settings.dev`, where `DEBUG=True`. CI declares `permissions: contents: read`; `.gitignore` covers the agent-tooling directories (`.claude/launch.json` stays tracked); the prepare step's Steam-derived input is named `steam` (operator file: `steam.parquet`); the About page and README carry the IGDB/Twitch attribution their API terms require.
+
 ## Known follow-ups (tech debt, not blocking the POC)
 
-- [x] **Bulk seed load** ✅ — the upsert is now a bulk loader (cached reference rows, `bulk_create`/`bulk_update`, in-Python slug allocation); the full ~392k catalog loads in ~2 min (was ~50 min per-row). Verified on the real data.
-- [ ] **Company dedup / merge** (now more relevant — the real seed created ~149k companies, and source names carry near-duplicate spellings even after trim/truncate cleaning): user-created companies (`source=manual`) are keyed only by exact name — near-duplicate spellings ("Virtuos" vs "Virtuos Games") can proliferate. Add a light admin merge tool (repoint `game_companies` + `contributions` to a canonical company, delete the dupe) once manual companies grow. The dormant `company_aliases` table (docs/04 §5) can back the merged names.
-- [ ] **`display_name` has no btree index** — only the GIN trigram one (`user_display_name_trgm`), which the planner can't use for `ORDER BY`. The open recruiter search orders every result set by `display_name`, so a broad filter makes it sort the whole user table. Measured against 100k users / 600k credits on the real 392k-game graph: adding `models.Index(fields=["display_name"])` to `User.Meta` halved a selective case (10.0ms → 4.9ms); worst legal case today is 118ms, so **not urgent**. It's an `accounts` migration — do it with the next one that touches the app rather than on its own.
+- [x] **Bulk seed load** ✅ — the upsert is now a bulk loader (cached reference rows, `bulk_create`/`bulk_update`, in-Python slug allocation); the full ~392k catalog loads in ~2 min (was ~50 min per-row).
+- [ ] **Company dedup / merge** (now more relevant at catalog scale — source names carry near-duplicate spellings even after trim/truncate cleaning): user-created companies (`source=manual`) are keyed only by exact name — near-duplicate spellings ("Virtuos" vs "Virtuos Games") can proliferate. Add a light admin merge tool (repoint `game_companies` + `contributions` to a canonical company, delete the dupe) once manual companies grow. The dormant `company_aliases` table (docs/04 §5) can back the merged names.
+- [ ] **`display_name` has no btree index** — only the GIN trigram one (`user_display_name_trgm`), which the planner can't use for `ORDER BY`. The open recruiter search orders every result set by `display_name`, so a broad filter makes it sort the whole user table. Measured against 100k users / 600k credits on a 392k-game graph: adding `models.Index(fields=["display_name"])` to `User.Meta` halved a selective case (10.0ms → 4.9ms); worst legal case today is 118ms, so **not urgent**. It's an `accounts` migration — do it with the next one that touches the app rather than on its own.
 - [x] **Redis for the rate limit** ✅ (2026-08-12) — prod's cache is Redis, so counters are shared across workers and survive; `REDIS_URL` is required and prod crashes without it, because a silent fallback is exactly the invisibility this fixed. A Redis outage un-meters rather than 500s (`RATELIMIT_FAIL_OPEN` plus django-redis's `IGNORE_EXCEPTIONS` — Django's built-in Redis backend catches nothing, so `RATELIMIT_FAIL_OPEN` would never run behind it) and is logged to `rollcall.cache`. Note the limits are now stricter by the old worker count without any number changing. Spec: `docs/superpowers/specs/2026-08-12-redis-rate-limit-design.md`.
 - [ ] `search:suggest` (the nav typeahead) carries no rate limit for anyone, while every other search surface does. It runs three trigram searches per keystroke. Metering it changes behaviour on every page for every visitor, so it needs its own decision rather than a drive-by.
 - [ ] A sustained Redis outage emits two ERROR log records with tracebacks per metered request (`add` and `incr` each hitting `DJANGO_REDIS_LOG_IGNORED_EXCEPTIONS`), and Sentry's default logging integration (`event_level=ERROR`) turns each into a Sentry event — a busy outage could burn through a free-tier quota fast. That is the design working as intended (the outage must be loud), not a defect; a `before_send` sampler or a logging filter on `rollcall.cache` is the candidate fix if it becomes a problem.

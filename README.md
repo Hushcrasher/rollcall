@@ -82,3 +82,7 @@ The full list lives in [docs/00-README.md](docs/00-README.md).
 ## License
 
 [AGPL v3](LICENSE).
+
+## Attribution
+
+Game metadata © IGDB.com / Twitch, used under their API terms.
