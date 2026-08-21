@@ -17,7 +17,8 @@
     {% if game_links %}
       <ul>
         {% for link in game_links %}
-          <li><a href="{% url 'games:game' link.game.slug %}">{{ link.game.title }}</a>
+          <li>{% if link.game.capsule_url %}<img class="capsule-sm" src="{{ link.game.capsule_url }}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">{% endif %}
+            <a href="{% url 'games:game' link.game.slug %}">{{ link.game.title }}</a>
             — {{ link.get_role_display }}</li>
         {% endfor %}
       </ul>
