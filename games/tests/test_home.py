@@ -36,15 +36,15 @@ def test_home_banner_invites_an_anonymous_visitor_to_declare(client: Client) -> 
     assert reverse("contributions:declare") in main
 
 
-def test_the_banner_is_one_translation_unit_not_three() -> None:
-    """Three separate {% translate %} calls joined around a link fix English
-    word order in place — any language ordering the question, the link and
-    the qualifier differently can't be produced. One {% blocktranslate %}
-    keeps the sentence whole, with only the link's URL as a placeholder."""
+def test_the_banner_has_no_trailing_qualifier_clause() -> None:
+    """The banner used to be one sentence fragmented around a link ("Worked on
+    a game? Add your credit — no account needed to start.") — that clause is
+    gone (spec 2026-08-21-search-chrome §3), so the two remaining phrases are
+    each a complete unit on their own and no longer need a single
+    {% blocktranslate %} to keep a shared sentence from being reordered."""
     source = _TEMPLATE.read_text()
-    assert '{% translate "Worked on a game?" %}' not in source
-    assert "{% blocktranslate %}Worked on a game?" in source
-    assert "no account needed to start.{% endblocktranslate %}" in source
+    assert '{% translate "Worked on a game?" %}' in source
+    assert "no account needed to start" not in source
 
 
 def test_a_member_gets_the_tool_without_the_pitch(client: Client) -> None:

@@ -71,7 +71,7 @@ def test_preview_renders_contact_inert(client: Client, user: User) -> None:
     not a link: contacting yourself is refused by the relay, a dead end."""
     client.force_login(user)
     body = client.get(user.get_absolute_url() + "?preview=member").content.decode()
-    assert "Contact" in body
+    assert "Message" in body
     assert reverse("contact:contact", kwargs={"slug": user.slug}) not in body
 
 
@@ -80,12 +80,12 @@ def test_preview_hides_contact_when_not_contactable(client: Client, user: User) 
     user.save(update_fields=["contactable"])
     client.force_login(user)
     body = client.get(user.get_absolute_url() + "?preview=member").content
-    assert b"Contact" not in body
+    assert b"Message" not in body
 
 
 def test_preview_param_is_inert_for_a_visitor(client: Client, user: User, other: User) -> None:
     """A third party already sees the member view — the param must not give them
-    a different page, and must not strip their real Contact link."""
+    a different page, and must not strip their real Message button."""
     client.force_login(other)
     body = client.get(user.get_absolute_url() + "?preview=member").content.decode()
     assert "Back to my profile" not in body

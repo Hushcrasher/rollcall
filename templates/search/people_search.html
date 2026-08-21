@@ -28,13 +28,11 @@
   {% if not user.is_authenticated %}
     {% comment %}
       One line, not the funnel: /declare/ carries the question and the game
-      form. One blocktranslate, not three translate calls fragmented around
-      the link — a fragmented sentence can't be reordered for a language
-      that doesn't share English's word order. The link's URL is the only
-      placeholder; its own text stays inside the translatable string.
+      form. Two independent phrases, not one sentence split around a link —
+      the question stands on its own and "Add your credit" is the link's own
+      text, so each can translate as its own unit without a reordering risk.
     {% endcomment %}
-    {% url 'contributions:declare' as declare_url %}
-    <p>{% blocktranslate %}Worked on a game? <a href="{{ declare_url }}">Add your credit</a> — no account needed to start.{% endblocktranslate %}</p>
+    <p>{% translate "Worked on a game?" %} <a href="{% url 'contributions:declare' %}">{% translate "Add your credit" %}</a></p>
   {% endif %}
 
   {% comment %}
@@ -48,7 +46,7 @@
     {% translate "The engine, genre and country filters need JavaScript. Without it you can still filter by discipline, rating, year and open-to-work." %}
   </p>
 
-  <form method="get" action="{% url 'home' %}#results">
+  <form class="filters" method="get" action="{% url 'home' %}#results">
     {{ form.non_field_errors }}
     {% comment %}
       A <label for> per facet, not just a <fieldset><legend>: a legend alone
@@ -131,7 +129,7 @@
             <a href="{% url 'accounts:profile' r.user.slug %}">{{ r.user.display_name }}</a>
             {% if r.user.open_to_work %}<span class="badge">{% translate "Open to work" %}</span>{% endif %}
             {% if r.user.contactable %}
-              — <a href="{% url 'contact:contact' r.user.slug %}">{% translate "Contact" %}</a>
+              <a role="button" href="{% url 'contact:contact' r.user.slug %}">{% translate "Message" %}</a>
             {% endif %}
           </h3>
 
