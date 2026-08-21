@@ -46,7 +46,7 @@ A **single Django monolith** (server-rendered) backed by **one managed PostgreSQ
 - **Data expectations (blocking prerequisites, verify before coding):**
   1. The parquet contains source IDs (`igdb_id`, `steam_appid`) — mandatory for reliable upserts.
   2. A Steam↔IGDB mapping exists (IGDB exposes Steam IDs via `external_games`); otherwise dedup preparation is the first data task, or massive duplicates ensue.
-  3. IGDB/Steam ToS verified in writing for this use (Hushcrasher-backed public product).
+  3. Data agreements in place for each source the operator loads.
 - Volume: ~400k games ≈ a few hundred MB in Postgres. Trivial.
 
 ## 4. Web application
@@ -96,7 +96,7 @@ Migrations: Django's, versioned, auto-applied on deploy. Dormant tables/columns 
 
 ## 8. Pre-code checklist (blocking)
 
-1. Written IGDB/Twitch ToS verification for this use, by Hushcrasher (+ Steam data check).
+1. Data agreements in place for each source the operator loads.
 2. Parquet content audit: source IDs present, Steam↔IGDB mapping exists.
 3. Open accounts: PaaS, bucket, Brevo, Sentry; pick Scalingo vs Clever Cloud.
 

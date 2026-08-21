@@ -257,9 +257,9 @@ Why wrong:   ROADMAP/DEPLOY are correct and honest (EU region of a US
              of them a user-facing legal page, assert the older, stronger
              claim.
 Consequence: A privacy-conscious user (this product's core audience) reads
-             "We host in the EU" and is told something counsel has not vetted
-             and the infrastructure does not straightforwardly deliver; a new
-             contributor reads docs/02 §5 and provisions the wrong stack.
+             "We host in the EU" and gets a stronger claim than the
+             infrastructure straightforwardly delivers; a new contributor
+             reads docs/02 §5 and provisions the wrong stack.
 Fix:         One sweep: update docs/02 §5, docs/03 infra table, README stack
              line, docs/01 §3.7 to "EU region on US-owned providers, DPAs
              signed"; soften privacy.html to "hosted in the EU region of our
@@ -289,18 +289,16 @@ Confidence:  high
 ```
 Evidence:    `COPY . .` (Dockerfile:16 context); no .dockerignore exists
              (checked). A maintainer's working tree contains `.env` (secrets)
-             and data/hushcrasher.parquet, data/steamdb.parquet,
-             data/rollcall_games.parquet (the private data the .gitignore
-             carefully keeps out of git).
+             and the local parquets under `data/` (the private data the
+             .gitignore carefully keeps out of git).
 Why wrong:   .gitignore does not apply to docker build contexts. The privacy
              boundary docs/02 §6 draws ("parquet URL, credentials, and DB
              dumps are private") holds in git and breaks in any locally built
              image.
 Consequence: One `docker build` on the maintainer's machine followed by a
-             push to any registry ships Hushcrasher's private catalog and the
-             .env secrets in an image layer. It also explains why the broken
-             collectstatic step (S2-1) went unnoticed locally: a copied .env
-             or cache can mask it.
+             push to any registry would carry those files in an image layer.
+             It also explains why the broken collectstatic step (S2-1) went
+             unnoticed locally: a copied .env or cache can mask it.
 Fix:         A .dockerignore mirroring .gitignore's data/, *.parquet, .env,
              .venv, media/, plus .git.
 Confidence:  high on mechanism; no evidence an image has actually been pushed.

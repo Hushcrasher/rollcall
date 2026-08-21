@@ -5,10 +5,9 @@ Target stack (chosen for this POC): **Railway** (app + Postgres + cron),
 a plain Docker image, so none of this is locked in — the same image runs on any
 PaaS or a VPS.
 
-> ⚠️ **Blocking before real game data goes live:** written IGDB/Twitch + Steam
-> ToS confirmation, and the parquet audit (see docs/02-ARCHITECTURE.md §8). The
-> app deploys and runs on dev fixtures without any of that; do not ingest real
-> scraped game data publicly until the ToS check passes.
+> The app deploys and runs on dev fixtures out of the box. Loading a real
+> catalog is a separate step: it needs the operator's own prepared parquet
+> matching `games/seed/schema.py`, under the operator's own data agreements.
 
 ## 1. Railway — app + database
 
@@ -93,15 +92,15 @@ changing. If 403s appear on a search that worked yesterday, that is the limit
 holding for the first time. Both limits are env vars, so retuning needs no
 redeploy.
 
-## 5. Seed the games catalog (after the ToS/parquet prerequisites)
+## 5. Seed the games catalog
 
 Two steps — a **prepare** (join the raw source files into one parquet) and a
 **seed** (load that parquet into Postgres):
 
 ```
-# 1. Join Hushcrasher's normalized source files into one prepared parquet.
-#    Expects, under --source-dir: igdb/igdb_games.parquet,
-#    igdb/igdb_release_dates.parquet, hushcrasher.parquet, steamdb.parquet
+# 1. Joins the operator's normalized source files (IGDB games + release dates,
+#    the operator's catalog, and a Steam-derived catalog) into one prepared
+#    parquet matching games/seed/schema.py.
 python manage.py prepare_seed_parquet --source-dir data --out data/rollcall_games.parquet
 #    → upload data/rollcall_games.parquet to the private R2 bucket.
 

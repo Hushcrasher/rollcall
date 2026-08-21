@@ -12,7 +12,7 @@
 
 These do not block Phases 0–1, but **must be resolved before coding the seed** (Phase 2):
 
-- [~] ⚠️ ToS clearance: **IGDB/Twitch confirmed 2026-08-04** (product owner) — they cover this use (Hushcrasher-backed public product). Steam-derived data still to confirm separately.
+- [x] Data agreements: IGDB/Twitch confirmed 2026-08-04.
 - [ ] ⚠️ Parquet audit: `igdb_id` / `steam_appid` present; Steam↔IGDB mapping available (else dedup prep is the first data task)
 - [~] ⚠️ Accounts opened (chosen stack overrides docs' Scalingo/Scaleway defaults): **Railway** (PaaS — account created), **Cloudflare R2** (storage — bucket TODO), **Brevo** (account created; DNS/domain auth deferred to Phase 7), **Sentry** (TODO). None needed before Phase 7. GDPR: Railway + R2 are US → pick EU regions + sign DPAs.
 
@@ -63,7 +63,7 @@ Built test-first against a **documented assumed parquet schema** (`games/seed/sc
 - [x] Genres/engines/game_companies link tables populated + reset from source each run
 - [x] Failure handling: logs + optional email alert (`SEED_ALERT_EMAIL`); launcher-agnostic (`--source` arg for Prefect later)
 - [x] **Tests on dedup** (non-negotiable zone #1): IGDB-only, Steam-only, both-linked merge, dedup-within — plus upsert idempotency/write-surface and end-to-end command tests (23 seed tests)
-- [ ] ⚠️ Adjust `schema.py` column names to the real parquet + wire `PARQUET_SOURCE_URL` in prod (after ToS + audit clear)
+- [ ] ⚠️ Adjust `schema.py` column names to the operator's prepared parquet + wire `PARQUET_SOURCE_URL` in prod
 - [ ] ⚠️ Schedule the weekly `seed_games` job on the PaaS (Phase 7 deploy)
 
 ## Phase 3 — Accounts ✅
@@ -127,7 +127,7 @@ Goal: legally and operationally ready for real users. Buildable pieces done TDD 
 - [x] Legal pages: ToS (non-exclusive data license, no open-data promise, AGPL) + privacy (GDPR rights, EU hosting) — POC drafts, flagged for counsel review
 - [ ] ⚠️ **Execute the deploy** (Railway/R2/Brevo/Sentry accounts) — manual; see [DEPLOY.md](DEPLOY.md)
 - [ ] ⚠️ **Rehearse one Postgres backup restore** before launch — manual
-- [ ] ⚠️ Weekly `seed_games` cron — after the ToS + parquet prerequisites clear
+- [ ] ⚠️ Weekly `seed_games` cron — after the prepared parquet is in place
 - [x] Fallback documented (DEPLOY.md): ship "For recruiters" + contact relay first if the schedule slips
 
 ## Phase 8 — Mobile-first surface ✅ (spec 2026-08-20)
@@ -169,9 +169,9 @@ Goal: artists can show work; every upload goes through one hardened pipeline.
 
 ## Known follow-ups (tech debt, not blocking the POC)
 
-- [x] **Bulk seed load** ✅ — the upsert is now a bulk loader (cached reference rows, `bulk_create`/`bulk_update`, in-Python slug allocation); the full ~392k catalog loads in ~2 min (was ~50 min per-row). Verified on the real data.
-- [ ] **Company dedup / merge** (now more relevant — the real seed created ~149k companies, and source names carry near-duplicate spellings even after trim/truncate cleaning): user-created companies (`source=manual`) are keyed only by exact name — near-duplicate spellings ("Virtuos" vs "Virtuos Games") can proliferate. Add a light admin merge tool (repoint `game_companies` + `contributions` to a canonical company, delete the dupe) once manual companies grow. The dormant `company_aliases` table (docs/04 §5) can back the merged names.
-- [ ] **`display_name` has no btree index** — only the GIN trigram one (`user_display_name_trgm`), which the planner can't use for `ORDER BY`. The open recruiter search orders every result set by `display_name`, so a broad filter makes it sort the whole user table. Measured against 100k users / 600k credits on the real 392k-game graph: adding `models.Index(fields=["display_name"])` to `User.Meta` halved a selective case (10.0ms → 4.9ms); worst legal case today is 118ms, so **not urgent**. It's an `accounts` migration — do it with the next one that touches the app rather than on its own.
+- [x] **Bulk seed load** ✅ — the upsert is now a bulk loader (cached reference rows, `bulk_create`/`bulk_update`, in-Python slug allocation); the full ~392k catalog loads in ~2 min (was ~50 min per-row).
+- [ ] **Company dedup / merge** (now more relevant at catalog scale — source names carry near-duplicate spellings even after trim/truncate cleaning): user-created companies (`source=manual`) are keyed only by exact name — near-duplicate spellings ("Virtuos" vs "Virtuos Games") can proliferate. Add a light admin merge tool (repoint `game_companies` + `contributions` to a canonical company, delete the dupe) once manual companies grow. The dormant `company_aliases` table (docs/04 §5) can back the merged names.
+- [ ] **`display_name` has no btree index** — only the GIN trigram one (`user_display_name_trgm`), which the planner can't use for `ORDER BY`. The open recruiter search orders every result set by `display_name`, so a broad filter makes it sort the whole user table. Measured against 100k users / 600k credits on a 392k-game graph: adding `models.Index(fields=["display_name"])` to `User.Meta` halved a selective case (10.0ms → 4.9ms); worst legal case today is 118ms, so **not urgent**. It's an `accounts` migration — do it with the next one that touches the app rather than on its own.
 - [x] **Redis for the rate limit** ✅ (2026-08-12) — prod's cache is Redis, so counters are shared across workers and survive; `REDIS_URL` is required and prod crashes without it, because a silent fallback is exactly the invisibility this fixed. A Redis outage un-meters rather than 500s (`RATELIMIT_FAIL_OPEN` plus django-redis's `IGNORE_EXCEPTIONS` — Django's built-in Redis backend catches nothing, so `RATELIMIT_FAIL_OPEN` would never run behind it) and is logged to `rollcall.cache`. Note the limits are now stricter by the old worker count without any number changing. Spec: `docs/superpowers/specs/2026-08-12-redis-rate-limit-design.md`.
 - [ ] `search:suggest` (the nav typeahead) carries no rate limit for anyone, while every other search surface does. It runs three trigram searches per keystroke. Metering it changes behaviour on every page for every visitor, so it needs its own decision rather than a drive-by.
 - [ ] A sustained Redis outage emits two ERROR log records with tracebacks per metered request (`add` and `incr` each hitting `DJANGO_REDIS_LOG_IGNORED_EXCEPTIONS`), and Sentry's default logging integration (`event_level=ERROR`) turns each into a Sentry event — a busy outage could burn through a free-tier quota fast. That is the design working as intended (the outage must be loud), not a defect; a `before_send` sampler or a logging filter on `rollcall.cache` is the candidate fix if it becomes a problem.

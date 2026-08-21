@@ -24,7 +24,7 @@ Documentation set for implementation (intended to be handed to Claude Code).
 
 ## Blocking prerequisites before coding the seed
 
-1. Written confirmation that IGDB/Twitch (and Steam-derived data) ToS cover this use for a Hushcrasher-backed public product.
+1. Data agreements in place for each source the operator loads.
 2. Parquet audit: `igdb_id` / `steam_appid` present; Steam↔IGDB mapping available (else dedup prep first).
 3. Accounts opened: PaaS, S3-compatible bucket, Brevo, Sentry. *(Chosen stack — see ROADMAP.md and DEPLOY.md: Railway + Cloudflare R2, EU regions + DPAs; this overrides the Scalingo/Scaleway defaults named in `02`/`03`.)*
 
