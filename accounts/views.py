@@ -187,6 +187,9 @@ class ProfileView(DetailView):
         context["og_type"] = "profile"
         context["og_url"] = self.request.build_absolute_uri(self.object.get_absolute_url())
         context["og_image"] = card_url(self.request, "cards:profile", card, self.object.slug)
+        # Share row (owner only, spec §3): the canonical URL, no query string.
+        context["share_url"] = context["og_url"]
+        context["share_text"] = _("%(name)s on Rollcall") % {"name": self.object.display_name}
         if card.stats:
             context["meta_description"] = card.stats
         return context
