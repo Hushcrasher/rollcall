@@ -54,8 +54,16 @@ def covered(text: str) -> bool:
 
 @lru_cache(maxsize=16)
 def _font(bold: bool, size: int) -> ImageFont.FreeTypeFont:
+    # layout_engine=BASIC, pinned rather than left to Pillow: Pillow picks RAQM
+    # when libfribidi/harfbuzz are present at runtime (common on Linux CI,
+    # absent on a stock macOS dev box) and RAQM's shaping changes kerning and
+    # therefore getlength(), which would make title_size()/_ellipsize() — and
+    # the pixels — platform-dependent. The cards need no complex shaping: text
+    # Inter can't cover already falls back to the neutral card (see `covered`).
     return ImageFont.truetype(
-        str(_FONTS / ("Inter-Bold.ttf" if bold else "Inter-Regular.ttf")), size
+        str(_FONTS / ("Inter-Bold.ttf" if bold else "Inter-Regular.ttf")),
+        size,
+        layout_engine=ImageFont.Layout.BASIC,
     )
 
 
@@ -84,21 +92,31 @@ def render(data: CardData) -> bytes:
     ):
         data = fallback_card()
     max_width = WIDTH - 2 * MARGIN
-    # (text, font, colour) top to bottom; empty fields are skipped so the
-    # block collapses instead of leaving gaps.
-    lines: list[tuple[str, ImageFont.FreeTypeFont, str]] = [("ROLLCALL", _font(True, 36), BLUE)]
+    # (text, font, colour, is_footer) top to bottom; empty fields are skipped so
+    # the block collapses instead of leaving gaps. is_footer is carried
+    # explicitly rather than inferred from the line's position or font object:
+    # the badge rides that line, and font identity would silently move it if
+    # another line ever shared its size and weight.
+    lines: list[tuple[str, ImageFont.FreeTypeFont, str, bool]] = [
+        ("ROLLCALL", _font(True, 36), BLUE, False)
+    ]
     title_font = _font(True, title_size(data.title))
-    lines.append((_ellipsize(data.title, title_font, max_width), title_font, INK))
+    lines.append((_ellipsize(data.title, title_font, max_width), title_font, INK, False))
     if data.subtitle:
         lines.append(
-            (_ellipsize(data.subtitle, _font(False, 40), max_width), _font(False, 40), INK)
+            (_ellipsize(data.subtitle, _font(False, 40), max_width), _font(False, 40), INK, False)
         )
     if data.stats:
-        lines.append((_ellipsize(data.stats, _font(False, 36), max_width), _font(False, 36), MUTED))
+        lines.append(
+            (_ellipsize(data.stats, _font(False, 36), max_width), _font(False, 36), MUTED, False)
+        )
     if data.footer or data.badge:
-        lines.append((data.footer, _font(False, 32), MUTED))
+        # A badge with no footer keeps this (empty-text) line: the badge is
+        # then drawn at the margin on its own line — the layout collapses, the
+        # badge still shows.
+        lines.append((data.footer, _font(False, 32), MUTED, True))
 
-    block_height = sum(font.size for _, font, _ in lines) + GAP * (len(lines) - 1)
+    block_height = sum(font.size for _t, font, _c, _f in lines) + GAP * (len(lines) - 1)
     image = Image.new("RGB", (WIDTH, HEIGHT), WHITE)
     draw = ImageDraw.Draw(image)
     # draw.text positions each line by its ascender, not its ink: a line with
@@ -106,15 +124,15 @@ def render(data: CardData) -> bytes:
     # a subtitle with "g"/"p") leaves a different visual gap than font.size
     # implies. Centre on the actual ink of the first and last lines (measured
     # with getbbox), not the nominal font-size box, or the block drifts.
-    first_text, first_font, _ = lines[0]
-    last_text, last_font, _ = lines[-1]
+    first_text, first_font = lines[0][0], lines[0][1]
+    last_text, last_font = lines[-1][0], lines[-1][1]
     top_bearing = first_font.getbbox(first_text)[1] if first_text else 0
     bottom_bearing = last_font.getbbox(last_text)[3] if last_text else last_font.size
     y = (HEIGHT - block_height) // 2 + (last_font.size - bottom_bearing - top_bearing) // 2
-    for text, font, colour in lines:
+    for text, font, colour, is_footer in lines:
         if text:
             draw.text((MARGIN, y), text, font=font, fill=colour)
-        if font is lines[-1][1] and data.badge:
+        if is_footer and data.badge:
             # The badge sits on the footer line, right of the footer text.
             x = MARGIN + (_width(data.footer, font) + GAP * 2 if data.footer else 0)
             draw.text((x, y), data.badge, font=_font(True, 32), fill=BLUE)

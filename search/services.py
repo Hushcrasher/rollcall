@@ -109,6 +109,7 @@ def profile_summaries(user_ids: list[int]) -> dict[int, ProfileSummary]:
             credits_count=row["credits_count"],
             games_count=row["games_count"],
             first_year=row["first_start"].year,
+            # Not still_active ⇒ every credit has an end_date ⇒ last_end is set.
             last_year=None if still_active else row["last_end"].year,
         )
     return summaries

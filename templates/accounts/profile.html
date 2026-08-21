@@ -46,11 +46,12 @@
           <a href="https://twitter.com/intent/tweet?url={{ share_url|urlencode:'' }}&amp;text={{ share_text|urlencode:'' }}" target="_blank" rel="noopener">X</a> ·
           <a href="{% url 'cards:profile' profile_user.slug %}" target="_blank" rel="noopener">{% translate "Preview your card" %}</a>
         </p>
+        {% translate "Copied" as copied %}
         <script>
           document.querySelector(".share-row [data-copy]").addEventListener("click", function () {
             var button = this, label = button.textContent;
             navigator.clipboard.writeText(button.dataset.copy).then(function () {
-              button.textContent = "{% translate 'Copied' %}";
+              button.textContent = "{{ copied|escapejs }}";
               setTimeout(function () { button.textContent = label; }, 2000);
             });
           });

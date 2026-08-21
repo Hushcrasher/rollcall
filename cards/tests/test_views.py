@@ -13,6 +13,7 @@ from django.urls import reverse
 from PIL import Image
 
 from accounts.models import User
+from cards.render import render as real_render
 from games.models import Game
 
 pytestmark = pytest.mark.django_db
@@ -56,7 +57,6 @@ def test_game_and_default_cards(client: Client) -> None:
 def test_second_request_is_served_from_cache(client: Client) -> None:
     user = User.objects.create_user(email="c@example.com", password="x", display_name="C")
     url = reverse("cards:profile", args=[user.slug])
-    real_render = __import__("cards.render", fromlist=["render"]).render
     with mock.patch("cards.views.render", wraps=real_render) as spy:
         client.get(url)
         client.get(url)

@@ -7,6 +7,7 @@ from django.core.cache import cache
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_safe
+from django_ratelimit import ALL
 from django_ratelimit.decorators import ratelimit
 
 from accounts.models import User
@@ -18,9 +19,10 @@ CACHE_SECONDS = 3600
 # Named group, house rule: an unnamed decorator derives its group from the
 # view's qualname, so a rename would silently move the counter.
 _RATELIMIT_GROUP = "card"
-# django_ratelimit.decorators monkey-patches `.ALL` onto the function at import
-# time; ty's static analysis can't see that assignment, hence the ignore.
-_ALL_METHODS = ratelimit.ALL  # ty: ignore[unresolved-attribute]
+# `django_ratelimit.ALL` (the package export) rather than `ratelimit.ALL`: the
+# decorator only carries it as a monkey-patched function attribute, invisible
+# to ty.
+_ALL_METHODS = ALL
 
 
 def _card_rate(group: str, request: HttpRequest) -> str:
@@ -28,6 +30,10 @@ def _card_rate(group: str, request: HttpRequest) -> str:
 
 
 def _png_response(key: str, data: CardData) -> HttpResponse:
+    """The cache keys on the content token, so it skips the PNG render only —
+    the caller's object lookup and, for profiles, `profile_card()`'s two
+    queries still run on every hit."""
+
     def _render() -> bytes:
         return render(data)
 

@@ -36,16 +36,24 @@ _DISALLOW = [
     "/*?",
 ]
 
-# Emitted BEFORE the disallows. No current Disallow prefix overlaps `/u/`,
-# `/g/` or `/c/`, so today's ordering isn't load-bearing — but RFC 9309 §2.2.2
-# picks the longest match while parsers with first-match semantics (Python's
-# own `urllib.robotparser` among them) take whichever rule they read first, so
-# Allow-first is kept as the safe default under both kinds of parser.
+# Emitted BEFORE the disallows. RFC 9309 §2.2.2 picks the longest match while
+# parsers with first-match semantics (Python's own `urllib.robotparser` among
+# them) take whichever rule they read first, so Allow-first is kept as the safe
+# default under both kinds of parser.
 #
 # Public profile, game and company pages are a major acquisition channel ("who
 # worked on X"), so they are listed explicitly rather than left to whatever a
 # crawler infers from the disallows below.
-_ALLOW = ["/u/", "/g/", "/c/"]
+#
+# The `card.png` entries are load-bearing, not decorative: every `og:image` URL
+# carries a `?v=` token (cards/data.py `card_url`), so `Disallow: /*?` below
+# matches all three of them for a wildcard-aware crawler. They must be allowed
+# explicitly and their patterns must stay LONGER than `/*?` to win the longest-
+# match rule — `/u/` alone would only tie-break against it by length, and
+# `/card.png?v=…` would have no matching Allow at all. Networks fetching
+# og:image mostly ignore robots.txt, but a blocked card is a silently broken
+# link preview, so the rule is written for the ones that do honour it.
+_ALLOW = ["/u/", "/g/", "/c/", "/card.png", "/u/*/card.png", "/g/*/card.png"]
 
 
 class ProfileSitemap(Sitemap):
