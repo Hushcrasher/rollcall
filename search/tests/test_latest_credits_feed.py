@@ -80,6 +80,17 @@ def test_feed_is_absent_once_a_search_ran(client: Client) -> None:
     assert "Latest credits" not in body
 
 
+def test_feed_survives_an_unrelated_tracking_param(client: Client) -> None:
+    # `?utm_source=...`/`?fbclid=...` on a tagged inbound link are not a
+    # search — the feed is keyed on RecruiterSearchForm's own filter fields,
+    # not on bare `bool(request.GET)`, so an unknown param must not swap the
+    # feed out for an empty results block.
+    _credit("a@example.com", "Ada Artist")
+    body = client.get(reverse("home"), {"utm_source": "newsletter"}).content.decode()
+    assert "Latest credits" in body
+    assert "Ada Artist" in body
+
+
 def test_feed_is_newest_first_and_capped_at_ten(client: Client) -> None:
     for i in range(11):
         _credit(f"u{i}@example.com", f"Person {i:02d}", title=f"Game {i:02d}")

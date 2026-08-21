@@ -85,7 +85,17 @@ class PeopleSearchView(TemplateView):
         context = super().get_context_data(**kwargs)
         form = RecruiterSearchForm(self.request.GET or None)
         context["form"] = form
-        if self.request.GET and form.is_valid():
+        # Keyed on whether one of the form's own filter fields is present at
+        # all, not bare `bool(request.GET)` and not the fields' truthiness —
+        # `?discipline=` (a real, if blank, filter submission) must still
+        # count as a search so its "pick at least one filter" error still
+        # replaces the feed, while an unrelated param (?utm_source=...,
+        # ?fbclid=...) on a tagged inbound link must not. The rate-limit
+        # metering in get() above is deliberately unrelated and stays keyed
+        # on request.GET as a whole.
+        base_fields = RecruiterSearchForm.base_fields  # ty: ignore[unresolved-attribute]  (metaclass-added attr)
+        searched = any(field in self.request.GET for field in base_fields)
+        if searched and form.is_valid():
             cleaned = form.cleaned_data
             context["results_page"] = recruiter_search(
                 discipline_id=cleaned["discipline"].pk if cleaned.get("discipline") else None,
@@ -100,10 +110,11 @@ class PeopleSearchView(TemplateView):
                 page=self.request.GET.get("page"),
             )
             context["searched"] = True
-        if not self.request.GET:
-            # The bare front door only: a search (valid or not) replaces the
-            # feed. Guards are the feature — only publishable rows render
-            # (docs/00 #7), and only for people who are findable at all.
+        if not searched:
+            # No search ran: a real filter submission (valid or not) replaces
+            # the feed; an unrelated query param does not. Guards are the
+            # feature — only publishable rows render (docs/00 #7), and only
+            # for people who are findable at all.
             context["latest_credits"] = (
                 Contribution.objects.filter(
                     status=Contribution.Status.ACTIVE,
