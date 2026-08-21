@@ -9,6 +9,7 @@ from typing import ClassVar
 from django.conf import settings
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from django_countries.fields import CountryField
 
 
 class Discipline(models.Model):
@@ -80,6 +81,9 @@ class Contribution(models.Model):
     end_date = models.DateField(  # null = "still working on it"
         _("end date"), null=True, blank=True
     )
+    # Where the work happened — the person's country is on the profile; a
+    # career can span several (spec 2026-08-21-credit-form-v2 §2). Optional.
+    country = CountryField(_("country"), blank=True)
     status = models.CharField(
         _("status"),
         max_length=20,

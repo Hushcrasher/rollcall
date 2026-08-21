@@ -61,8 +61,9 @@ class ContributionForm(forms.ModelForm):
 
     class Meta:
         model = Contribution
-        fields = ["game", "company", "discipline", "job_title", "start_date", "end_date"]
+        fields = ["game", "company", "discipline", "job_title", "start_date", "end_date", "country"]
         widgets = {"company": forms.HiddenInput}
+        help_texts = {"country": _("Where this work happened.")}
 
     def clean(self) -> dict[str, Any]:
         cleaned = super().clean()

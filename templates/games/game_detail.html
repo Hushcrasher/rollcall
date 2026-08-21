@@ -39,8 +39,7 @@
         — {{ c.job_title }} <em>({{ c.discipline.name }})</em>
         {% if c.company %}@ {{ c.company.name }}{% endif %}
         <span class="dates">
-          {{ c.start_date|date:"m/Y" }} –
-          {% if c.end_date %}{{ c.end_date|date:"m/Y" }}{% else %}{% translate "present" %}{% endif %}
+          {{ c.start_date|date:"m/Y" }} – {% if c.end_date %}{{ c.end_date|date:"m/Y" }}{% else %}{% translate "present" %}{% endif %}{% if c.country %} · {{ c.country.name }}{% endif %}
         </span>
         <span class="badge">{% translate "Declared" %}</span>
       </div>

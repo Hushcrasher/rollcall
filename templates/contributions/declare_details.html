@@ -35,6 +35,11 @@
       {{ form.end_date }} {{ form.end_date.errors }}
       <small>{% translate "Leave empty if you're still working on it." %}</small>
     </p>
+    <p>
+      <label for="{{ form.country.id_for_label }}">{{ form.country.label }}</label>
+      {{ form.country }} {{ form.country.errors }}
+      <small>{{ form.country.help_text }}</small>
+    </p>
 
     <button type="submit">{% translate "Continue" %}</button>
   </form>

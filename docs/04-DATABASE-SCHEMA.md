@@ -137,6 +137,7 @@ One row = "person X worked on game G, [as an employee of company C], as [job tit
 | job_title | varchar(150) | not null | Free text, displayed verbatim. |
 | start_date | date | not null | Month/year (day=01). |
 | end_date | date | nullable | Null = "still working on it". CHECK `end_date >= start_date` when set. |
+| country | varchar(2) | not null, default `''` | ISO 3166-1 alpha-2 (django-countries `CountryField`). Where this credit happened — independent from the person's profile country (a career can span several). Blank = not given. |
 | status | varchar enum | not null, default `active` | **Dormant.** `active` / `disputed` / `removed`. `disputed` never shown publicly; only `active` rows are displayed/searchable. |
 
 **No unique constraint on (user_id, game_id)** — multiple roles/periods per game are a feature.
