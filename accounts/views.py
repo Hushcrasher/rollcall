@@ -222,6 +222,17 @@ class PortfolioAddView(EmailVerifiedRequiredMixin, View):
     verification_message = _("Please verify your email before adding images.")
 
     def post(self, request: AuthedHttpRequest, *args: object, **kwargs: object) -> HttpResponse:
+        # Advisory only — cheap, unlocked, and purely to skip the expensive
+        # decode (full Pillow load + two WebP encodes) for a user already at
+        # the cap. The locked re-check below inside transaction.atomic() is
+        # the one that actually closes the concurrency race and must run
+        # regardless of this short-circuit.
+        if ProfileImage.objects.filter(user=request.user).count() >= MAX_PORTFOLIO_IMAGES:
+            messages.error(
+                request,
+                _("You can show up to %(n)d images.") % {"n": MAX_PORTFOLIO_IMAGES},
+            )
+            return redirect("accounts:profile_edit")
         form = PortfolioImageForm(request.POST, request.FILES)
         if not form.is_valid():
             for field_errors in form.errors.values():

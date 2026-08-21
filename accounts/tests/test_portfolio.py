@@ -14,6 +14,7 @@ from django.urls import reverse
 from django.utils import timezone
 from PIL import Image
 
+from accounts.images import process_image as _real_process_image
 from accounts.models import MAX_PORTFOLIO_IMAGES, ProfileImage, User
 
 pytestmark = pytest.mark.django_db
@@ -93,13 +94,24 @@ def test_anonymous_is_sent_to_login(client: Client) -> None:
     assert reverse("accounts:login") in response.url
 
 
-def test_the_thirteenth_image_is_rejected(client: Client) -> None:
+def test_the_thirteenth_image_is_rejected(client: Client, monkeypatch: pytest.MonkeyPatch) -> None:
+    # The cheap advisory cap check must run before the form (and therefore
+    # before process_image's full decode + two WebP encodes): a user already
+    # at the cap should never pay for a decode that can only be discarded.
+    calls: list[object] = []
+
+    def spy(*args: object, **kwargs: object) -> Any:
+        calls.append((args, kwargs))
+        return _real_process_image(*args, **kwargs)  # ty: ignore[invalid-argument-type]
+
+    monkeypatch.setattr("accounts.forms.process_image", spy)
     user = _user()
     client.force_login(user)
     for _i in range(MAX_PORTFOLIO_IMAGES):
         _image(user)
     client.post(reverse("accounts:portfolio_add"), {"image": _png_upload()})
     assert user.portfolio_images.count() == MAX_PORTFOLIO_IMAGES  # ty: ignore[unresolved-attribute]
+    assert calls == []
 
 
 def test_the_twelfth_image_lands(client: Client) -> None:
