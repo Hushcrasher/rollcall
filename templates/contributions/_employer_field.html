@@ -10,7 +10,7 @@
 {% endcomment %}
 <div class="autocomplete" id="employer-field" data-hidden="{{ form.company.auto_id }}"
      data-employers-url="{% url 'games:game_employers' 0 %}"
-     data-selected="{{ form.instance.company_id|default_if_none:'' }}">
+     data-selected="{{ form|employer_id }}">
   <label>{% translate "Employer" %}</label>
   {{ form.company }}
   <p class="employer-hint">{% translate "Pick a game first." %}</p>

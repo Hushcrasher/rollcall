@@ -125,6 +125,37 @@ def test_repicking_the_same_game_does_not_render_none_as_the_employer(
 
     assert b"Silver Forge Games" in response.content
     assert b">None<" not in response.content
+    # `data-selected` is what the JS reads to ask games:game_employers to
+    # preselect this company instead of falling back to the game's first
+    # studio (loadEmployers() in declare_details.html).
+    assert f'data-selected="{company.pk}"'.encode() in response.content
+
+
+def test_an_invalid_post_keeps_the_chosen_employer_in_data_selected(
+    client: Client, game: Game
+) -> None:
+    """A POST that fails validation (a bad date here) must still carry the
+    employer the member already picked into `data-selected` on re-render, so
+    the JS re-fetches the select with it preselected instead of resetting to
+    the game's first company (or to no employer at all)."""
+    company = Company.objects.create(name="Silver Forge Games", source=Company.Source.MANUAL)
+    _with_game(client, game)
+
+    response = client.post(
+        reverse("contributions:declare_details"),
+        {
+            "game": str(game.pk),
+            "company": str(company.pk),
+            "discipline": str(Discipline.objects.get(name="Design").pk),
+            "job_title": "Level Designer",
+            "start_date": "not-a-date",
+            "end_date": "",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.context["form"].errors
+    assert f'data-selected="{company.pk}"'.encode() in response.content
 
 
 def test_a_deleted_game_redirects_to_the_question(client: Client, game: Game) -> None:

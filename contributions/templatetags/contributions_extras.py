@@ -36,3 +36,24 @@ def employer_label(form: ContributionForm) -> str:
         return ""
     company = Company.objects.filter(pk=value).first()
     return str(company) if company is not None else ""
+
+
+@register.filter
+def employer_id(form: ContributionForm) -> str:
+    """The company pk for `data-selected` on _employer_field.html — what the
+    credit-form/funnel JS asks games:game_employers to preselect on load.
+
+    Opposite precedence from employer_label above, and for the same reason:
+    `form["company"].value()` reads the BoundField's value regardless of
+    *why* the form is unbound — a real instance's model_to_dict-derived
+    initial (editing) or the funnel's session-draft initial — and a bound
+    form's raw posted value (a validation-error re-render) without waiting
+    on `_post_clean`. `form.instance.company_id` is the fallback: it only
+    disagrees with the above when the posted value didn't survive field
+    validation (e.g. a stray "__other"), in which case emitting it as
+    `data-selected` would be wrong anyway.
+    """
+    value = form["company"].value()
+    if value and str(value).isdecimal():
+        return str(value)
+    return str(form.instance.company_id) if form.instance.company_id else ""

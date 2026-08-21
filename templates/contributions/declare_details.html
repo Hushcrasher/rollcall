@@ -79,10 +79,16 @@
     // version reloads this when the game changes; here the game is fixed, so it
     // runs once. `.employer-search` stays hidden until "Another company…" is
     // picked from the select (applyEmployerSelect above reveals it).
+    // `data-selected` (the funnel draft's already-chosen company, or a
+    // freshly-posted one after a validation-error re-render — see
+    // employer_id in contributions_extras.py) is passed through so a bounced
+    // "Wrong game?" repick or a fixed-up resubmit doesn't lose the employer.
     function loadEmployers() {
       const field = document.getElementById("employer-field");
       const url = field.dataset.employersUrl.replace(/0\/employers\/$/, GAME_PK + "/employers/");
-      fetch(url)
+      const selected = field.dataset.selected;
+      const fullUrl = url + (selected ? "?selected=" + selected : "");
+      fetch(fullUrl)
         .then((response) => response.text())
         .then((html) => {
           document.getElementById("employer-quickpicks").innerHTML = html;
