@@ -122,20 +122,6 @@ class RecruiterSearchForm(forms.Form):
     )
     open_to_work = forms.BooleanField(required=False, label=_("Open to work only"))
 
-    def typeahead_fields(self) -> list[forms.BoundField]:
-        """The facets the template renders as chips + a search box.
-
-        Enumerated, for the same reason `clean()` is: sniffing for
-        `TypeaheadSelectMultiple` widgets instead would blind the guard aimed at
-        exactly this. Swap a widget back and the sniffed list silently drops the
-        field, so `test_empty_form_does_not_ship_a_choice_per_country` sees a
-        small payload and passes (mutation-tested both ways). Sibling chip tests
-        do fail, so the swap isn't invisible — but the guard that names the
-        regression goes quiet. Listed here, the same swap renders the checkbox
-        list and that guard fails loudly.
-        """
-        return [self["engines"], self["genres"], self["countries"]]
-
     def game_fields(self) -> list[forms.BoundField]:
         """Row 1 — what they worked on (spec 2026-08-21-search-chrome §2)."""
         return [self["engines"], self["genres"], self["min_rating"]]

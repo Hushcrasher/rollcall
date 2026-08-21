@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 from io import BytesIO
 from pathlib import Path
+from typing import Literal
 
 from django.utils.translation import gettext_lazy as _
 from PIL import Image, ImageDraw, ImageFont
@@ -45,7 +46,10 @@ class CardData:
 
 
 def fallback_card() -> CardData:
-    return CardData(kind="default", title="ROLLCALL", footer=str(DEFAULT_TAGLINE))
+    # No footer: the stacked wordmark above the title already carries the
+    # brand, so repeating it as a title *and* a footer duplicated it on the
+    # card (review follow-up, 2026-08-21).
+    return CardData(kind="default", title=str(DEFAULT_TAGLINE))
 
 
 def covered(text: str) -> bool:
@@ -60,14 +64,14 @@ _FACE_FILES = {
 
 
 @lru_cache(maxsize=16)
-def _font(face: str, size: int) -> ImageFont.FreeTypeFont:
+def _font(face: Literal["regular", "bold", "mono"], size: int) -> ImageFont.FreeTypeFont:
     # layout_engine=BASIC, pinned rather than left to Pillow: Pillow picks RAQM
     # when libfribidi/harfbuzz are present at runtime (common on Linux CI,
     # absent on a stock macOS dev box) and RAQM's shaping changes kerning and
     # therefore getlength(), which would make title_size()/_ellipsize() — and
     # the pixels — platform-dependent. The cards need no complex shaping: text
-    # Inter (or the mono wordmark face) can't cover already falls back to the
-    # neutral card (see `covered`).
+    # Inter can't cover already falls back to the neutral card (see `covered`);
+    # the mono face only ever draws the ASCII wordmark.
     return ImageFont.truetype(
         str(_FONTS / _FACE_FILES[face]),
         size,
@@ -116,11 +120,13 @@ def render(data: CardData) -> bytes:
     # object: the badge rides that line, and font identity would silently
     # move it if another line ever shared its size and weight. gap_after lets
     # the two wordmark lines sit closer to each other (WORDMARK_GAP) than to
-    # the rest of the block (GAP) — they're one mark, not two lines.
-    wordmark_font = wordmark_lines()[0][1]
+    # the rest of the block (GAP) — they're one mark, not two lines. Drawn
+    # from wordmark_lines() itself, not re-hardcoded, so a change there (or a
+    # future third line) is what the renderer actually draws.
+    marks = wordmark_lines()
     lines: list[tuple[str, ImageFont.FreeTypeFont, str, bool, int]] = [
-        ("ROLL", wordmark_font, BLUE, False, WORDMARK_GAP),
-        ("CALL", wordmark_font, BLUE, False, GAP),
+        (text, font, BLUE, False, WORDMARK_GAP if i < len(marks) - 1 else GAP)
+        for i, (text, font) in enumerate(marks)
     ]
     title_font = _font("bold", title_size(data.title))
     lines.append((_ellipsize(data.title, title_font, max_width), title_font, INK, False, GAP))

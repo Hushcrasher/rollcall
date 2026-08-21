@@ -50,8 +50,9 @@ Two `<fieldset>`s with `<legend>`s, laid out by one functional grid rule:
   footnote line** under the rows (`<small>`); the two "Matches … any of the
   selected" help texts go — the chips make it obvious. Labels stay above
   their inputs; the Search button sits under the second row, left-aligned.
-- Nothing changes in `search/forms.py` except the removed help texts; the
-  `>= 1 filter` rule, typeahead widgets and chips are untouched.
+- `search/forms.py` gains `game_fields()`/`person_fields()` (replacing
+  `typeahead_fields()`), besides the removed help texts; the `>= 1 filter`
+  rule, typeahead widgets and chips are untouched.
 
 ## 3. Banner copy
 

@@ -19,9 +19,3 @@ def test_visitor_sees_a_message_button(client: Client) -> None:
     contact_url = reverse("contact:contact", args=[target.slug])
     assert f'<a role="button" href="{contact_url}">Message</a>' in main
     assert ">Contact<" not in main
-
-
-def test_banner_has_no_trailing_clause(client: Client) -> None:
-    body = client.get(reverse("home")).content.decode()
-    assert "Worked on a game?" in body
-    assert "no account needed to start" not in body

@@ -51,6 +51,14 @@ def test_the_banner_is_one_translation_unit_not_three() -> None:
     assert "no account needed to start" not in source
 
 
+def test_banner_has_no_trailing_clause(client: Client) -> None:
+    """Rendered-output complement to the source-level test above: the trimmed
+    banner (spec 2026-08-21-search-chrome §3) actually reaches the page."""
+    body = client.get(reverse("home")).content.decode()
+    assert "Worked on a game?" in body
+    assert "no account needed to start" not in body
+
+
 def test_a_member_gets_the_tool_without_the_pitch(client: Client) -> None:
     """They already have an account — the pitch is spent."""
     user = User.objects.create_user(email="m@example.com", password="x", display_name="M")

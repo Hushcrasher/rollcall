@@ -135,7 +135,7 @@ Goal: legally and operationally ready for real users. Buildable pieces done TDD 
 Goal: a styled, mobile-first site without custom design — Pico CSS v2 classless.
 
 - [x] Pico CSS v2 classless vendored; `app.css` = functional layout only (dark mode fixed)
-- [x] Nav: ROLLCALL wordmark, `Add your credit` primary CTA (declare funnel for anonymous)
+- [x] Nav: ROLLCALL wordmark, `Add your credit` primary CTA (declare funnel for anonymous) (stacked `ROLL` / `CALL` since Phase 11)
 - [x] Home: filters first for everyone; worker pitch = one-line banner; `#results` anchor
 - [x] Latest-credits feed (active credits of public profiles only)
 - [x] Credit dates display as MM/YYYY sitewide

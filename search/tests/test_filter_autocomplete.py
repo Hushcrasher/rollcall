@@ -5,6 +5,7 @@ for countries alone, on every anonymous hit. These cover the replacement: the
 autocomplete endpoints, and the chips the widget renders back.
 """
 
+import re
 from typing import Any
 
 import pytest
@@ -169,12 +170,15 @@ def test_typeahead_input_has_a_real_label(client: Client) -> None:
     the GROUP — countries keeps its own <label for>, unlike the old checkbox
     list where the legend was the only accessible name 249 checkboxes shared.
     No more aria-describedby: the per-field help text that used to attach here
-    is gone, folded into the page's single data-caveat footnote."""
+    is gone, folded into the page's single data-caveat footnote. Scoped to the
+    countries <input> itself, not the whole page — other markup gaining an
+    aria-describedby elsewhere shouldn't fail this test."""
     content = _search(client, "")
 
     assert '<label for="id_countries">' in content
-    assert 'id="id_countries"' in content
-    assert "aria-describedby" not in content
+    tag = re.search(r'<input[^>]*id="id_countries"[^>]*>', content)
+    assert tag, 'no <input id="id_countries"> tag found'
+    assert "aria-describedby" not in tag.group(0)
     assert "<legend>" in content
 
 
