@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     "contributions",
     "search",
     "contact",
+    "cards",
 ]
 
 MIDDLEWARE = [
