@@ -81,7 +81,7 @@ A **single Django monolith** (server-rendered) backed by **one managed PostgreSQ
 - **License: AGPL v3 in `LICENSE` at commit 1** (relicensing after external contributions requires every contributor's consent).
 - **DCO** (`Signed-off-by`) instead of a CLA: minimal provenance protection without scaring contributors.
 - README transparency paragraph: *"Code is AGPL; the production database is operated by Hushcrasher."*
-- **Dev fixtures:** a few hundred fake/sample games + fake profiles, loadable in one command — contributors have no parquet access; without fixtures nobody can contribute.
+- **Dev fixtures:** a few hundred fake/sample games + fake profiles, loadable in one command (refuses to run outside `DEBUG`) — contributors have no parquet access; without fixtures nobody can contribute.
 - **CI (GitHub Actions) from the start:** tests + ruff on every PR.
 - Public/private boundary: all *code* is public including the seed logic; parquet URL, credentials, and DB dumps are private. A fork must be able to plug its own game source — that's the cleanliness test.
 

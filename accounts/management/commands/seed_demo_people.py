@@ -1,18 +1,20 @@
-"""`python manage.py seed_demo_people` — demo people with credits on REAL games.
+"""`python manage.py seed_demo_people` — demo people with credits on catalog games.
 
-Dev only. The game catalog comes from the real seed; this adds the "who worked
-on them" side so person pages, game pages, search, and (above all) recruiter
-search are populated with real games, engines, genres, and ratings.
+Dev only. The game catalog comes from the seed; this adds the "who worked on
+them" side so person pages, game pages, search, and (above all) recruiter
+search are populated with catalog games, engines, genres, and ratings.
 
 Deterministic (fixed seed) and idempotent. Demo accounts: demoN@example.com,
-password "demopass". Never run against production.
+password "demopass". Those credentials are public in an open-source repo, so
+the command refuses to run unless DEBUG is on.
 """
 
 import random
 from datetime import date
 from typing import Any
 
-from django.core.management.base import BaseCommand, CommandParser
+from django.conf import settings
+from django.core.management.base import BaseCommand, CommandError, CommandParser
 from django.utils import timezone
 
 from accounts.models import User
@@ -75,13 +77,21 @@ JOB_TITLES = {
 
 
 class Command(BaseCommand):
-    help = "Create demo people with credits on real games (dev only)."
+    help = "Create demo people with credits on catalog games (dev only)."
 
     def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument("--people", type=int, default=40)
         parser.add_argument("--max-credits", type=int, default=6)
 
     def handle(self, *args: Any, **options: Any) -> None:
+        # demo{i}@example.com / "demopass" is published with the source; DEBUG is
+        # the only signal separating a contributor's box from a real deployment,
+        # so fail closed here, before anything is written.
+        if not settings.DEBUG:
+            raise CommandError(
+                "seed_demo_people is DEV ONLY: it creates accounts with the "
+                "password 'demopass'. Refusing to run with DEBUG=False."
+            )
         rng = random.Random(7)
         disciplines = list(Discipline.objects.all())
         if not disciplines:
@@ -141,7 +151,7 @@ class Command(BaseCommand):
             if rng.random() < 0.7:
                 end = date(min(start_year + rng.randint(1, 4), 2025), rng.randint(1, 12), 1)
                 end = max(end, start)
-            # Employer = one of the game's real studios, sometimes.
+            # Employer = one of the game's own studios, sometimes.
             employer: Company | None = None
             if rng.random() < 0.6:
                 link = GameCompany.objects.filter(game=game).select_related("company").first()

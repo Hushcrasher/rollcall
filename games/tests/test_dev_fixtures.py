@@ -28,13 +28,14 @@ def _debug_on(settings: Any) -> None:
 def test_refuses_to_create_the_dev_superuser_outside_debug(settings: Any) -> None:
     """admin@example.com / "admin" is a published credential pair once the repo
     is public; DEBUG is the only thing separating a contributor's box from a
-    real database, so the command must fail closed rather than create it."""
+    live database, so the command must fail closed rather than create it."""
     settings.DEBUG = False
 
     with pytest.raises(CommandError):
         call_command("load_dev_fixtures", games=1, users=1, contributions=1)
 
     assert not User.objects.filter(email="admin@example.com").exists()
+    assert not Game.objects.exists()  # the guard runs before any row is written
 
 
 def test_load_dev_fixtures_is_idempotent() -> None:

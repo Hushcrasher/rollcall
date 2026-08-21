@@ -5,9 +5,11 @@ Target stack (chosen for this POC): **Railway** (app + Postgres + cron),
 a plain Docker image, so none of this is locked in — the same image runs on any
 PaaS or a VPS.
 
-> The app deploys and runs on dev fixtures out of the box. Loading a real
-> catalog is a separate step: it needs the operator's own prepared parquet
-> matching `games/seed/schema.py`, under the operator's own data agreements.
+> The app deploys and runs without a game catalog. A local dataset is
+> available to contributors via `load_dev_fixtures` (DEBUG only). Loading a
+> real catalog is a separate step: it needs the operator's own prepared
+> parquet matching `games/seed/schema.py`, under the operator's own data
+> agreements.
 
 ## 1. Railway — app + database
 
@@ -98,9 +100,10 @@ Two steps — a **prepare** (join the raw source files into one parquet) and a
 **seed** (load that parquet into Postgres):
 
 ```
-# 1. Joins the operator's normalized source files (IGDB games + release dates,
-#    the operator's catalog, and a Steam-derived catalog) into one prepared
-#    parquet matching games/seed/schema.py.
+# 1. Joins the operator's normalized source files into one prepared parquet
+#    matching games/seed/schema.py. Expects, under --source-dir:
+#    igdb/igdb_games.parquet, igdb/igdb_release_dates.parquet,
+#    hushcrasher.parquet, steam.parquet
 python manage.py prepare_seed_parquet --source-dir data --out data/rollcall_games.parquet
 #    → upload data/rollcall_games.parquet to the private R2 bucket.
 
@@ -108,6 +111,9 @@ python manage.py prepare_seed_parquet --source-dir data --out data/rollcall_game
 python manage.py seed_games
 ```
 
+- **`steam.parquet`** is the Steam-derived catalog; that filename is the
+  contract `prepare_seed_parquet` expects, whatever the operator's own
+  pipeline calls the file upstream.
 - **Where the raw files live:** only the *prepared* parquet needs to reach the
   app — put it in the private R2 bucket and point `PARQUET_SOURCE_URL` at it
   (`s3://…` with the S3 creds, or an https URL). The raw source files stay in

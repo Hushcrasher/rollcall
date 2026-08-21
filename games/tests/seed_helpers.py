@@ -1,4 +1,4 @@
-"""Write synthetic prepared parquets for seed tests — no real data needed."""
+"""Write synthetic prepared parquets for seed tests — no catalog file needed."""
 
 from pathlib import Path
 from typing import Any

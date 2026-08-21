@@ -12,7 +12,7 @@
 
 These do not block Phases 0–1, but **must be resolved before coding the seed** (Phase 2):
 
-- [x] Data agreements: IGDB/Twitch confirmed 2026-08-04.
+- [x] IGDB/Twitch data agreement confirmed 2026-08-04.
 - [ ] ⚠️ Parquet audit: `igdb_id` / `steam_appid` present; Steam↔IGDB mapping available (else dedup prep is the first data task)
 - [~] ⚠️ Accounts opened (chosen stack overrides docs' Scalingo/Scaleway defaults): **Railway** (PaaS — account created), **Cloudflare R2** (storage — bucket TODO), **Brevo** (account created; DNS/domain auth deferred to Phase 7), **Sentry** (TODO). None needed before Phase 7. GDPR: Railway + R2 are US → pick EU regions + sign DPAs.
 
@@ -50,11 +50,11 @@ Goal: the **complete** schema from [docs/04-DATABASE-SCHEMA.md](docs/04-DATABASE
 - [x] **Dev fixtures**: `manage.py load_dev_fixtures` — 300 fake games, 50 companies, 40 profiles, 150 contributions; deterministic & idempotent
 - [x] Tests (20): CHECK constraints, cascades/anonymization on account deletion, vouch uniqueness, trigram search, fixtures idempotency
 
-## Phase 2 — Seed pipeline ✅ (engine built; ⚠️ real-parquet wiring still gated)
+## Phase 2 — Seed pipeline ✅ (engine built; ⚠️ prepared-parquet wiring pending)
 
 Goal: `python manage.py seed_games` — idempotent weekly refresh, DuckDB → Postgres.
 
-Built test-first against a **documented assumed parquet schema** (`games/seed/schema.py`) — the contract a fork or the real Hushcrasher parquet must match. Pointing it at the real source later = adjust column names in `schema.py` + clear the prerequisites above.
+Built test-first against a **documented assumed parquet schema** (`games/seed/schema.py`) — the contract a fork or the operator's prepared parquet must match. Pointing it at the operator's source later = adjust column names in `schema.py` + clear the prerequisites above.
 
 - [x] DuckDB reads the parquet (local path, or HTTP/S3 via httpfs, `PARQUET_SOURCE_URL`), constant memory (`fetchmany` streaming)
 - [x] Steam↔IGDB dedup/merge in SQL — now lives in the **prepare step** (`games/seed/prepare.py`, `prepare_seed_parquet`); `pipeline.py` is a straight reader of the prepared parquet
@@ -167,7 +167,7 @@ Goal: artists can show work; every upload goes through one hardened pipeline.
 
 - [x] **Project review fixes** (2026-08-12, from `docs/reviews/2026-08-12-project-review.md`): fresh-clone Docker build repaired (collectstatic placeholder `REDIS_URL` + a CI `docker build` job + `.dockerignore` keeping `.env`/parquets out of image layers); dev settings tolerate a verbatim `cp .env.example .env`; **emails are case-folded** at signup/login/manager with a `Lower(email)` unique constraint (migration `accounts/0006`); **the contact relay requires a verified sender** (behavior change — `EmailVerifiedRequiredMixin` moved to `accounts/mixins.py`, reused by contributions and contact); `igdb_import` over an existing game no longer wipes its Steam columns; employer quick-picks ordered dev→pub→porting→support; `company_create` rejects over-long names; DCO checked in CI on PRs; OSS scaffolding added (SECURITY.md, CODE_OF_CONDUCT.md, issue/PR templates, root CLAUDE.md); hosting story aligned across docs (Railway + R2, EU regions + DPAs).
 
-- [x] **Public-release prep** (2026-08-21): `load_dev_fixtures` now **refuses to run outside `DEBUG`** (behavior change — `admin@example.com` / `admin` becomes a published credential pair the moment the repo is public, and DEBUG is the only signal separating a contributor's box from a real database); CI declares `permissions: contents: read`; `.gitignore` covers the agent-tooling directories (`.claude/launch.json` stays tracked); the prepare step's Steam-derived input is named `steam` (operator file: `steam.parquet`).
+- [x] **Public-release prep** (2026-08-21): `load_dev_fixtures` **and** `seed_demo_people` now **refuse to run outside `DEBUG`** (behavior change — `admin@example.com` / `admin` and `demoN@example.com` / `demopass` become published credential pairs the moment the repo is public, and DEBUG is the only signal separating a contributor's box from a live database; both guards run before any row is written). Both documented onboarding paths keep working: `compose.yml` and `manage.py` both default to `config.settings.dev`, where `DEBUG=True`. CI declares `permissions: contents: read`; `.gitignore` covers the agent-tooling directories (`.claude/launch.json` stays tracked); the prepare step's Steam-derived input is named `steam` (operator file: `steam.parquet`); the About page and README carry the IGDB/Twitch attribution their API terms require.
 
 ## Known follow-ups (tech debt, not blocking the POC)
 

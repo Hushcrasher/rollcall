@@ -46,7 +46,7 @@ cheap to fix. The bones are excellent; the front door is broken.
 3. **Defuse the `.env.example` secret-key trap** (S2-2): make
    [dev.py:8](../../config/settings/dev.py) fall back on an *empty*
    `DJANGO_SECRET_KEY`, or ship the example with a dev default. One line.
-4. **Decide the non-Steam facet story before launch** (S2-3): 57% of the real
+4. **Decide the non-Steam facet story before launch** (S2-3): 57% of the full
    catalog has no rating and no genre data, so the `min_rating` and genre
    filters silently exclude every non-Steam credit while docs/01 promises IGDB
    ratings cover them. Either wire ratings/genres into the upstream export, or
@@ -143,7 +143,7 @@ Fix:         dev.py: `SECRET_KEY = env("DJANGO_SECRET_KEY", default="") or
 Confidence:  high (reproduced)
 ```
 
-### [S2] games/seed/prepare.py:80-81 — with the real data, the rating and genre facets exclude 57% of the catalog; docs/01 §3.6 promises otherwise
+### [S2] games/seed/prepare.py:80-81 — with the full catalog, the rating and genre facets exclude 57% of it; docs/01 §3.6 promises otherwise
 ```
 Evidence:    prepare.py:80-81 hardcodes `NULL::DOUBLE AS igdb_rating` (both
              branches) and prepare.py:38 takes genres from the Steam-side file
@@ -170,7 +170,7 @@ Fix:         Short term, truth in docs/UI: note on the rating/genre fields
              docs/01 §3.6. Real fix: add rating/genre names to the upstream
              IGDB export and wire them through prepare.py (the schema and
              seed already accept them).
-Confidence:  high on the data and mechanism (measured); the "real parquet"
+Confidence:  high on the data and mechanism (measured); the prepared parquet
              on this machine is presumed representative of production.
 ```
 
@@ -575,10 +575,10 @@ concentrated in S2-1 and S2-2.
    Settle: one test deploy, or check Railway's build-args behavior for
    Dockerfile builds.
 2. **Is the local `data/` representative of the production parquet?** The
-   57%-no-facets measurement (S2-3) ran on this machine's
-   rollcall_games.parquet. If a newer upstream export carries ratings/genres
-   for IGDB rows, the finding shrinks to a doc fix. Settle: DESCRIBE the
-   parquet in the private R2 bucket.
+   57%-no-facets measurement (S2-3) ran on the prepared parquet on this
+   machine. If a newer upstream export carries ratings/genres for IGDB rows,
+   the finding shrinks to a doc fix. Settle: DESCRIBE the parquet in the
+   private R2 bucket.
 3. **GitHub block "prefer stale" promise**: the spec says any refresh error
    should prefer serving stale data; `_record_status` flips the snapshot to
    ERROR while keeping old fields (accounts/github.py:310-319). Whether the
