@@ -51,7 +51,7 @@ def test_settings_page_renders_the_field_with_its_help(client: Client) -> None:
     client.force_login(user)
     body = client.get(reverse("accounts:profile_edit")).content.decode()
     assert 'name="public_email"' in body
-    assert "Shown on your public profile to anyone" in body
+    assert "whether or not relay contact is allowed" in body
 
 
 def test_settings_form_rejects_a_malformed_address() -> None:

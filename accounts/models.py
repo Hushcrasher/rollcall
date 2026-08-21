@@ -1,8 +1,9 @@
 """Users & recruiter applications — docs/04-DATABASE-SCHEMA.md §1–2.
 
 Custom user with email as the login identifier, decided at project start
-(cannot change after the first migration). The email is NEVER displayed
-anywhere on the platform; contact goes through the relay only.
+(cannot change after the first migration). The account email is NEVER
+displayed anywhere on the platform; a separate opt-in `public_email` renders
+on the public profile page only; contact otherwise goes through the relay.
 """
 
 from typing import Any, ClassVar

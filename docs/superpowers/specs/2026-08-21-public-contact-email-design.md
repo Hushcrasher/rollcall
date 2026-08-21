@@ -45,9 +45,9 @@ through Rollcall messages.` Lowercased in `clean_public_email`.
 ## 3. Profile (`accounts/profile.html`)
 
 For visitors of a **public** profile with a non-empty `public_email`:
-`<a href="mailto:…">address</a>` under the location line, with a `Message`
-button next to it when `contactable` (the relay stays the default channel —
-spec 2026-08-21-search-chrome). The owner sees the same block plus a muted
+`<a href="mailto:…">address</a>` under the location line; the relay button
+keeps its existing place on the page (its `Message` label lands with spec
+2026-08-21-search-chrome). The owner sees the same block plus a muted
 `Shown publicly` note. Private profile → the page 404s already.
 
 ## 4. Where it must NOT appear — and the tests that prove it
@@ -82,5 +82,5 @@ recruiters only" tier.
 ## Tests
 
 Lowercasing; display on public profile to anonymous and logged-in visitors;
-absence everywhere listed in §4; export includes it; deletion removes it
-(cascade, nothing extra); the policy texts contain the new wording.
+absence everywhere listed in §4; export includes it; the policy texts contain
+the new wording.

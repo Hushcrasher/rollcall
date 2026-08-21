@@ -112,6 +112,16 @@ class ProfileForm(AvatarCleanMixin, PublicEmailCleanMixin, forms.ModelForm):
             "open_to_work",
         ]
         labels = {"public_email": _("Public contact email (optional)")}
+        help_texts = {
+            "contactable": _(
+                "Allow contact via Rollcall messages (the relay). Your account "
+                "email itself is never exposed."
+            ),
+            "public_email": _(
+                "Shown on your public profile to anyone, whether or not relay "
+                "contact is allowed. Leave empty to publish no address."
+            ),
+        }
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
