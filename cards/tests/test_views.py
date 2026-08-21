@@ -71,3 +71,16 @@ def test_cards_are_rate_limited(client: Client, settings: Any) -> None:
     client.get(url)
     client.get(url)
     assert client.get(url).status_code == 403
+
+
+def test_head_shares_the_get_quota_and_post_is_not_allowed(client: Client, settings: Any) -> None:
+    # method=_ALL_METHODS (cards.views): GET and HEAD must share one counter, or a client
+    # can double its effective quota by alternating verbs. require_safe keeps
+    # POST/PUT out of the limiter entirely (405, not a quota-consuming 403).
+    settings.RATELIMIT_ENABLE = True
+    settings.PROFILE_RATELIMIT = "1/m"
+    cache.clear()
+    url = reverse("cards:default")
+    assert client.get(url).status_code == 200
+    assert client.head(url).status_code == 403
+    assert client.post(url).status_code == 405

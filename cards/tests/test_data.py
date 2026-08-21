@@ -6,9 +6,11 @@ from datetime import date
 from typing import Any
 
 import pytest
+from django.test import RequestFactory
+from django.urls import reverse
 
 from accounts.models import User
-from cards.data import default_card, game_card, profile_card, token
+from cards.data import card_url, default_card, game_card, profile_card, token
 from contributions.models import Contribution, Discipline
 from games.models import Game
 
@@ -73,7 +75,25 @@ def test_game_card_with_nobody_invites_the_first_claim() -> None:
     assert game_card(game).stats == "Be the first to claim a credit"
 
 
+def test_game_card_pluralizes_two_or_more_people() -> None:
+    game = Game.objects.create(title="Two Devs", source=Game.Source.MANUAL)
+    _credit(_user(email="a@example.com"), game, "Artist", date(2020, 1, 1), None)
+    _credit(_user(email="c@example.com"), game, "Designer", date(2021, 1, 1), None)
+    assert game_card(game).stats == "2 people credited on Rollcall"
+
+
 def test_token_changes_with_the_data() -> None:
     a = default_card()
     assert len(token(a)) == 10
     assert token(a) != token(profile_card(_user()))
+
+
+def test_card_url_is_absolute_and_carries_the_token() -> None:
+    slug = "sasha-haddad"
+    data = default_card()
+    request = RequestFactory().get("/")
+    url = card_url(request, "cards:profile", data, slug)
+    # RequestFactory defaults to host "testserver" — asserted literally (not
+    # via request.build_absolute_uri again) so the test doesn't just re-run
+    # the code under test.
+    assert url == "http://testserver" + reverse("cards:profile", args=[slug]) + "?v=" + token(data)

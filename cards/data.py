@@ -65,6 +65,7 @@ def game_card(game: Game) -> CardData:
         if people
         else _("Be the first to claim a credit")
     )
+    # release_date is a `date` at runtime; the type checker sees the DateField.
     release: Any = game.release_date
     return CardData(
         kind="game",
