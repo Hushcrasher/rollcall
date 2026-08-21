@@ -3,8 +3,10 @@ feature: only active credits of public profiles, nothing else about the user
 (spec 2026-08-20-mobile-first-surface §3)."""
 
 from datetime import date
+from pathlib import Path
 
 import pytest
+from django.conf import settings
 from django.test import Client
 from django.urls import reverse
 
@@ -13,6 +15,8 @@ from contributions.models import Contribution, Discipline
 from games.models import Company, Game
 
 pytestmark = pytest.mark.django_db
+
+_TEMPLATE = Path(settings.BASE_DIR) / "templates" / "search" / "people_search.html"
 
 
 def _credit(
@@ -89,6 +93,16 @@ def test_feed_survives_an_unrelated_tracking_param(client: Client) -> None:
     body = client.get(reverse("home"), {"utm_source": "newsletter"}).content.decode()
     assert "Latest credits" in body
     assert "Ada Artist" in body
+
+
+def test_the_feed_sentence_is_one_translation_unit_not_split_around_a_link() -> None:
+    """`{% translate "added a credit on" %}` sandwiched between the two links
+    fixes English word order in place. One {% blocktranslate %} keeps the
+    sentence whole, with only the two links' URLs as placeholders."""
+    source = _TEMPLATE.read_text()
+    assert '{% translate "added a credit on" %}' not in source
+    assert "{% blocktranslate" in source
+    assert "added a credit on" in source
 
 
 def test_feed_is_newest_first_and_capped_at_ten(client: Client) -> None:

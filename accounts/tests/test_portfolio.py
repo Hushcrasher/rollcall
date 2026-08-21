@@ -12,10 +12,12 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.functional import Promise
 from PIL import Image
 
 from accounts.images import process_image as _real_process_image
 from accounts.models import MAX_PORTFOLIO_IMAGES, ProfileImage, User
+from accounts.views import PortfolioAddView
 
 pytestmark = pytest.mark.django_db
 
@@ -77,6 +79,14 @@ def test_upload_creates_reencoded_image_and_thumbnail(client: Client) -> None:
     assert stored.image.name.endswith(".webp")
     assert "work" not in stored.image.name  # client filename never survives
     assert stored.thumbnail.name.endswith(".webp")
+
+
+def test_verification_message_is_lazy() -> None:
+    # A class attribute set with plain gettext() resolves the active language
+    # once, at import time, and bakes that string into the class forever —
+    # invisible today with LANGUAGES=[en], but wrong the day a second
+    # language ships. gettext_lazy defers resolution to render time instead.
+    assert isinstance(PortfolioAddView.verification_message, Promise)
 
 
 def test_unverified_user_is_bounced_to_verification(client: Client) -> None:

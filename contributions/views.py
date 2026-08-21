@@ -17,6 +17,7 @@ from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy as _lazy
 from django.views.generic import CreateView, DeleteView, FormView, TemplateView, UpdateView
 from django_ratelimit.core import is_ratelimited
 from django_ratelimit.exceptions import Ratelimited
@@ -254,7 +255,10 @@ class ContributionCreateView(
     model = Contribution
     form_class = ContributionForm
     template_name = "contributions/contribution_form.html"
-    verification_message = _("Please verify your email before adding credits.")
+    # Lazy: a class attribute evaluates at import time, and plain gettext()
+    # would bake in whatever language happened to be active then
+    # (accounts/mixins.py's base class attribute is lazy for the same reason).
+    verification_message = _lazy("Please verify your email before adding credits.")
 
     def form_valid(self, form: ContributionForm) -> HttpResponse:
         form.instance.user = self.request.user

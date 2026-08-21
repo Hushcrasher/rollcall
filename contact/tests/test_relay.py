@@ -9,9 +9,11 @@ from django.core import mail
 from django.test import Client
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.functional import Promise
 
 from accounts.models import User
 from contact.models import ContactRequest
+from contact.views import ContactView
 
 pytestmark = pytest.mark.django_db
 
@@ -59,6 +61,14 @@ def test_unverified_sender_cannot_use_the_relay(client: Client, target: User) ->
     assert len(mail.outbox) == 0
     assert ContactRequest.objects.count() == 0
     assert response.status_code == 302  # bounced to the verification notice
+
+
+def test_verification_message_is_lazy() -> None:
+    # A class attribute set with plain gettext() resolves the active language
+    # once, at import time, and bakes that string into the class forever —
+    # invisible today with LANGUAGES=[en], but wrong the day a second
+    # language ships. gettext_lazy defers resolution to render time instead.
+    assert isinstance(ContactView.verification_message, Promise)
 
 
 def test_sending_relays_an_email_with_reply_to_sender(
