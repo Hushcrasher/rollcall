@@ -32,7 +32,7 @@
     {% if profile_user.public_email %}
       {# The member's own choice to publish this address (spec 2026-08-21-public-contact-email §3). The account email is never rendered. #}
       <p><a href="mailto:{{ profile_user.public_email }}">{{ profile_user.public_email }}</a>
-        {% if is_owner %}<span class="muted">{% translate "Shown publicly" %}</span>{% endif %}</p>
+        {% if is_owner and profile_user.profile_public %}<span class="muted">{% translate "Shown publicly" %}</span>{% endif %}</p>
     {% endif %}
     {% if profile_user.bio %}<p>{{ profile_user.bio }}</p>{% endif %}
 

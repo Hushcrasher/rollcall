@@ -68,12 +68,22 @@ class AvatarCleanMixin:
         return avatar
 
 
-class AdminUserChangeForm(AvatarCleanMixin, UserChangeForm):
+class PublicEmailCleanMixin:
+    """Case-folds `public_email` like the account `email` (SignupForm.clean_email):
+    one column, one casing rule, whichever form writes it — staff included."""
+
+    cleaned_data: dict[str, Any]  # provided by the Form/ModelForm this is mixed into
+
+    def clean_public_email(self) -> str:
+        return self.cleaned_data.get("public_email", "").strip().lower()
+
+
+class AdminUserChangeForm(AvatarCleanMixin, PublicEmailCleanMixin, UserChangeForm):
     """Django's stock admin form would write the raw bytes: the pipeline is
     not optional because the poster happens to be staff."""
 
 
-class ProfileForm(AvatarCleanMixin, forms.ModelForm):
+class ProfileForm(AvatarCleanMixin, PublicEmailCleanMixin, forms.ModelForm):
     """The profile fields + the three visibility booleans (docs/01-DESIGN.md §3.4),
     plus an optional GitHub handle (stored parsed as a login)."""
 
@@ -107,10 +117,6 @@ class ProfileForm(AvatarCleanMixin, forms.ModelForm):
         super().__init__(*args, **kwargs)
         if self.instance and self.instance.pk:
             self.fields["github_url"].initial = str(self.instance.github_login)
-
-    def clean_public_email(self) -> str:
-        # Same case-folding rule as the account email (SignupForm.clean_email).
-        return self.cleaned_data.get("public_email", "").strip().lower()
 
     def clean_github_url(self) -> str:
         raw = self.cleaned_data.get("github_url", "").strip()
