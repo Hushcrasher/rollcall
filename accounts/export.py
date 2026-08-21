@@ -28,6 +28,7 @@ def build_personal_data_export(user: User) -> dict[str, Any]:
     return {
         "identity": {
             "email": user.email,
+            "public_email": user.public_email,
             "display_name": user.display_name,
             "slug": user.slug,
             "role": user.role,
