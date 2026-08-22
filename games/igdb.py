@@ -18,6 +18,8 @@ from typing import Any
 
 from django.conf import settings
 from django.core.cache import cache
+from django.http import HttpRequest
+from django_ratelimit.core import is_ratelimited
 
 from games.models import Game
 from games.seed.schema import CanonicalGame
@@ -120,6 +122,36 @@ def igdb_label(result: dict[str, Any]) -> str:
     if timestamp:
         return f"{name} ({datetime.fromtimestamp(timestamp, tz=UTC).year})"
     return name
+
+
+_QUOTA_GROUP = "igdb_search"
+
+
+def quota_exceeded(request: HttpRequest) -> bool:
+    """True when this IP has spent its IGDB allowance for the window.
+
+    Two things make this unlike every other limit in the project, and both are
+    deliberate (spec 2026-08-22-igdb-auto-fallback §2):
+
+    - **It never blocks.** No `block=True`, no `Ratelimited`. Reaching the
+      quota means the caller skips the IGDB call and falls back to the copy
+      that existed before this feature — 403-ing a page whose own local
+      results are perfectly good would be a worse outcome than not asking a
+      third party.
+    - **Only call it when a live request is about to be made.** A cache hit
+      costs IGDB nothing, so it must not spend quota; callers check the cache
+      first.
+
+    RATELIMIT_FAIL_OPEN is already True project-wide, so an unreachable cache
+    un-meters rather than 500s — bounded here by the 4s search timeout.
+    """
+    return is_ratelimited(
+        request=request,
+        group=_QUOTA_GROUP,
+        key="ip",
+        rate=settings.IGDB_RATELIMIT,
+        increment=True,
+    )
 
 
 def _search_cache_key(query: str) -> str:

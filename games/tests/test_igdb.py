@@ -8,8 +8,9 @@ from typing import Any
 
 import pytest
 from django.core.cache import cache
+from django.test import RequestFactory
 
-from games.igdb import IGDBClient, cached_search, igdb_label, igdb_to_canonical
+from games.igdb import IGDBClient, cached_search, igdb_label, igdb_to_canonical, quota_exceeded
 
 # A trimmed IGDB `games` response (Hades).
 HADES = {
@@ -177,3 +178,23 @@ def test_search_uses_the_short_timeout_and_get_game_keeps_the_long_one(
 def test_igdb_label_appends_the_release_year() -> None:
     assert igdb_label({"name": "Celeste", "first_release_date": 1516924800}) == "Celeste (2018)"
     assert igdb_label({"name": "Unreleased"}) == "Unreleased"
+
+
+def test_quota_allows_up_to_the_limit_then_reports_exceeded(settings: Any) -> None:
+    settings.RATELIMIT_ENABLE = True
+    settings.IGDB_RATELIMIT = "1/m"
+    request = RequestFactory().get("/declare/")
+    assert quota_exceeded(request) is False
+    assert quota_exceeded(request) is True
+
+
+def test_quota_is_independent_of_the_search_ratelimit(settings: Any) -> None:
+    """The local trigram search is cheap and ours; an IGDB call is a third
+    party's quota. Spending one must not spend the other."""
+    settings.RATELIMIT_ENABLE = True
+    settings.SEARCH_RATELIMIT = "1/m"
+    settings.IGDB_RATELIMIT = "5/m"
+    request = RequestFactory().get("/declare/")
+    for _ in range(5):
+        assert quota_exceeded(request) is False
+    assert quota_exceeded(request) is True
