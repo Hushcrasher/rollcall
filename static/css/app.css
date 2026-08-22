@@ -42,10 +42,18 @@ nav [role=button] { white-space: nowrap; }
 nav form button[type=submit] { background: none; border: none; color: var(--pico-primary); }
 .results, .nav-suggest {
   position: absolute; z-index: 100; left: 0; top: 100%;
-  min-width: 20rem; max-width: 90vw; max-height: 20rem; overflow-y: auto;
+  /* At least as wide as the field this hangs under, free to grow for a long
+     game title. A flat 20rem made the panel jut out over its neighbour in the
+     search form's narrow columns. */
+  min-width: 100%; max-width: 90vw; max-height: 20rem; overflow-y: auto;
   background: var(--pico-background-color); color: inherit;
   border: 1px solid var(--pico-muted-border-color);
 }
+/* `static/js/autocomplete.js` dismisses a panel by setting the `hidden`
+   attribute, which works only because nothing here gives these two a
+   `display` outside `:empty`: the UA sheet's `[hidden] { display: none }` is
+   (0,1,0) and would lose to any author rule added below. Do not give them
+   one — no test can catch it, and it would break every dropdown at once. */
 .results:empty, .nav-suggest:empty { display: none; }
 .autocomplete-option, .igdb-option, .igdb-trigger, .suggest-item {
   display: block; width: 100%; text-align: left; box-sizing: border-box;
