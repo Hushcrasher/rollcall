@@ -15,7 +15,7 @@
       already gives them a way forward, so this stays out of their way.
     {% endcomment %}
     <p class="autocomplete-hint">
-      {% translate "Employer is optional — you can add it once you've created your account." %}
+      {% translate "Optional — you can add it after signing up." %}
     </p>
   {% elif not offer_create %}
     {% comment %}
@@ -29,7 +29,7 @@
       branch never fires there — it gets the button above, not a hint.
     {% endcomment %}
     <p class="autocomplete-hint">
-      {% translate "Employer is optional — you can add it later from your credit." %}
+      {% translate "Optional — you can add it later." %}
     </p>
   {% endif %}
 {% endfor %}
