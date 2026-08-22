@@ -12,6 +12,7 @@ from typing import Any
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db import IntegrityError
 from django.db.models import QuerySet
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect
@@ -178,14 +179,40 @@ class DeclareGameView(TemplateView):
         # to cover on an endpoint anonymous traffic posts to.
         if not _is_row_id(raw):
             return None
+        if not IGDBClient().configured:
+            # The guard _offer_igdb_matches and games.views.igdb_search already
+            # carry. Without it, a deployment that never enabled IGDB still
+            # drives an outbound Twitch token request from an anonymous POST and
+            # can hold a worker for the full 10s import timeout. Spec §4: that
+            # deployment shows the signup line and nothing else.
+            return None
         if quota_exceeded(request):
-            self.igdb_error = "throttled"
+            # Deliberately no igdb_error: spec §4 gives "throttled" no copy on
+            # this page, and setting it here would only clobber the
+            # "unavailable" that _offer_igdb_matches may legitimately set on the
+            # re-render.
+            #
+            # Known cost, not fixed here: a failed import with a cold search
+            # cache spends the quota twice in one request — once on this line,
+            # once inside search_options when get_context_data rebuilds the
+            # option list. Both are real IGDB calls, so neither check is wrong;
+            # collapsing them would mean threading per-request state through
+            # search_options, which games.views.igdb_search shares.
             return None
         try:
             game = import_igdb_game(int(raw))
         except IGDBError:
             self.igdb_error = "unavailable"
             return None
+        except IntegrityError:
+            # A double-click on the funnel's conversion button. Two simultaneous
+            # imports of an igdb_id nobody holds yet both preload an empty
+            # by-igdb_id map in games/seed/upsert.py and both bulk_create, so the
+            # unique index on Game.igdb_id turns the loser into an IntegrityError
+            # -> 500. Recovered here rather than in the seed, whose dedup is a
+            # non-negotiable test zone (docs/02 §7): the winner has written the
+            # very row this request wanted, so re-read it and carry on.
+            game = Game.objects.filter(igdb_id=int(raw)).first()
         if game is None:
             self.igdb_error = "gone"
         return game

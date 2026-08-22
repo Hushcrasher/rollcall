@@ -9,9 +9,11 @@ from typing import Any
 
 import pytest
 from django.core.cache import cache
+from django.db import IntegrityError
 from django.test import Client
 from django.urls import reverse
 
+import contributions.views
 from accounts.models import User
 from contributions.funnel import SESSION_KEY
 from games.igdb import IGDBClient, IGDBError
@@ -347,6 +349,20 @@ def test_a_junk_igdb_id_does_not_500(
     assert calls == []
 
 
+def test_an_unconfigured_import_never_calls_igdb(
+    client: Client, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Default test settings blank the credentials. `_offer_igdb_matches` and
+    `games.views.igdb_search` both return early on `not configured`; this path
+    did not, so an anonymous POST on a deployment that never enabled IGDB still
+    drove a Twitch token request and could hold a worker for 10s (spec §4)."""
+    calls: list[Any] = []
+    monkeypatch.setattr(IGDBClient, "_http", lambda self, *a, **kw: calls.append(a) or {})
+    response = client.post(reverse("contributions:declare"), {"igdb": "40477"})
+    assert response.status_code == 200
+    assert calls == []
+
+
 def test_an_import_that_igdb_no_longer_has_says_so(
     client: Client, igdb_configured: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -374,6 +390,42 @@ def test_an_import_that_igdb_no_longer_has_says_so(
     assert response.status_code == 200
     assert b"no longer listed on IGDB" in response.content
     assert b"Not in our catalogue yet" in response.content
+
+
+def test_a_double_click_reuses_the_row_the_other_request_wrote(
+    client: Client, igdb_configured: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The funnel's conversion button is exactly where a double-click happens.
+    Two simultaneous imports of an unseen igdb_id both bulk_create through the
+    seed's upsert, and the unique index turns the loser into an IntegrityError
+    -> 500. The loser must re-read the winner's row and carry on instead."""
+    winner = Game.objects.create(
+        title="Slay the Spire", igdb_id=40477, source=Game.Source.IGDB_LIVE
+    )
+
+    def lose_the_race(igdb_id: int, client: IGDBClient | None = None) -> Game | None:
+        raise IntegrityError("duplicate key value violates unique constraint")
+
+    monkeypatch.setattr(contributions.views, "import_igdb_game", lose_the_race)
+    response = client.post(reverse("contributions:declare"), {"igdb": "40477"})
+    assert response.status_code == 302
+    assert response.url == reverse("contributions:declare_details")
+    assert client.session[SESSION_KEY]["game"] == str(winner.pk)
+
+
+def test_an_integrity_error_with_nothing_to_re_read_falls_back(
+    client: Client, igdb_configured: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """If the re-read finds nothing the row was never written, so this is a
+    failed import like any other — a re-render, not a 500."""
+
+    def lose_the_race(igdb_id: int, client: IGDBClient | None = None) -> Game | None:
+        raise IntegrityError("duplicate key value violates unique constraint")
+
+    monkeypatch.setattr(contributions.views, "import_igdb_game", lose_the_race)
+    response = client.post(reverse("contributions:declare"), {"igdb": "40477"})
+    assert response.status_code == 200
+    assert SESSION_KEY not in client.session
 
 
 def test_an_import_over_quota_does_not_call_igdb(
