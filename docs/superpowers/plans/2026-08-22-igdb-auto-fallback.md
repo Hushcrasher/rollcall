@@ -501,7 +501,8 @@ def search_options(
     """
     if cache.get(_search_cache_key(query)) is None and quota_exceeded(request):
         return None
-    return [{"igdb_id": r["id"], "label": igdb_label(r)} for r in cached_search(query, client=client)]
+    results = cached_search(query, client=client)
+    return [{"igdb_id": r["id"], "label": igdb_label(r)} for r in results]
 ```
 
 - [ ] **Step 4: Rewrite `igdb_search` in `games/views.py`**
