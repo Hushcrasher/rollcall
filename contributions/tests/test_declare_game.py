@@ -310,8 +310,13 @@ def test_the_deeper_search_hatch_renders_alongside_local_matches(
     client: Client, game: Game, igdb_configured: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """At catalogue scale a local miss is effectively unreachable, so the
-    hatch must be offered even when local matches exist — and offering it
-    must not itself spend an IGDB call."""
+    hatch link must render even when local matches exist. It does not, on its
+    own, exercise the IGDB trigger: with `games` present and `deep` false the
+    widened `not games or deep` condition is False, so `_offer_igdb_matches`
+    is never reached here — `search_games` and `calls == []` merely pin that
+    rendering the page itself never spends an IGDB call, regardless of the
+    hatch. See test_following_the_hatch_offers_igdb_matches_despite_local_matches
+    for the case that actually reaches IGDB with local matches present."""
     calls: list[str] = []
     monkeypatch.setattr(IGDBClient, "search_games", lambda self, q, limit=10: calls.append(q) or [])
     response = client.get(reverse("contributions:declare"), {"q": "Hollow Knight"})

@@ -47,7 +47,14 @@
       {% comment %}
         The same shape as the local picks above — one POST form per option —
         so keyboard and no-JS both work with no extra code. `q` rides along so
-        a failed import re-renders this list instead of an empty page.
+        a failed import re-renders this list instead of an empty page. `deep`
+        rides along too, hidden, for the same reason: these forms carry no
+        `action`, so the browser resubmits to the current URL and Django
+        happens to read `deep` back out of `request.GET` — true today, but
+        undocumented and not something to rely on implicitly, unlike `q`,
+        which is already explicit here. Needed now that a local-match-plus-
+        `deep` page can also fail an import and must re-render with its
+        options intact.
       {% endcomment %}
       <ul>
         {% for option in igdb_options %}
@@ -56,6 +63,7 @@
               {% csrf_token %}
               <input type="hidden" name="igdb" value="{{ option.igdb_id }}">
               <input type="hidden" name="q" value="{{ query }}">
+              {% if deep %}<input type="hidden" name="deep" value="1">{% endif %}
               <button class="pick" type="submit">{{ option.label }}</button>
             </form>
           </li>
