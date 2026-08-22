@@ -36,3 +36,49 @@ def employer_label(form: ContributionForm) -> str:
         return ""
     company = Company.objects.filter(pk=value).first()
     return str(company) if company is not None else ""
+
+
+# The "no employer" sentinel of the `data-selected` / `?selected=` contract
+# below. Read by games.views.game_employers, which documents the same three
+# states from the endpoint's side — the two must not drift.
+NO_EMPLOYER = "none"
+
+
+@register.filter
+def employer_id(form: ContributionForm) -> str:
+    """`data-selected` on _employer_field.html — what the credit-form/funnel JS
+    forwards to games:game_employers as `?selected=` to preselect on load.
+
+    Three-way, because "no employer" and "we haven't asked yet" need different
+    answers from the endpoint:
+
+    - `"<pk>"` — that company.
+    - `NO_EMPLOYER` — the employer is known to be empty: a bound form whose
+      `company` came back empty (the member picked `No employer / freelance`),
+      a saved credit being edited with no company, or a funnel draft that has
+      been through step 2 (`"company"` present in `initial`, empty). Returning
+      `""` here would send no `?selected=` at all, the endpoint would preselect
+      the developer, and the JS's `sync()` would write its pk into the hidden
+      field — so saving a typo fix on a freelance credit would silently stamp
+      the developer as employer (spec §1: the edit form never silently changes
+      an employer).
+    - `""` — genuinely unknown (a blank new form, or the funnel right after the
+      game step): the endpoint's developer-first default is what's wanted.
+
+    Opposite precedence from employer_label above, and for the same reason:
+    `form["company"].value()` reads the BoundField's value regardless of
+    *why* the form is unbound — a real instance's model_to_dict-derived
+    initial (editing) or the funnel's session-draft initial — and a bound
+    form's raw posted value (a validation-error re-render) without waiting
+    on `_post_clean`. `form.instance.company_id` is the fallback: it only
+    disagrees with the above when the posted value didn't survive field
+    validation (e.g. a stray "__other"), in which case emitting it as
+    `data-selected` would be wrong anyway.
+    """
+    value = form["company"].value()
+    if value and str(value).isdecimal():
+        return str(value)
+    if form.instance.company_id:
+        return str(form.instance.company_id)
+    asked = form.is_bound or form.instance.pk is not None or "company" in form.initial
+    return NO_EMPLOYER if asked else ""

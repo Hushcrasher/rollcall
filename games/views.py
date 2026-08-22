@@ -11,6 +11,7 @@ from typing import Any
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
+from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST
 from django.views.generic import DetailView
 
@@ -102,7 +103,7 @@ def igdb_search(request: HttpRequest) -> HttpResponse:
     return render(request, "games/_igdb_options.html", context)
 
 
-# Quick-pick relevance order — NOT the enum strings' alphabetical order, which
+# Employer option order — NOT the enum strings' alphabetical order, which
 # would sort porting before publisher.
 _EMPLOYER_ROLE_ORDER = [
     GameCompany.Role.DEVELOPER,
@@ -113,8 +114,25 @@ _EMPLOYER_ROLE_ORDER = [
 
 
 def game_employers(request: HttpRequest, pk: int) -> HttpResponse:
-    """The companies credited on this game — quick-picks for the employer field.
-    Deduplicated across roles; ordered developer → publisher → porting → support."""
+    """The companies credited on this game, as a <select>: developer first and
+    preselected (spec 2026-08-21-credit-form-v2 §1). Deduplicated across
+    roles; ordered developer → publisher → porting → support.
+
+    `?selected=` carries the form's three-way employer state, produced by
+    `contributions_extras.employer_id` and forwarded verbatim by the JS:
+
+    - absent or empty — the employer is **unknown** (a blank new form, or the
+      funnel right after the game step): the developer-first default applies.
+    - `none` — the employer is **known to be empty** (editing a credit saved
+      without a company, or a member who picked `No employer / freelance`):
+      `No employer / freelance` is selected. Falling back to the default here
+      would let a typo fix on a freelance credit stamp the developer as
+      employer, since the JS writes the selected option back into the form.
+    - `<company pk>` — that company, appended to the list as
+      `_("current employer")` when it isn't already one of the game's studios,
+      so editing a credit never silently drops the employer the member
+      actually recorded.
+    """
     game = get_object_or_404(Game, pk=pk)
     employers: list[dict[str, Any]] = []
     seen: set[int] = set()
@@ -129,7 +147,41 @@ def game_employers(request: HttpRequest, pk: int) -> HttpResponse:
         employers.append(
             {"id": link.company.pk, "name": link.company.name, "role": link.get_role_display()}
         )
-    return render(request, "games/_employer_options.html", {"employers": employers})
+
+    # `isdecimal()`, not `isdigit()`: superscripts like "²" are digits but
+    # int() rejects them, so `?selected=²` raised ValueError -> 500 here —
+    # the same trap `DeclareGameView._picked_game` guards against.
+    # isdecimal() is still True for "１"/"٣" (int() accepts those).
+    selected = request.GET.get("selected", "")
+    selected_pk: int | None = int(selected) if selected.isdecimal() else None
+    if selected_pk is not None and selected_pk not in seen:
+        company = Company.objects.filter(pk=selected_pk).first()
+        if company is not None:
+            seen.add(company.pk)
+            employers.append(
+                {"id": company.pk, "name": company.name, "role": _("current employer")}
+            )
+
+    # Selection rule (spec §1): the saved company when it made it into the
+    # list above, else the explicit "no employer" of `selected=none`, else the
+    # first employer (developer-first ordering), else None — "No employer /
+    # freelance" is the only sane default with nothing to preselect.
+    # `__other` is never a candidate: it isn't a company id.
+    selected_id: int | None
+    if selected_pk is not None and selected_pk in seen:
+        selected_id = selected_pk
+    elif selected == "none":
+        selected_id = None
+    elif employers:
+        selected_id = employers[0]["id"]
+    else:
+        selected_id = None
+
+    return render(
+        request,
+        "games/_employer_options.html",
+        {"employers": employers, "selected_id": selected_id},
+    )
 
 
 @require_POST

@@ -51,6 +51,7 @@ def build_personal_data_export(user: User) -> dict[str, Any]:
                 "job_title": c.job_title,
                 "start_date": _iso(c.start_date),
                 "end_date": _iso(c.end_date),
+                "country": c.country.code or None,
                 "status": c.status,
             }
             for c in contributions

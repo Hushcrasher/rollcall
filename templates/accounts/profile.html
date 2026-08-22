@@ -90,8 +90,7 @@
           @ <a href="{% url 'games:company' c.company.slug %}">{{ c.company.name }}</a>
         {% endif %}
         <span class="dates">
-          {{ c.start_date|date:"m/Y" }} –
-          {% if c.end_date %}{{ c.end_date|date:"m/Y" }}{% else %}{% translate "present" %}{% endif %}
+          {{ c.start_date|date:"m/Y" }} – {% if c.end_date %}{{ c.end_date|date:"m/Y" }}{% else %}{% translate "present" %}{% endif %}{% if c.country %} · {{ c.country.name }}{% endif %}
         </span>
         <span class="badge">{% translate "Declared" %}</span>
         {% if is_owner %}

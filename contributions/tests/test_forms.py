@@ -5,8 +5,9 @@ from typing import Any
 
 import pytest
 
+from accounts.models import User
 from contributions.forms import ContributionForm
-from contributions.models import Discipline
+from contributions.models import Contribution, Discipline
 from games.models import Company, Game
 
 pytestmark = pytest.mark.django_db
@@ -64,3 +65,37 @@ def test_optional_company_is_accepted(game: Game, discipline: Discipline) -> Non
     form = ContributionForm(_data(game, discipline, company=company.pk))
     assert form.is_valid(), form.errors
     assert form.cleaned_data["company"] == company
+
+
+def test_mm_yyyy_is_accepted_and_stored_as_first_of_month(
+    game: Game, discipline: Discipline
+) -> None:
+    form = ContributionForm(_data(game, discipline, start_date="08/2024"))
+    assert form.is_valid(), form.errors
+    assert form.cleaned_data["start_date"] == date(2024, 8, 1)
+
+
+def test_legacy_yyyy_mm_is_still_accepted(game: Game, discipline: Discipline) -> None:
+    form = ContributionForm(_data(game, discipline, start_date="2024-08"))
+    assert form.is_valid(), form.errors
+
+
+@pytest.mark.parametrize("raw", ["13/2024", "8/24", "2024/08", "août 2024"])
+def test_malformed_months_are_rejected_with_the_format_hint(
+    game: Game, discipline: Discipline, raw: str
+) -> None:
+    form = ContributionForm(_data(game, discipline, start_date=raw))
+    assert not form.is_valid()
+    assert "MM/YYYY" in " ".join(form.errors["start_date"])
+
+
+def test_edit_form_shows_the_saved_month_as_mm_yyyy(game: Game, discipline: Discipline) -> None:
+    user = User.objects.create_user(email="e@example.com", password="x", display_name="E")
+    credit = Contribution.objects.create(
+        user=user, game=game, discipline=discipline, job_title="Dev", start_date=date(2024, 8, 1)
+    )
+    bound = ContributionForm(instance=credit)["start_date"]
+    # The rendered widget, not `bound.value()`: the field hands the widget the
+    # raw `date` and MonthInput's format (`%m/%Y`) is what turns it into text.
+    assert 'value="08/2024"' in str(bound)
+    assert 'inputmode="numeric"' in str(bound) and 'placeholder="MM/YYYY"' in str(bound)

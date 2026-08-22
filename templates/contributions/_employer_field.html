@@ -9,10 +9,11 @@
   search/_company_options.html, which is what actually renders the button.
 {% endcomment %}
 <div class="autocomplete" id="employer-field" data-hidden="{{ form.company.auto_id }}"
-     data-employers-url="{% url 'games:game_employers' 0 %}">
-  <label>{% translate "Employer company (optional)" %}</label>
+     data-employers-url="{% url 'games:game_employers' 0 %}"
+     data-selected="{{ form|employer_id }}">
+  <label>{% translate "Employer" %}</label>
   {{ form.company }}
-  <p class="employer-hint">{% translate "Pick a game above to see its studios." %}</p>
+  <p class="employer-hint">{% translate "Pick a game first." %}</p>
   <div id="employer-quickpicks"></div>
   <div class="employer-search" hidden>
     <input type="text" class="autocomplete-input" name="q" autocomplete="off"

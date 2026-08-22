@@ -1,5 +1,5 @@
 """Contribution form — game required in the POC, optional employer company,
-discipline, free job title, and month/year dates (docs/01-DESIGN.md §3.3)."""
+discipline, free job title, and MM/YYYY dates (docs/01-DESIGN.md §3.3)."""
 
 from typing import Any
 
@@ -11,22 +11,36 @@ from games.models import Game
 
 
 class MonthInput(forms.DateInput):
-    """Native month picker — the browser submits 'YYYY-MM'."""
+    """A text box, not the native month picker: the picker renders in the
+    browser's locale ("février 2026"), and the site's date format is MM/YYYY
+    everywhere (spec 2026-08-21-credit-form-v2 §3)."""
 
-    input_type = "month"
+    input_type = "text"
 
     def __init__(self, attrs: dict[str, Any] | None = None) -> None:
-        super().__init__(attrs=attrs, format="%Y-%m")
+        base = {
+            "inputmode": "numeric",
+            "placeholder": "MM/YYYY",
+            "pattern": "[0-9]{2}/[0-9]{4}",
+            # Without a title the browser's own `pattern` message is generic
+            # ("Please match the requested format"), which would contradict the
+            # server's "Enter a month as MM/YYYY, e.g. 08/2024." on the same box.
+            "title": _("MM/YYYY, e.g. 08/2024"),
+            "autocomplete": "off",
+        }
+        super().__init__(attrs={**base, **(attrs or {})}, format="%m/%Y")
 
 
 class MonthYearField(forms.DateField):
     """Stores month/year precision as a DATE with day forced to 01 (native SQL
-    range/overlap ops matter for the future vouching system)."""
+    range/overlap ops matter for the future vouching system). Accepts MM/YYYY
+    and, for older clients and tests, the legacy YYYY-MM."""
 
     widget = MonthInput
+    default_error_messages = {"invalid": _("Enter a month as MM/YYYY, e.g. 08/2024.")}
 
     def __init__(self, **kwargs: Any) -> None:
-        kwargs.setdefault("input_formats", ["%Y-%m"])
+        kwargs.setdefault("input_formats", ["%m/%Y", "%Y-%m"])
         super().__init__(**kwargs)
 
 
@@ -42,8 +56,9 @@ class ContributionForm(forms.ModelForm):
 
     class Meta:
         model = Contribution
-        fields = ["game", "company", "discipline", "job_title", "start_date", "end_date"]
+        fields = ["game", "company", "discipline", "job_title", "start_date", "end_date", "country"]
         widgets = {"company": forms.HiddenInput}
+        help_texts = {"country": _("Where this work happened.")}
 
     def clean(self) -> dict[str, Any]:
         cleaned = super().clean()

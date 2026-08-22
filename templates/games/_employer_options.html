@@ -1,10 +1,20 @@
 {% load i18n %}
-{% for employer in employers %}
-  <button type="button" class="autocomplete-option"
-          data-id="{{ employer.id }}" data-label="{{ employer.name }}">
-    {{ employer.name }} <small>{{ employer.role }}</small>
-  </button>
-{% endfor %}
-<button type="button" class="employer-other-toggle">
-  {% translate "Worked for another company?" %}
-</button>
+{% comment %}
+  A select, developer first and preselected: the common case needs no click
+  (spec 2026-08-21-credit-form-v2 §1). The two trailing options are the
+  escapes; which one starts selected is `selected_id` (games.views
+  .game_employers documents the three `?selected=` states).
+
+  Written as a comment/endcomment block on purpose: Django's lexer only ever
+  strips a hash-style comment that fits on ONE line, so a multi-line one is
+  emitted verbatim — and this fragment is swapped straight into the page,
+  comment and all. Pinned by games/tests/test_employer.py's
+  test_employer_select_has_no_leaked_template_comment.
+{% endcomment %}
+<select id="employer-select" class="employer-select" aria-label="{% translate 'Employer' %}">
+  {% for employer in employers %}
+    <option value="{{ employer.id }}"{% if employer.id == selected_id %} selected{% endif %}>{{ employer.name }} ({{ employer.role }})</option>
+  {% endfor %}
+  <option value=""{% if selected_id is None %} selected{% endif %}>{% translate "No employer / freelance" %}</option>
+  <option value="__other">{% translate "Another company…" %}</option>
+</select>

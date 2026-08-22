@@ -35,6 +35,11 @@
       {{ form.end_date }} {{ form.end_date.errors }}
       <small>{% translate "Leave empty if you're still working on it." %}</small>
     </p>
+    <p>
+      <label for="{{ form.country.id_for_label }}">{{ form.country.label }}</label>
+      {{ form.country }} {{ form.country.errors }}
+      <small>{{ form.country.help_text }}</small>
+    </p>
 
     <button type="submit">{% translate "Continue" %}</button>
   </form>
@@ -43,19 +48,58 @@
     const COMPANY_FIELD = "{{ form.company.auto_id }}";
     const GAME_PK = "{{ game.pk }}";
 
-    // The employer quick-picks for the game chosen in step 1. The credit form's
+    // Sync the just-loaded (or just-changed) #employer-select into the hidden
+    // COMPANY_FIELD: its value for a real option, cleared for "__other" (which
+    // reveals the search instead — __other is never a company id, so it must
+    // never reach the hidden field, let alone get posted). Copied verbatim
+    // from contribution_form.html: the two templates already carry their own
+    // employer JS on purpose (_employer_field.html's comment), since here the
+    // game is fixed and loadEmployers() below runs once instead of reloading
+    // on a game change.
+    function applyEmployerSelect(field) {
+      const select = field.querySelector("#employer-select");
+      if (!select) return;
+      function sync() {
+        const hidden = document.getElementById(COMPANY_FIELD);
+        // `.chosen` exists to show a company the select cannot: one picked from
+        // the company search, or created out of it. Whenever the select drives
+        // the value — "__other" included — it already shows the choice itself,
+        // so a second line could only ever disagree with it.
+        field.querySelector(".chosen").textContent = "";
+        if (select.value === "__other") {
+          hidden.value = "";
+          field.querySelector(".employer-search").hidden = false;
+          field.querySelector(".employer-search .autocomplete-input").focus();
+          return;
+        }
+        hidden.value = select.value;
+        field.querySelector(".employer-search").hidden = true;
+      }
+      sync();
+      select.addEventListener("change", sync);
+    }
+
+    // The employer select for the game chosen in step 1. The credit form's
     // version reloads this when the game changes; here the game is fixed, so it
-    // runs once. `.employer-search` stays hidden until the toggle below reveals
-    // it — same as the credit form's version, so "Worked for another company?"
-    // isn't a no-op button sitting above an already-open search box.
+    // runs once. `.employer-search` stays hidden until "Another company…" is
+    // picked from the select (applyEmployerSelect above reveals it).
+    // `data-selected` (the funnel draft's already-chosen company, a
+    // freshly-posted one after a validation-error re-render, or the `none`
+    // sentinel when the member picked "No employer / freelance" — see
+    // employer_id in contributions_extras.py) is forwarded verbatim as
+    // `?selected=`, so a bounced "Wrong game?" repick or a fixed-up resubmit
+    // loses neither a chosen employer nor a deliberate lack of one.
     function loadEmployers() {
       const field = document.getElementById("employer-field");
       const url = field.dataset.employersUrl.replace(/0\/employers\/$/, GAME_PK + "/employers/");
-      fetch(url)
+      const selected = field.dataset.selected;
+      const fullUrl = url + (selected ? "?selected=" + selected : "");
+      fetch(fullUrl)
         .then((response) => response.text())
         .then((html) => {
           document.getElementById("employer-quickpicks").innerHTML = html;
           field.querySelector(".employer-hint").hidden = true;
+          applyEmployerSelect(field);
         });
     }
 
@@ -66,14 +110,6 @@
       document.querySelector("#employer-field .chosen").textContent = option.dataset.label;
       const results = document.querySelector("#employer-field .results");
       if (results) results.innerHTML = "";
-    });
-
-    // "Worked for another company?" → reveal the company search.
-    document.addEventListener("click", function (event) {
-      if (!event.target.closest(".employer-other-toggle")) return;
-      const search = document.querySelector("#employer-field .employer-search");
-      search.hidden = false;
-      search.querySelector(".autocomplete-input").focus();
     });
 
     loadEmployers();
