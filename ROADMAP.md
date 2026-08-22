@@ -201,6 +201,19 @@ Goal: a member can publish a contact address without exposing the account email 
 - [x] Policy texts amended for the new rule (docs/00 #1, `CLAUDE.md`'s first hard rule, docs/01-DESIGN.md §3.4/§3.6, docs/04-DATABASE-SCHEMA.md §1, `privacy.html`, `about.html`)
 - [x] Negative tests: the address appears nowhere but the profile page (feed, search, game page, company page, sitemap, card PNG, profile meta tags, the contact relay's outbound mail) — plus the export sweep and account-deletion/no-email test zones re-run clean
 
+## Phase 15 — Visual identity ✅ (2026-08-22)
+
+Goal: stop looking like an unstyled framework demo, without turning it into a design project.
+
+- [x] `static/css/theme.css` — the site's ONE aesthetic stylesheet, loaded after Pico and before `app.css`, scoped `:root[data-theme=light]` (0,2,0) so it outranks Pico's own light block without `!important`
+- [x] Density: `--pico-font-size` fixed at 93.75% for every viewport (Pico's own scale reaches 131%), tighter rhythm, `--pico-border-radius: 0`, shadows off, monospace for data and Inter for prose
+- [x] Two colours: text and headings `#3B0918` (17:1 on white — Pico colours headings from six variables of their own, so `--pico-color` alone was not enough), highlight `#647BCA` replacing Pico's blue in the seven variables Pico states literally, with the rest of the framework following through `var()`
+- [x] Highlight contrast measured and accepted: 4.0:1 — clears AA for large text and UI components, just under the 4.5:1 normal-size text wants; `#5A70C0` (4.65:1) is the compliant shade of the same hue if it is ever wanted. An earlier single-accent `#DC4731` was rejected at 3.88:1 while it still carried body text
+- [x] Inter vendored as subset woff2 (`static/fonts/`, OFL) — the same family `cards/` already renders the OG cards with
+- [x] The declare funnel's game picks read as a list of records instead of eleven stacked primary buttons
+- [x] Explored and **rejected** (recorded so they are not re-proposed): brutalism — thick rules, hard offset shadows, uppercase monospace buttons; ordered-dither texture borrowed from the operator's marketing site; the cream/red `#FFFCF2` + `#DC4731` pairing
+- [ ] Follow-up: a dark palette — `theme.css` is scoped to `[data-theme=light]`, so a dark one is a second block rather than an edit to the first
+
 ## Post-roadmap additions
 
 - [x] **Dev email backend** — prints a clean, copy-friendly body so console verification/reset links aren't corrupted by quoted-printable wrapping

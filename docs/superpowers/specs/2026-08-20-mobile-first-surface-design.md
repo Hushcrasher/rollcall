@@ -58,8 +58,15 @@ English browsers see English.
   (autocomplete dropdown positioning, chip flex layout, the thumbnail grid of
   the gallery spec). No colors, no font choices, no radii/shadows/decoration —
   where a color is unavoidable (dropdown background) use Pico's CSS variables
-  (`var(--pico-background-color)` etc.), never literals. Aesthetics come from
-  Pico or don't happen.
+  (`var(--pico-background-color)` etc.), never literals. ~~Aesthetics come from
+  Pico or don't happen.~~
+  **Amended 2026-08-22** (ROADMAP Phase 15, docs/01-DESIGN.md §3.6): aesthetics
+  now have a home — a second stylesheet, `static/css/theme.css`, loaded after
+  Pico and before `app.css`, carrying the density layer and the `#3B0918`
+  accent. The rule above still binds `app.css` itself, and is in fact easier to
+  hold now that there is somewhere else for a colour or a font to go; the one
+  exception it already carried (the wordmark's monospace family, mandated
+  2026-08-21) stays where it is.
 - Delete rules Pico makes redundant instead of porting them. `.muted`
   (opacity) stays; the system-color hacks (`Canvas`, `GrayText`…) go.
 - Django messages (`ul.messages`) currently render unstyled; keep them as a
@@ -191,8 +198,11 @@ consistency of the few product nouns (**credit**, **profile**, **discipline**,
 - The search query, filters, funnel steps, contact relay: untouched.
 - The profile gallery and upload hardening:
   [2026-08-20-profile-gallery-design.md](2026-08-20-profile-gallery-design.md).
-- Any custom visual design (fonts, brand colors, illustrations): explicitly
-  rejected — Pico's defaults are the design.
+- ~~Any custom visual design (fonts, brand colors, illustrations): explicitly
+  rejected — Pico's defaults are the design.~~ **Reversed 2026-08-22**
+  (ROADMAP Phase 15): Pico's defaults are still the *substrate*, but the site
+  now sets its own density, type pairing and accent colour on top of them.
+  Illustrations remain out.
 - Collapsible mobile filters, saved searches, OG social cards: candidates for
   later specs.
 
