@@ -24,7 +24,11 @@ def test_anonymous_nav_leads_with_the_declare_cta(client: Client) -> None:
     renders as Pico's one solid button on the bar. Sign up leaves the nav —
     the declare funnel IS the signup path; the login page keeps a direct link."""
     header = _header(client.get(reverse("home")).content.decode())
-    assert "ROLLCALL" in header
+    # Stacked wordmark: two four-letter lines in a monospace face (spec
+    # 2026-08-21-search-chrome §1) — never the one-word form.
+    assert 'class="wordmark"' in header
+    assert "ROLL<br>CALL" in header
+    assert "ROLLCALL" not in header
     assert 'role="button"' in header
     assert reverse("contributions:declare") in header
     assert "Add your credit" in header

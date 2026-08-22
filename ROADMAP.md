@@ -135,7 +135,7 @@ Goal: legally and operationally ready for real users. Buildable pieces done TDD 
 Goal: a styled, mobile-first site without custom design — Pico CSS v2 classless.
 
 - [x] Pico CSS v2 classless vendored; `app.css` = functional layout only (dark mode fixed)
-- [x] Nav: ROLLCALL wordmark, `Add your credit` primary CTA (declare funnel for anonymous)
+- [x] Nav: ROLLCALL wordmark, `Add your credit` primary CTA (declare funnel for anonymous) (stacked `ROLL` / `CALL` since Phase 11)
 - [x] Home: filters first for everyone; worker pitch = one-line banner; `#results` anchor
 - [x] Latest-credits feed (active credits of public profiles only)
 - [x] Credit dates display as MM/YYYY sitewide
@@ -164,6 +164,15 @@ Goal: a Rollcall link previews richly wherever it is pasted; sharing a profile i
 - [x] Owner-only share row: copy link, LinkedIn / Bluesky / X, card preview
 - [ ] v2: Noto fallback chain for non-Latin names (v1 renders the neutral card)
 
+## Phase 11 — Search chrome ✅ (spec 2026-08-21)
+
+Goal: a recognisable mark, filters that fit one screen, one word for reaching someone.
+
+- [x] Stacked `ROLL` / `CALL` wordmark — system monospace in the nav, JetBrains Mono (OFL) on the OG cards
+- [x] Filters in two named rows: *Games they worked on* · *About the person*; data caveat as one footnote
+- [x] Banner trimmed to `Worked on a game? Add your credit` (still one translation unit)
+- [x] `Message` buttons replace `Contact` links on profiles and search cards
+
 ## Post-roadmap additions
 
 - [x] **Dev email backend** — prints a clean, copy-friendly body so console verification/reset links aren't corrupted by quoted-printable wrapping
@@ -188,7 +197,7 @@ Goal: a Rollcall link previews richly wherever it is pasted; sharing a profile i
 - [x] **Redis for the rate limit** ✅ (2026-08-12) — prod's cache is Redis, so counters are shared across workers and survive; `REDIS_URL` is required and prod crashes without it, because a silent fallback is exactly the invisibility this fixed. A Redis outage un-meters rather than 500s (`RATELIMIT_FAIL_OPEN` plus django-redis's `IGNORE_EXCEPTIONS` — Django's built-in Redis backend catches nothing, so `RATELIMIT_FAIL_OPEN` would never run behind it) and is logged to `rollcall.cache`. Note the limits are now stricter by the old worker count without any number changing. Spec: `docs/superpowers/specs/2026-08-12-redis-rate-limit-design.md`.
 - [ ] `search:suggest` (the nav typeahead) carries no rate limit for anyone, while every other search surface does. It runs three trigram searches per keystroke. Metering it changes behaviour on every page for every visitor, so it needs its own decision rather than a drive-by.
 - [ ] A sustained Redis outage emits two ERROR log records with tracebacks per metered request (`add` and `incr` each hitting `DJANGO_REDIS_LOG_IGNORED_EXCEPTIONS`), and Sentry's default logging integration (`event_level=ERROR`) turns each into a Sentry event — a busy outage could burn through a free-tier quota fast. That is the design working as intended (the outage must be loud), not a defect; a `before_send` sampler or a logging filter on `rollcall.cache` is the candidate fix if it becomes a problem.
-- [ ] **Non-Steam facet coverage** (found 2026-08-12): the upstream IGDB export carries no ratings and no genre names, so IGDB-only games (~224k of ~392k) have neither — the people search's `min_rating` and genre filters silently exclude anyone whose matching credit is on a non-Steam game. The honest caveat now lives on the form's help text and in docs/01 §3.6; the real fix is adding `rating`/genre-name columns to the upstream export and wiring them through `games/seed/prepare.py`.
+- [ ] **Non-Steam facet coverage** (found 2026-08-12): the upstream IGDB export carries no ratings and no genre names, so IGDB-only games (~224k of ~392k) have neither — the people search's `min_rating` and genre filters silently exclude anyone whose matching credit is on a non-Steam game. The honest caveat now lives in the search template's shared footnote (moved off the per-field help text 2026-08-21, spec `docs/superpowers/specs/2026-08-21-search-chrome-design.md`) and in docs/01 §3.6; the real fix is adding `rating`/genre-name columns to the upstream export and wiring them through `games/seed/prepare.py`.
 - [ ] `sitemap.xml` is a single sitemap — switch to a paginated sitemap index at ~400k games (see DEPLOY.md).
 - [ ] `ty` runs without Django awareness (no plugin) — the codebase carries small typed accommodations (`AuthedHttpRequest`, `ClassVar` managers, `Any` bridges); revisit if `ty` ships Django support or if the tax grows.
 

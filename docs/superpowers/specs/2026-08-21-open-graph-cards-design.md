@@ -120,16 +120,25 @@ CardData(kind: "profile" | "game" | "default",
 1200×630, white `#FFFFFF` background. **Text only**, no shapes but the text,
 no avatar, no icons (the "+ avatar" variant was considered and rejected — it
 adds image composition for little gain and can wait). Type: **Inter** (SIL OFL
-1.1, vendored with its licence; Pillow ships no usable font):
+1.1, vendored with its licence; Pillow ships no usable font) for every element
+but the wordmark, amended below:
 
 | Element | Face | Size | Colour |
 |---|---|---|---|
-| Wordmark `ROLLCALL`, top-left | Bold | 36 px | `#0172AD` (Pico's primary, the same blue as the site) |
+| Wordmark `ROLL` / `CALL`, top-left, two lines | JetBrains Mono Bold | 36 px | `#0172AD` (Pico's primary, the same blue as the site) |
 | `title` | Bold | 72 px, shrinks to 56 then 44 to fit one line, then ellipsis | `#111111` |
 | `subtitle` | Regular | 40 px, one line, ellipsis | `#111111` |
 | `stats` | Regular | 36 px | `#555555` |
 | `footer` | Regular | 32 px | `#555555` |
 | `badge` | Bold | 32 px, plain text, right of the footer | `#0172AD` |
+
+> **Amended 2026-08-21 by spec `2026-08-21-search-chrome-design.md` §1**
+> (product owner decision). The wordmark was one line, `ROLLCALL` in Inter
+> Bold; it is now two lines, `ROLL` over `CALL`, in **JetBrains Mono Bold**
+> (SIL OFL 1.1, vendored as `cards/fonts/JetBrainsMono-Bold.ttf` with its own
+> licence file) — monospace makes the two four-glyph lines the same width by
+> construction, echoing the stacked wordmark the same spec puts in the nav.
+> Size and colour are unchanged; every other element still renders in Inter.
 
 60 px side margins, 24 px vertical rhythm; the text block is **vertically
 centred** in the card (networks crop edges, and a top-aligned block leaves the

@@ -28,13 +28,15 @@
   {% if not user.is_authenticated %}
     {% comment %}
       One line, not the funnel: /declare/ carries the question and the game
-      form. One blocktranslate, not three translate calls fragmented around
+      form. One blocktranslate, not two translate calls fragmented around
       the link — a fragmented sentence can't be reordered for a language
       that doesn't share English's word order. The link's URL is the only
-      placeholder; its own text stays inside the translatable string.
+      placeholder; its own text stays inside the translatable string. (#6;
+      the trailing qualifier clause is gone per spec 2026-08-21-search-chrome
+      §3, but the sentence is still one unit.)
     {% endcomment %}
     {% url 'contributions:declare' as declare_url %}
-    <p>{% blocktranslate %}Worked on a game? <a href="{{ declare_url }}">Add your credit</a> — no account needed to start.{% endblocktranslate %}</p>
+    <p>{% blocktranslate %}Worked on a game? <a href="{{ declare_url }}">Add your credit</a>{% endblocktranslate %}</p>
   {% endif %}
 
   {% comment %}
@@ -48,26 +50,40 @@
     {% translate "The engine, genre and country filters need JavaScript. Without it you can still filter by discipline, rating, year and open-to-work." %}
   </p>
 
-  <form method="get" action="{% url 'home' %}#results">
+  <form class="filters" method="get" action="{% url 'home' %}#results">
     {{ form.non_field_errors }}
-    <p>{{ form.discipline.errors }}{{ form.discipline.label_tag }} {{ form.discipline }}</p>
     {% comment %}
-      A <label for> per facet, NOT a <fieldset><legend>: a legend joins the
-      accessible name of every control inside it, which is what made the old
-      list announce its help text once per checkbox. Here the label names the
-      one search box, and `aria-describedby` (which Django points at
-      `id_<field>_helptext`) attaches the help text once.
+      A <label for> per facet, not just a <fieldset><legend>: a legend alone
+      would be the only accessible name every control inside it shares — the
+      old checkbox list's helptext-per-checkbox problem. Two legends here are
+      fine because each control still keeps its own <label for>; the legend
+      only names the group. The help texts that caused the old repetition are
+      gone (see the shared footnote below).
     {% endcomment %}
-    {% for field in form.typeahead_fields %}
-      <div class="filter">
-        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-        <p class="helptext muted" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</p>
-        {{ field.errors }}{{ field }}
-      </div>
-    {% endfor %}
-    <p>{{ form.min_rating.errors }}{{ form.min_rating.label_tag }} {{ form.min_rating }}</p>
-    <p>{{ form.year_from.errors }}{{ form.year_from.label_tag }} {{ form.year_from }}</p>
-    <p>{{ form.open_to_work.errors }}<label>{{ form.open_to_work }} {{ form.open_to_work.label }}</label></p>
+    <fieldset class="filter-row">
+      <legend>{% translate "Games they worked on" %}</legend>
+      {% for field in form.game_fields %}
+        <div class="filter">
+          <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field.errors }}{{ field }}
+        </div>
+      {% endfor %}
+    </fieldset>
+    <fieldset class="filter-row">
+      <legend>{% translate "About the person" %}</legend>
+      {% for field in form.person_fields %}
+        <div class="filter">
+          {% if field.name == "open_to_work" %}
+            <label>{{ field }} {{ field.label }}</label>{{ field.errors }}
+          {% else %}
+            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field.errors }}{{ field }}
+          {% endif %}
+        </div>
+      {% endfor %}
+    </fieldset>
+    {# The data caveat once, not per field: genre and rating data cover Steam-linked games only (ROADMAP "Non-Steam facet coverage"). #}
+    <p class="filters-note"><small class="muted">{% translate "Genre and rating data currently cover Steam-linked games only." %}</small></p>
     <button type="submit">{% translate "Search" %}</button>
   </form>
 
@@ -117,7 +133,7 @@
             <a href="{% url 'accounts:profile' r.user.slug %}">{{ r.user.display_name }}</a>
             {% if r.user.open_to_work %}<span class="badge">{% translate "Open to work" %}</span>{% endif %}
             {% if r.user.contactable %}
-              — <a href="{% url 'contact:contact' r.user.slug %}">{% translate "Contact" %}</a>
+              <a role="button" href="{% url 'contact:contact' r.user.slug %}">{% translate "Message" %}</a>
             {% endif %}
           </h3>
 

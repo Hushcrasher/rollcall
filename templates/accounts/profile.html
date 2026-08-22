@@ -63,9 +63,9 @@
 
     {% if profile_user.contactable %}
       {% if preview %}
-        <p><span class="muted">{% translate "Contact" %}</span></p>
+        <p><span class="muted">{% translate "Message" %}</span></p>
       {% elif is_visitor %}
-        <p><a href="{% url 'contact:contact' profile_user.slug %}">{% translate "Contact" %}</a></p>
+        <p><a role="button" href="{% url 'contact:contact' profile_user.slug %}">{% translate "Message" %}</a></p>
       {% endif %}
     {% endif %}
 

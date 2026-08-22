@@ -40,11 +40,23 @@ def test_the_banner_is_one_translation_unit_not_three() -> None:
     """Three separate {% translate %} calls joined around a link fix English
     word order in place — any language ordering the question, the link and
     the qualifier differently can't be produced. One {% blocktranslate %}
-    keeps the sentence whole, with only the link's URL as a placeholder."""
+    keeps the sentence whole, with only the link's URL as a placeholder.
+    (#6.) The trailing "— no account needed to start." clause is gone (spec
+    2026-08-21-search-chrome §3), but the remaining sentence is still one
+    translation unit, not fragmented back into separate calls."""
     source = _TEMPLATE.read_text()
     assert '{% translate "Worked on a game?" %}' not in source
     assert "{% blocktranslate %}Worked on a game?" in source
-    assert "no account needed to start.{% endblocktranslate %}" in source
+    assert "Add your credit</a>{% endblocktranslate %}" in source
+    assert "no account needed to start" not in source
+
+
+def test_banner_has_no_trailing_clause(client: Client) -> None:
+    """Rendered-output complement to the source-level test above: the trimmed
+    banner (spec 2026-08-21-search-chrome §3) actually reaches the page."""
+    body = client.get(reverse("home")).content.decode()
+    assert "Worked on a game?" in body
+    assert "no account needed to start" not in body
 
 
 def test_a_member_gets_the_tool_without_the_pitch(client: Client) -> None:

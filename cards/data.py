@@ -17,7 +17,9 @@ from search.services import profile_summary
 
 
 def default_card() -> CardData:
-    return CardData(kind="default", title="ROLLCALL", footer=str(DEFAULT_TAGLINE))
+    # No footer: the stacked wordmark drawn above the title already carries
+    # the brand (see cards/render.py's fallback_card, same reasoning).
+    return CardData(kind="default", title=str(DEFAULT_TAGLINE))
 
 
 def profile_card(user: User) -> CardData:
