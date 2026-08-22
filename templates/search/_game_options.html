@@ -9,10 +9,22 @@
 {% endfor %}
 
 {% if igdb_enabled and query %}
-  {# Local-first: IGDB is queried only when this is clicked (rate-friendly). #}
-  <button type="button" class="igdb-trigger"
-          hx-get="{% url 'games:igdb_search' %}?q={{ query|urlencode }}"
-          hx-target="closest .results">
-    {% blocktranslate %}Not it? Search IGDB for "{{ query }}"{% endblocktranslate %}
-  </button>
+  {% if games %}
+    {# Local matches exist, so the search found something: IGDB stays one
+       deliberate click, and a search that got what it wanted costs zero
+       IGDB calls. #}
+    <button type="button" class="igdb-trigger"
+            hx-get="{% url 'games:igdb_search' %}?q={{ query|urlencode }}"
+            hx-target="closest .results">
+      {% blocktranslate %}Not it? Search IGDB for "{{ query }}"{% endblocktranslate %}
+    </button>
+  {% else %}
+    {# Nothing locally: don't make the member find the escape hatch. htmx
+       fires this on swap-in; hx-swap="outerHTML" replaces only this div, so
+       "No games found locally." above it stays. #}
+    <div hx-get="{% url 'games:igdb_search' %}?q={{ query|urlencode }}"
+         hx-trigger="load" hx-swap="outerHTML">
+      <p class="autocomplete-empty">{% translate "Searching IGDB…" %}</p>
+    </div>
+  {% endif %}
 {% endif %}
