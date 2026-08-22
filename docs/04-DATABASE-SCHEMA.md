@@ -27,8 +27,9 @@ Extends Django's user (custom user model, email as username — **decide at proj
 | role | varchar enum | not null, default `member` | `member` / `recruiter` / `admin`. |
 | email_verified_at | timestamptz | nullable | **Gate: must be non-null to create contributions.** |
 | profile_public | boolean | not null, default **true** | False = invisible everywhere (safety valve). |
-| contactable | boolean | not null, default **true** | Relay contact allowed. Email itself is never exposed regardless. |
+| contactable | boolean | not null, default **true** | Relay contact allowed. The account `email` above is never exposed regardless — see `public_email` below for the separate, opt-in field that is. |
 | open_to_work | boolean | not null, default **false** | Badge + recruiter filter. Independent from `contactable`. |
+| public_email | varchar | blank, default `''`, not unique | Opt-in, user-owned; **a separate address from `email`**, lowercased the same way (case-folded on write) but deliberately not unique — a studio address may be shared by several people. Renders as a `mailto:` link on that member's own public profile page only, nowhere else. Added 2026-08-21 (spec `public-contact-email`, amends #1 above). |
 | avatar | varchar | nullable | Key in the S3 bucket. |
 | country | varchar(2) | not null, default `''` | ISO 3166-1 alpha-2 (django-countries `CountryField`). Blank = not given. Person-level recruiter-search filter (§3.6); shown on the profile as "City · Country". |
 | bio, location, links… | | nullable | Optional profile fields, implementer's discretion. `location` is the free-text **"city / region"** display line (it is *not* nullable in practice: `blank=True, default=''`). |

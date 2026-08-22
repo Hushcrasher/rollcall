@@ -166,8 +166,9 @@ implementation:
   scraped.
 - **Open source** — AGPL v3, link to the GitHub repo, invitation to
   contribute; user data stays private and is not part of the code.
-- **Contact & safety** — the relay principle (personal emails never exposed),
-  link to the report form.
+- **Contact & safety** — the relay principle (account emails never exposed;
+  wording amended 2026-08-21 by spec `2026-08-21-public-contact-email`: a
+  member may publish a separate contact address), link to the report form.
 
 ## 6. English copy pass
 

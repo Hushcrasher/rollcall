@@ -1,8 +1,9 @@
 """Users & recruiter applications — docs/04-DATABASE-SCHEMA.md §1–2.
 
 Custom user with email as the login identifier, decided at project start
-(cannot change after the first migration). The email is NEVER displayed
-anywhere on the platform; contact goes through the relay only.
+(cannot change after the first migration). The account email is NEVER
+displayed anywhere on the platform; a separate opt-in `public_email` renders
+on the public profile page only; contact otherwise goes through the relay.
 """
 
 from typing import Any, ClassVar
@@ -94,6 +95,20 @@ class User(AbstractUser):
         _("contactable"),
         default=True,
         help_text=_("Allow contact via the relay. The email itself is never exposed."),
+    )
+    # A SEPARATE, opt-in address the member chooses to publish. The account
+    # `email` above is never rendered anywhere; this one renders on the public
+    # profile page only (spec 2026-08-21-public-contact-email). Lowercased on
+    # every write path, like `email`; deliberately not unique (a studio
+    # address may be shared).
+    public_email = models.EmailField(
+        _("public contact email"),
+        blank=True,
+        default="",
+        help_text=_(
+            "Shown on your public profile to anyone. Leave empty to be reachable "
+            "only through Rollcall messages."
+        ),
     )
     open_to_work = models.BooleanField(
         _("open to work"),

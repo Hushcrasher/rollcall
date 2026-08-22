@@ -15,8 +15,10 @@ privately through their GitHub profiles.
 
 Especially important to us, straight from the project's non-negotiables:
 
-- any way to read a member's **email address** through any page, endpoint,
-  header, export or search response;
+- any way to read a member's **account email address** (the one they sign in
+  with) through any page, endpoint, header, export or search response — the
+  opt-in contact address a member chooses to show on their profile is by
+  design;
 - any way to see a **private profile** (`profile_public=False`) or a
   non-`active` credit anywhere public;
 - any way to write another person's data (credits, profile fields);

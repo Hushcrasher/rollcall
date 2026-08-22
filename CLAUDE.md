@@ -15,9 +15,11 @@ specified in `docs/`, and code that contradicts them is a bug even if it works.
 
 ## Hard rules an agent must never break
 
-- **Never expose a personal email** in any page, response, header, export or
-  log. Contact is relay-only (`contact/views.py`, Reply-To pattern).
-  `User.__str__` returns `display_name` — keep it that way.
+- **Never expose the account email** in any page, response, header, export-to-others or
+  log. A member's opt-in `public_email` renders on their public profile page only —
+  nowhere else (spec 2026-08-21-public-contact-email). Contact is otherwise
+  relay-only (`contact/views.py`, Reply-To pattern). `User.__str__` returns
+  `display_name` — keep it that way.
 - **No public negative signals**: no down-votes, no "disputed" labels, no
   numeric scores of people. Only `status='active'` credits render anywhere.
 - **Every user-facing string goes through i18n** (`gettext` /

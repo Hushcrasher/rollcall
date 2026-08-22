@@ -68,12 +68,22 @@ class AvatarCleanMixin:
         return avatar
 
 
-class AdminUserChangeForm(AvatarCleanMixin, UserChangeForm):
+class PublicEmailCleanMixin:
+    """Case-folds `public_email` like the account `email` (SignupForm.clean_email):
+    one column, one casing rule, whichever form writes it — staff included."""
+
+    cleaned_data: dict[str, Any]  # provided by the Form/ModelForm this is mixed into
+
+    def clean_public_email(self) -> str:
+        return self.cleaned_data.get("public_email", "").strip().lower()
+
+
+class AdminUserChangeForm(AvatarCleanMixin, PublicEmailCleanMixin, UserChangeForm):
     """Django's stock admin form would write the raw bytes: the pipeline is
     not optional because the poster happens to be staff."""
 
 
-class ProfileForm(AvatarCleanMixin, forms.ModelForm):
+class ProfileForm(AvatarCleanMixin, PublicEmailCleanMixin, forms.ModelForm):
     """The profile fields + the three visibility booleans (docs/01-DESIGN.md §3.4),
     plus an optional GitHub handle (stored parsed as a login)."""
 
@@ -98,8 +108,20 @@ class ProfileForm(AvatarCleanMixin, forms.ModelForm):
             "avatar",
             "profile_public",
             "contactable",
+            "public_email",
             "open_to_work",
         ]
+        labels = {"public_email": _("Public contact email (optional)")}
+        help_texts = {
+            "contactable": _(
+                "Allow contact via Rollcall messages (the relay). Your account "
+                "email itself is never exposed."
+            ),
+            "public_email": _(
+                "Shown on your public profile to anyone, whether or not relay "
+                "contact is allowed. Leave empty to publish no address."
+            ),
+        }
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)

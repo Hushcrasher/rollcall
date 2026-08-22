@@ -62,4 +62,6 @@ load-bearing here, not decoration.
   recruiter search query, and account deletion paths are non-negotiable
   test zones (docs/02-ARCHITECTURE.md §7).
 - All user-facing strings go through Django i18n (`gettext`/`{% translate %}`).
-- Never expose a personal email anywhere. Never add public negative signals.
+- Never expose the account email anywhere; a member's opt-in `public_email`
+  renders on their public profile page only (spec
+  2026-08-21-public-contact-email). Never add public negative signals.

@@ -40,6 +40,7 @@ class UserAdmin(DjangoUserAdmin):
                     "email_verified_at",
                     "profile_public",
                     "contactable",
+                    "public_email",
                     "open_to_work",
                     "avatar",
                     "bio",
