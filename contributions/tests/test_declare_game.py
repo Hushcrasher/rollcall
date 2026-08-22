@@ -350,10 +350,30 @@ def test_a_junk_igdb_id_does_not_500(
 def test_an_import_that_igdb_no_longer_has_says_so(
     client: Client, igdb_configured: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """The message has to render *alongside* the options, not instead of them.
+
+    A failed import re-renders, `get_context_data` re-runs `_offer_igdb_matches`,
+    and that hits the 24h search cache this visitor's own search just filled —
+    so the list comes back and an `{% elif %}` hanging off `{% if igdb_options %}`
+    suppressed the one message it exists for.
+
+    Stubbing `search_games` is also what keeps this test off the network: with
+    only `get_game` stubbed, the re-render reached `cached_search` ->
+    `search_games` -> `_get_token` -> a live POST to id.twitch.tv, and the
+    assertion below passed only because that call failed.
+    """
     monkeypatch.setattr(IGDBClient, "get_game", lambda self, igdb_id: None)
+    monkeypatch.setattr(
+        IGDBClient,
+        "search_games",
+        lambda self, q, limit=10: [
+            {"id": 40477, "name": "Slay the Spire", "first_release_date": 1548201600}
+        ],
+    )
     response = client.post(reverse("contributions:declare"), {"igdb": "40477", "q": "slay"})
     assert response.status_code == 200
     assert b"no longer listed on IGDB" in response.content
+    assert b"Not in our catalogue yet" in response.content
 
 
 def test_an_import_over_quota_does_not_call_igdb(
