@@ -1,10 +1,10 @@
 {% load i18n %}
 {% if error == "unconfigured" %}
-  <p class="autocomplete-empty">{% translate "IGDB search is not configured on this server." %}</p>
+  <p class="autocomplete-empty">{% translate "The deeper search is not available on this server." %}</p>
 {% elif error == "throttled" %}
-  <p class="autocomplete-empty">{% translate "IGDB search is busy right now — try again in a minute." %}</p>
+  <p class="autocomplete-empty">{% translate "The deeper search is busy right now — try again in a minute." %}</p>
 {% elif error == "unavailable" %}
-  <p class="autocomplete-empty">{% translate "IGDB is unavailable right now — try again later." %}</p>
+  <p class="autocomplete-empty">{% translate "The deeper search is unavailable right now — try again later." %}</p>
 {% else %}
   {% for option in options %}
     <button type="button" class="igdb-option"
@@ -12,6 +12,6 @@
       {{ option.label }}
     </button>
   {% empty %}
-    <p class="autocomplete-empty">{% translate "No games found on IGDB." %}</p>
+    <p class="autocomplete-empty">{% translate "The deeper search found no match." %}</p>
   {% endfor %}
 {% endif %}

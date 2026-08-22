@@ -250,7 +250,7 @@ def test_igdb_finding_nothing_either_leaves_the_signup_line_alone(
     response = client.get(reverse("contributions:declare"), {"q": "Slay the Spire"})
     assert response.status_code == 200
     assert b"Not in our catalogue yet" not in response.content
-    assert b"IGDB is unavailable right now" not in response.content
+    assert b"deeper search is unavailable right now" not in response.content
     assert b"No match." in response.content
     assert b"Create your account" in response.content
 
@@ -281,7 +281,7 @@ def test_igdb_being_down_leaves_the_page_usable(
     monkeypatch.setattr(IGDBClient, "search_games", boom)
     response = client.get(reverse("contributions:declare"), {"q": "Slay the Spire"})
     assert response.status_code == 200
-    assert b"IGDB is unavailable right now" in response.content
+    assert b"deeper search is unavailable right now" in response.content
     assert b"Create your account" in response.content
 
 
@@ -463,7 +463,7 @@ def test_an_import_that_igdb_no_longer_has_says_so(
     )
     response = client.post(reverse("contributions:declare"), {"igdb": "40477", "q": "slay"})
     assert response.status_code == 200
-    assert b"no longer listed on IGDB" in response.content
+    assert b"no longer listed." in response.content
     assert b"Not in our catalogue yet" in response.content
 
 

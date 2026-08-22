@@ -162,7 +162,7 @@ def test_a_local_miss_fetches_igdb_without_being_asked(
     Nothing found locally means the question was already asked — ask IGDB."""
     response = client.get(reverse("search:game_autocomplete"), {"q": "Slay the Spire"})
     assert b'hx-trigger="load"' in response.content
-    assert b"Searching IGDB" in response.content
+    assert b"Running a deeper search" in response.content
 
 
 def test_local_matches_keep_igdb_behind_a_deliberate_click(

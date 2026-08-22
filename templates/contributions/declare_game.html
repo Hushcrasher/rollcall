@@ -38,9 +38,9 @@
       visitor clicked a dead option onto an identical page with no explanation.
     {% endcomment %}
     {% if igdb_error == "unavailable" %}
-      <p class="muted">{% translate "IGDB is unavailable right now — try again later." %}</p>
+      <p class="muted">{% translate "The deeper search is unavailable right now — try again later." %}</p>
     {% elif igdb_error == "gone" %}
-      <p class="muted">{% translate "That game is no longer listed on IGDB." %}</p>
+      <p class="muted">{% translate "That game is no longer listed." %}</p>
     {% endif %}
     {% if igdb_options %}
       <h2>{% translate "Not in our catalogue yet" %}</h2>

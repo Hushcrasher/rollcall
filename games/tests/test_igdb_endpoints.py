@@ -61,7 +61,7 @@ def test_search_shows_a_notice_when_igdb_is_unconfigured(client: Client, member:
     # No IGDB creds in the default test settings.
     response = client.get(reverse("games:igdb_search"), {"q": "celeste"})
     assert response.status_code == 200
-    assert b"not configured" in response.content.lower()
+    assert b"not available" in response.content.lower()
 
 
 def test_search_over_quota_says_so_and_calls_nothing(

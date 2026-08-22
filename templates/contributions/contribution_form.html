@@ -168,13 +168,13 @@
         const gameField = document.getElementById(GAME_FIELD);
         gameField.value = game.id;
         const wrapper = gameField.closest(".autocomplete");
-        wrapper.querySelector(".chosen").textContent = game.label + " {% translate '(imported from IGDB)' %}";
+        wrapper.querySelector(".chosen").textContent = game.label + " {% translate '(added to the catalogue)' %}";
         wrapper.querySelector(".results").innerHTML = "";
         loadEmployers(game.id, true);
       } catch (err) {
         option.textContent = original;
         option.disabled = false;
-        alert("{% translate 'Could not import from IGDB. Please try again.' %}");
+        alert("{% translate 'Could not add that game. Please try again.' %}");
       }
     });
 
