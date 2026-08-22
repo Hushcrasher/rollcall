@@ -137,3 +137,8 @@ nav form button[type=submit] { background: none; border: none; color: var(--pico
    selector is load-bearing — Pico styles this element via [type=button]
    (specificity 0,1,0), which a bare type-selector chain can't outrank. */
 .share-row button[type=button] { background: none; border: none; color: var(--pico-primary); }
+
+/* Game capsules (spec 2026-08-21-game-capsules): Steam's 460x215 header,
+   scaled. Sizes only — the image is the decoration. */
+.capsule { max-width: 460px; width: 100%; height: auto; display: block; margin-bottom: .5rem; }
+.capsule-sm { width: 92px; height: 43px; object-fit: cover; vertical-align: middle; margin-right: .5rem; }

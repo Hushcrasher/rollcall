@@ -182,6 +182,14 @@ Goal: the common credit takes three fields and no guesswork.
 - [x] `MM/YYYY` text inputs replace the locale-dependent native month picker (legacy `YYYY-MM` still accepted)
 - [ ] Follow-up: credit country as a recruiter filter ("worked in …")
 
+## Phase 13 — Game capsules ✅ (spec 2026-08-21)
+
+Goal: a game looks like a game — on its page and on every credit line.
+
+- [x] `Game.capsule_url`: the catalog's `cover_url`, else Steam's public header by `steam_appid` (derived, never fetched or stored)
+- [x] Capsule on the game page; 92×43 thumbnails on profile credit lines and company game lists; `no-referrer`, hidden on load error
+- [ ] Follow-up: capsules in search result cards (measure page weight first)
+
 ## Post-roadmap additions
 
 - [x] **Dev email backend** — prints a clean, copy-friendly body so console verification/reset links aren't corrupted by quoted-printable wrapping

@@ -150,6 +150,15 @@ class CompanyAlias(models.Model):
         return f"{self.alias} → {self.company}"
 
 
+# Steam's public store asset for an app — the same 460x215 "header" the store
+# pages use. One constant, so a CDN move is a one-line change. Measured
+# 2026-08-21: the `cloudflare.`-prefixed hosts (e.g. shared.cloudflare.
+# steamstatic.com) answer an uncached 301 to this host; a real app id here
+# serves `image/jpeg` with a 10-year cache; an unknown id 404s, which is what
+# the templates' `onerror` guard relies on.
+STEAM_CAPSULE_URL = "https://shared.steamstatic.com/store_item_assets/steam/apps/{appid}/header.jpg"
+
+
 class Game(models.Model):
     """§3 — one record per canonical game. Source of truth: the parquet seed."""
 
@@ -225,6 +234,17 @@ class Game(models.Model):
 
     def get_absolute_url(self) -> str:
         return reverse("games:game", kwargs={"slug": self.slug})
+
+    @property
+    def capsule_url(self) -> str:
+        """The catalog's own image when the seed/IGDB gave one, else the public
+        Steam CDN asset for the app id — derived, never fetched or stored by us
+        (spec 2026-08-21-game-capsules §1)."""
+        if self.cover_url:
+            return str(self.cover_url)
+        if self.steam_appid:
+            return STEAM_CAPSULE_URL.format(appid=self.steam_appid)
+        return ""
 
 
 class GameGenre(models.Model):

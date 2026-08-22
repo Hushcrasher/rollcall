@@ -5,8 +5,9 @@
 
 {% block content %}
   <article>
-    {% if game.cover_url %}
-      <img src="{{ game.cover_url }}" alt="{{ game.title }}" width="180">
+    {% if game.capsule_url %}
+      {# onerror is the one inline handler in the templates: a dead CDN URL must leave no broken-image icon (spec 2026-08-21-game-capsules §2). alt="" — the title below is the text. Not lazy: this is the page's largest above-the-fold element (likely LCP), above the <h1>. #}
+      <img class="capsule" src="{{ game.capsule_url }}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">
     {% endif %}
     <h1>{{ game.title }}</h1>
     {% if game.release_date %}<p>{{ game.release_date|date:"Y" }}</p>{% endif %}
