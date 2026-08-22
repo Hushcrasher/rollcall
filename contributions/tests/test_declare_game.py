@@ -234,10 +234,15 @@ def test_a_local_miss_offers_igdb_matches_to_an_anonymous_visitor(
 def test_local_matches_never_reach_igdb(
     client: Client, game: Game, igdb_configured: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """A local hit must never trigger the IGDB fallback. Asserting on the pick
+    form rather than bare page text: `b"Hollow Knight" in response.content` is
+    trivially true regardless of any match, because the search box's own
+    placeholder ("Hollow Knight, Dishonored…") renders on every response."""
     calls: list[str] = []
     monkeypatch.setattr(IGDBClient, "search_games", lambda self, q, limit=10: calls.append(q) or [])
     response = client.get(reverse("contributions:declare"), {"q": "Hollow Knight"})
-    assert b"Hollow Knight" in response.content
+    assert b'name="game" value="' in response.content
+    assert b"Not in our catalogue yet" not in response.content
     assert calls == []
 
 
@@ -275,3 +280,66 @@ def test_unconfigured_igdb_changes_nothing(client: Client) -> None:
     response = client.get(reverse("contributions:declare"), {"q": "Slay the Spire"})
     assert b"Not in our catalogue yet" not in response.content
     assert b"Create your account" in response.content
+
+
+def test_picking_an_igdb_match_imports_it_and_moves_on(
+    client: Client, igdb_configured: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        IGDBClient,
+        "get_game",
+        lambda self, igdb_id: {"id": 40477, "name": "Slay the Spire", "genres": []},
+    )
+    response = client.post(reverse("contributions:declare"), {"igdb": "40477"})
+    assert response.status_code == 302
+    assert response.url == reverse("contributions:declare_details")
+    game = Game.objects.get(igdb_id=40477)
+    assert game.title == "Slay the Spire"
+    assert game.source == Game.Source.IGDB_LIVE
+    assert client.session[SESSION_KEY]["game"] == str(game.pk)
+
+
+def test_picking_the_same_igdb_match_twice_creates_no_duplicate(
+    client: Client, igdb_configured: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """It reuses the seed's idempotent upsert, keyed on igdb_id — a repeat is
+    an update. This is most of why an anonymous write path is acceptable."""
+    monkeypatch.setattr(
+        IGDBClient,
+        "get_game",
+        lambda self, igdb_id: {"id": 40477, "name": "Slay the Spire", "genres": []},
+    )
+    url = reverse("contributions:declare")
+    client.post(url, {"igdb": "40477"})
+    client.post(url, {"igdb": "40477"})
+    assert Game.objects.filter(igdb_id=40477).count() == 1
+
+
+@pytest.mark.parametrize("raw", ["abc", "²", ""])
+def test_a_junk_igdb_id_does_not_500(client: Client, raw: str) -> None:
+    """`²` is a digit to isdigit() but int() rejects it — the same trap
+    _picked_game and games.views.game_employers already guard against, on a
+    page anonymous traffic can post to."""
+    response = client.post(reverse("contributions:declare"), {"igdb": raw})
+    assert response.status_code == 200
+
+
+def test_an_import_that_igdb_no_longer_has_says_so(
+    client: Client, igdb_configured: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(IGDBClient, "get_game", lambda self, igdb_id: None)
+    response = client.post(reverse("contributions:declare"), {"igdb": "40477", "q": "slay"})
+    assert response.status_code == 200
+    assert b"no longer listed on IGDB" in response.content
+
+
+def test_an_import_over_quota_does_not_call_igdb(
+    client: Client, igdb_configured: None, settings: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    settings.RATELIMIT_ENABLE = True
+    settings.IGDB_RATELIMIT = "0/m"
+    calls: list[int] = []
+    monkeypatch.setattr(IGDBClient, "get_game", lambda self, igdb_id: calls.append(igdb_id) or None)
+    response = client.post(reverse("contributions:declare"), {"igdb": "40477"})
+    assert response.status_code == 200
+    assert calls == []

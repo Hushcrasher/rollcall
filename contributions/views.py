@@ -29,7 +29,7 @@ from accounts.registration import create_and_login
 from contributions.forms import ContributionForm
 from contributions.funnel import CREDIT_FIELDS, clear_draft, get_draft, set_draft
 from contributions.models import Contribution
-from games.igdb import IGDBClient, IGDBError, search_options
+from games.igdb import IGDBClient, IGDBError, import_igdb_game, quota_exceeded, search_options
 from games.models import Game
 from search.services import search_games
 
@@ -72,6 +72,8 @@ class DeclareGameView(TemplateView):
 
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         game = self._picked_game(request)
+        if game is None and request.POST.get("igdb"):
+            game = self._import_picked_igdb_game(request)
         if game is not None:
             # `request.session` is added by middleware, which `ty` cannot see —
             # the same accommodation the codebase already uses elsewhere.
@@ -140,6 +142,36 @@ class DeclareGameView(TemplateView):
         # page, exactly as it did before.
         if options:
             context["igdb_options"] = options
+
+    def _import_picked_igdb_game(self, request: HttpRequest) -> Game | None:
+        """Import the IGDB game the visitor picked, then behave like a local pick.
+
+        This is the funnel's one anonymous write path, and it amends the rule
+        in spec 2026-08-11 that kept these endpoints login-gated. What it can
+        cause is one row in the *games catalogue*, written from IGDB's own
+        data — no user data, through the seed's idempotent upsert keyed on
+        `igdb_id` (so a repeat is an update, not a duplicate), marked
+        `source='igdb_live'`, and metered on the same IGDB quota as the search
+        that produced the option. `igdb_import` and `company_create` stay
+        `@login_required`.
+        """
+        raw = request.POST.get("igdb", "")
+        # isdecimal(), not isdigit(): "²" is a digit but int() rejects it, so
+        # isdigit() would raise ValueError -> 500 on a page anonymous traffic
+        # posts to. The same guard _picked_game already carries.
+        if not raw.isdecimal():
+            return None
+        if quota_exceeded(request):
+            self.igdb_error = "throttled"
+            return None
+        try:
+            game = import_igdb_game(int(raw))
+        except IGDBError:
+            self.igdb_error = "unavailable"
+            return None
+        if game is None:
+            self.igdb_error = "gone"
+        return game
 
     @staticmethod
     def _picked_game(request: HttpRequest) -> Game | None:
