@@ -1,9 +1,10 @@
 // Dismissable autocomplete panels — spec 2026-08-22-autocomplete-dismiss.
 //
 // htmx creates and fills every panel on this site; this module only ever
-// toggles `hidden` on one. Two selectors describe all five panels (the nav
+// toggles `hidden` on one. Two selectors describe all six panels (the nav
 // suggest box, the credit form's game field, the shared employer field, and
-// the three filter typeaheads), so no template needs a hook of its own.
+// the three filter typeaheads) across their four call-site templates, so no
+// template needs a hook of its own.
 //
 // `hidden` is what actually hides a panel: the UA stylesheet's
 // `[hidden] { display: none }` is specificity (0,1,0) and `app.css` sets no
@@ -34,29 +35,49 @@
   }
 
   // A fresh result set must appear even if the panel was dismissed a keystroke
-  // ago, or the field looks broken on the next character typed.
+  // ago, or the field looks broken on the next character typed. Only while
+  // focus is still inside the owner, though: between the debounce and the
+  // round trip the user can press elsewhere, and a late response must not pop
+  // the panel back open over whatever they moved to. Escape-then-keep-typing
+  // is unaffected — focus is in the input for that.
   document.addEventListener("htmx:afterSwap", function (event) {
     var target = event.target;
     var panel = target && target.closest ? target.closest(PANEL) : null;
     panel = panel || panelFor(target);
-    if (panel) panel.hidden = false;
+    if (!panel) return;
+    var owner = panel.closest(OWNER);
+    if (owner && owner.contains(document.activeElement)) panel.hidden = false;
   });
 
-  // pointerdown, NOT click: click fires after focus has already moved, and
-  // dismissing there would swallow the first press on whatever sits under the
-  // panel. Here the panel is gone before the press lands, so the press reaches
-  // the field underneath — which is the bug this module exists for.
+  // pointerdown, NOT click — but not for the usual "click would swallow the
+  // first press" reason, which does not apply here: hit-testing resolves the
+  // event target before any handler runs, so a press on the covered region IS
+  // a press on the panel whatever we do, and a press outside the owner never
+  // targeted the panel in the first place. (That folklore belongs to blur-based
+  // dismissers; this module dismisses on owner-scoped focusin, not on blur.)
+  // The three real reasons: closing at press time is what native menus and
+  // selects do, where a click dismisser visibly lags to mouseup; a touch scroll
+  // started outside the panel fires pointerdown but never click, so on mobile
+  // the panel goes away as the page moves instead of riding along (there is no
+  // scroll listener); and a text-selection drag from inside the input released
+  // outside the owner fires click on a common ancestor outside it, which a
+  // click dismisser would read as "outside" and close the panel of the very
+  // field being selected in — pointerdown, still inside the owner, keeps it.
   document.addEventListener("pointerdown", function (event) {
     hideAllExcept(panelFor(event.target));
   });
 
   // Escape closes the open panel, and calls preventDefault ONLY when one was
   // open — so a second Escape still reaches the browser's own behaviour on a
-  // type=search input (clear the field).
+  // type=search input (clear the field). `!hidden` alone does not mean open:
+  // a panel that has never been filled, or that an option-pick emptied, is
+  // `hidden === false` and invisible through `.results:empty { display: none }`.
+  // Without the emptiness test the first Escape in the nav box — pasted text,
+  // or anything inside the 250ms debounce — would silently eat the clear.
   document.addEventListener("keydown", function (event) {
     if (event.key !== "Escape") return;
     var panel = panelFor(event.target);
-    if (panel && !panel.hidden) {
+    if (panel && !panel.hidden && panel.innerHTML.trim() !== "") {
       panel.hidden = true;
       event.preventDefault();
     }

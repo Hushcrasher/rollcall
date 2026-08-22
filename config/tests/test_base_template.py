@@ -21,11 +21,12 @@ def test_every_page_links_pico_then_app_css(client: Client) -> None:
 
 def test_every_page_loads_the_autocomplete_dismiss_script(client: Client) -> None:
     """Every page carries a dropdown — the nav search box — so the module that
-    dismisses one is sitewide. Both properties asserted here are load-bearing:
-    `defer`, because it binds document-level listeners and must not run before
-    the DOM exists; and the order after htmx, because one of those listeners is
-    for htmx's own `htmx:afterSwap` event (spec 2026-08-22-autocomplete-dismiss
-    §1)."""
+    dismisses one is sitewide. `defer` is load-bearing: the module binds
+    document-level listeners and must not run before the DOM exists. The order
+    after htmx is convention, not a requirement — listening for a custom event
+    needs no library loaded, and both scripts being `defer` means both run
+    before any interaction anyway; the assertion keeps the two vendored-then-
+    ours groups in a stable order (spec 2026-08-22-autocomplete-dismiss §1)."""
     body = client.get(reverse("home")).content.decode()
     htmx = body.index("vendor/htmx.min.js")
     module = body.index("js/autocomplete.js")
