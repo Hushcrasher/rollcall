@@ -14,9 +14,21 @@ from django.urls import reverse
 
 from accounts.models import User
 from contributions.funnel import SESSION_KEY
+from games.igdb import IGDBClient, IGDBError
 from games.models import Game
 
 pytestmark = pytest.mark.django_db
+
+
+@pytest.fixture(autouse=True)
+def _clear_cache() -> None:
+    cache.clear()
+
+
+@pytest.fixture
+def igdb_configured(settings: Any) -> None:
+    settings.IGDB_CLIENT_ID = "cid"
+    settings.IGDB_CLIENT_SECRET = "secret"
 
 
 @pytest.fixture
@@ -198,3 +210,68 @@ def test_home_does_not_pitch_a_member(client: Client) -> None:
     body = client.get(reverse("home")).content
     assert b"Worked on a game?" not in body
     assert b"Find people by what they" in body
+
+
+def test_a_local_miss_offers_igdb_matches_to_an_anonymous_visitor(
+    client: Client, igdb_configured: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The funnel is where a signed-out visitor first meets a missing game.
+    It used to be a dead end that offered signup (spec §4)."""
+    monkeypatch.setattr(
+        IGDBClient,
+        "search_games",
+        lambda self, q, limit=10: [
+            {"id": 40477, "name": "Slay the Spire", "first_release_date": 1548201600}
+        ],
+    )
+    response = client.get(reverse("contributions:declare"), {"q": "Slay the Spire"})
+    assert response.status_code == 200
+    assert b"Not in our catalogue yet" in response.content
+    assert b"Slay the Spire (2019)" in response.content
+    assert b'name="igdb" value="40477"' in response.content
+
+
+def test_local_matches_never_reach_igdb(
+    client: Client, game: Game, igdb_configured: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[str] = []
+    monkeypatch.setattr(IGDBClient, "search_games", lambda self, q, limit=10: calls.append(q) or [])
+    response = client.get(reverse("contributions:declare"), {"q": "Hollow Knight"})
+    assert b"Hollow Knight" in response.content
+    assert calls == []
+
+
+def test_igdb_being_down_leaves_the_page_usable(
+    client: Client, igdb_configured: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Never an error page: the visitor still gets the signup route."""
+
+    def boom(self: IGDBClient, query: str, limit: int = 10) -> list[dict[str, Any]]:
+        raise IGDBError("down")
+
+    monkeypatch.setattr(IGDBClient, "search_games", boom)
+    response = client.get(reverse("contributions:declare"), {"q": "Slay the Spire"})
+    assert response.status_code == 200
+    assert b"IGDB is unavailable right now" in response.content
+    assert b"Create your account" in response.content
+
+
+def test_over_quota_falls_back_to_the_signup_line(
+    client: Client, igdb_configured: None, settings: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    settings.RATELIMIT_ENABLE = True
+    settings.IGDB_RATELIMIT = "0/m"
+    calls: list[str] = []
+    monkeypatch.setattr(IGDBClient, "search_games", lambda self, q, limit=10: calls.append(q) or [])
+    response = client.get(reverse("contributions:declare"), {"q": "Slay the Spire"})
+    assert response.status_code == 200
+    assert calls == []
+    assert b"Create your account" in response.content
+
+
+def test_unconfigured_igdb_changes_nothing(client: Client) -> None:
+    """Default test settings blank the credentials: byte-for-byte the old
+    behaviour."""
+    response = client.get(reverse("contributions:declare"), {"q": "Slay the Spire"})
+    assert b"Not in our catalogue yet" not in response.content
+    assert b"Create your account" in response.content

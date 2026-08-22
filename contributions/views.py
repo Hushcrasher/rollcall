@@ -29,7 +29,7 @@ from accounts.registration import create_and_login
 from contributions.forms import ContributionForm
 from contributions.funnel import CREDIT_FIELDS, clear_draft, get_draft, set_draft
 from contributions.models import Contribution
-from games.igdb import IGDBClient
+from games.igdb import IGDBClient, IGDBError, search_options
 from games.models import Game
 from search.services import search_games
 
@@ -61,6 +61,10 @@ class DeclareGameView(TemplateView):
     """
 
     template_name = "contributions/declare_game.html"
+
+    # Set on the instance by the IGDB paths below. Django builds one view
+    # instance per request, so this class default is never shared.
+    igdb_error: str = ""
 
     def get(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         self._meter_search_if_any(request)
@@ -110,8 +114,32 @@ class DeclareGameView(TemplateView):
         context = super().get_context_data(**kwargs)
         query = self.request.POST.get("q", "") or self.request.GET.get("q", "")
         context["query"] = query
-        context["games"] = search_games(query) if query.strip() else []
+        games = search_games(query) if query.strip() else []
+        context["games"] = games
+        # IGDB only on a local miss, and only as an offer: everything that can
+        # stop it — unconfigured, over quota, IGDB down — leaves the page as it
+        # was before this existed (the miss plus the signup line). It is never
+        # an error page (spec 2026-08-22-igdb-auto-fallback §4).
+        if query.strip() and not games:
+            self._offer_igdb_matches(context, query)
+        if self.igdb_error:
+            # An explicit failure from the import path wins over anything the
+            # offer above may have set.
+            context["igdb_error"] = self.igdb_error
         return context
+
+    def _offer_igdb_matches(self, context: dict[str, Any], query: str) -> None:
+        if not IGDBClient().configured:
+            return
+        try:
+            options = search_options(self.request, query)
+        except IGDBError:
+            context["igdb_error"] = "unavailable"
+            return
+        # None is "over quota" — say nothing and let the signup line carry the
+        # page, exactly as it did before.
+        if options:
+            context["igdb_options"] = options
 
     @staticmethod
     def _picked_game(request: HttpRequest) -> Game | None:

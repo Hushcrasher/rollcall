@@ -29,6 +29,30 @@
     {% else %}
       <p>{% translate "No match." %}</p>
     {% endif %}
+    {% if igdb_options %}
+      <h2>{% translate "Not in our catalogue yet" %}</h2>
+      {% comment %}
+        The same shape as the local picks above — one POST form per option —
+        so keyboard and no-JS both work with no extra code. `q` rides along so
+        a failed import re-renders this list instead of an empty page.
+      {% endcomment %}
+      <ul>
+        {% for option in igdb_options %}
+          <li>
+            <form method="post">
+              {% csrf_token %}
+              <input type="hidden" name="igdb" value="{{ option.igdb_id }}">
+              <input type="hidden" name="q" value="{{ query }}">
+              <button class="pick" type="submit">{{ option.label }}</button>
+            </form>
+          </li>
+        {% endfor %}
+      </ul>
+    {% elif igdb_error == "unavailable" %}
+      <p class="muted">{% translate "IGDB is unavailable right now — try again later." %}</p>
+    {% elif igdb_error == "gone" %}
+      <p class="muted">{% translate "That game is no longer listed on IGDB." %}</p>
+    {% endif %}
     {% comment %}
       games:igdb_search is @login_required and stays that way — it is a write
       path to an external API. A miss therefore converts into a signup instead
