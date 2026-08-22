@@ -62,6 +62,18 @@
         {% endfor %}
       </ul>
     {% endif %}
+    {% if igdb_enabled and not deep %}
+      {% comment %}
+        Always available, not only on a local miss: at catalogue scale the
+        trigram search almost always returns something, so "no local rows" is
+        effectively unreachable and the funnel would otherwise never offer a
+        way out. A GET, because it is a search and repeating it is harmless.
+        The copy names no external service on purpose.
+      {% endcomment %}
+      <p><a href="?q={{ query|urlencode }}&amp;deep=1">{% blocktranslate %}Not your game? Run a deeper search for "{{ query }}"{% endblocktranslate %}</a></p>
+    {% elif deep and not igdb_options and not igdb_error %}
+      <p class="muted">{% translate "The deeper search found nothing either." %}</p>
+    {% endif %}
     {% comment %}
       games:igdb_search is @login_required and stays that way — it is a write
       path to an external API. A miss therefore converts into a signup instead

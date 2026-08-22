@@ -16,7 +16,7 @@
     <button type="button" class="igdb-trigger"
             hx-get="{% url 'games:igdb_search' %}?q={{ query|urlencode }}"
             hx-target="closest .results">
-      {% blocktranslate %}Not it? Search IGDB for "{{ query }}"{% endblocktranslate %}
+      {% blocktranslate %}Not your game? Run a deeper search for "{{ query }}"{% endblocktranslate %}
     </button>
   {% else %}
     {# Nothing locally: don't make the member find the escape hatch. htmx

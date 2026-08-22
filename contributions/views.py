@@ -137,11 +137,20 @@ class DeclareGameView(TemplateView):
         context["query"] = query
         games = search_games(query) if query.strip() else []
         context["games"] = games
-        # IGDB only on a local miss, and only as an offer: everything that can
-        # stop it — unconfigured, over quota, IGDB down — leaves the page as it
-        # was before this existed (the miss plus the signup line). It is never
-        # an error page (spec 2026-08-22-igdb-auto-fallback §4).
-        if query.strip() and not games:
+        # At catalogue scale (391k games) a local miss is effectively
+        # unreachable — search_games ORs a low trigram threshold with
+        # icontains, so most queries clear it — so the funnel also needs a
+        # manual escape hatch the visitor can ask for even when local matches
+        # exist, not only on a miss.
+        deep = self.request.POST.get("deep") == "1" or self.request.GET.get("deep") == "1"
+        context["igdb_enabled"] = IGDBClient().configured
+        context["deep"] = deep
+        # IGDB on a local miss, or when the hatch asked for it, and only as an
+        # offer: everything that can stop it — unconfigured, over quota, IGDB
+        # down — leaves the page as it was before this existed (the miss plus
+        # the signup line). It is never an error page (spec
+        # 2026-08-22-igdb-auto-fallback §4).
+        if query.strip() and (not games or deep):
             self._offer_igdb_matches(context, query)
         if self.igdb_error:
             # An explicit failure from the import path wins over anything the
