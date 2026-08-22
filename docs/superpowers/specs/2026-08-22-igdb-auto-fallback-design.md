@@ -12,6 +12,18 @@
    it is an italic line — `Not it? Search IGDB for "…"` — under
    `No games found locally.`, and nothing happens until it is clicked. A member
    who does not notice it concludes the game does not exist.
+
+   > **Amended 2026-08-22** (same-day follow-up on this branch, commit
+   > `ee984ed`, "declare,search: make the deeper search always available, not
+   > just on a local miss"). The quote above is the copy this spec shipped
+   > with and stays as the historical description of the problem it was
+   > fixing. It no longer matches the code: the wording is now `Not your
+   > game? Run a deeper search for "…"` on both surfaces — chosen so no
+   > user-facing string here names the external service — and the escape
+   > hatch is no longer gated on `No games found locally.` at all; it is
+   > always offered (behind `igdb_enabled`, hidden once already run). See the
+   > amendment to §3 below and `docs/01-DESIGN.md` §3.1 for the current
+   > behaviour.
 2. **The anonymous funnel has no IGDB path at all**, by design of the 2026-08-11
    spec. `/declare/` is what the nav's `Add your credit` opens for a signed-out
    visitor, so it is the *first* place a missing game is met — and there it is a
@@ -133,6 +145,21 @@ It gains one branch:
 - **Local matches present** → the manual `Not it? Search IGDB for "…"` button
   stays exactly as it is. A search that finds what it was looking for still
   costs zero IGDB calls; the escape hatch is there for a wrong match.
+
+  > **Amended 2026-08-22** (same-day follow-up on this branch, commit
+  > `ee984ed`) — false as stated: against the real 391k-game catalogue,
+  > "zero local rows" turned out to be effectively unreachable (`search_games`
+  > ORs a low trigram threshold with `icontains`, so almost any multi-word
+  > query clears it), so gating the escape hatch on a local miss meant it was,
+  > in practice, never offered. The button no longer "stays exactly as it
+  > is": it now renders unconditionally (still behind `igdb_enabled`, and not
+  > re-offered once a deeper search already ran — see `deep` in
+  > `contributions/views.py`), and its copy dropped "IGDB" — `Not your game?
+  > Run a deeper search for "…"`, per an explicit product-owner call that no
+  > user-facing string here may name the external service. The same wording
+  > and always-available behaviour now apply on `/declare/` too (§4). The
+  > existing IGDB error strings were left alone — that wasn't part of this
+  > decision.
 
 `games.views.igdb_search` keeps `@login_required`, switches to `cached_search`,
 and gains the quota check. Over quota it renders `_igdb_options.html` with a

@@ -250,7 +250,7 @@ def test_igdb_finding_nothing_either_leaves_the_signup_line_alone(
     response = client.get(reverse("contributions:declare"), {"q": "Slay the Spire"})
     assert response.status_code == 200
     assert b"Not in our catalogue yet" not in response.content
-    assert b"IGDB is unavailable right now" not in response.content
+    assert b"deeper search is unavailable right now" not in response.content
     assert b"No match." in response.content
     assert b"Create your account" in response.content
 
@@ -281,7 +281,7 @@ def test_igdb_being_down_leaves_the_page_usable(
     monkeypatch.setattr(IGDBClient, "search_games", boom)
     response = client.get(reverse("contributions:declare"), {"q": "Slay the Spire"})
     assert response.status_code == 200
-    assert b"IGDB is unavailable right now" in response.content
+    assert b"deeper search is unavailable right now" in response.content
     assert b"Create your account" in response.content
 
 
@@ -304,6 +304,65 @@ def test_unconfigured_igdb_changes_nothing(client: Client) -> None:
     response = client.get(reverse("contributions:declare"), {"q": "Slay the Spire"})
     assert b"Not in our catalogue yet" not in response.content
     assert b"Create your account" in response.content
+
+
+def test_the_deeper_search_hatch_renders_alongside_local_matches(
+    client: Client, game: Game, igdb_configured: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """At catalogue scale a local miss is effectively unreachable, so the
+    hatch link must render even when local matches exist. It does not, on its
+    own, exercise the IGDB trigger: with `games` present and `deep` false the
+    widened `not games or deep` condition is False, so `_offer_igdb_matches`
+    is never reached here — `search_games` and `calls == []` merely pin that
+    rendering the page itself never spends an IGDB call, regardless of the
+    hatch. See test_following_the_hatch_offers_igdb_matches_despite_local_matches
+    for the case that actually reaches IGDB with local matches present."""
+    calls: list[str] = []
+    monkeypatch.setattr(IGDBClient, "search_games", lambda self, q, limit=10: calls.append(q) or [])
+    response = client.get(reverse("contributions:declare"), {"q": "Hollow Knight"})
+    assert response.status_code == 200
+    assert b"Run a deeper search" in response.content
+    assert calls == []
+
+
+def test_following_the_hatch_offers_igdb_matches_despite_local_matches(
+    client: Client, game: Game, igdb_configured: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`?q=…&deep=1` is the hatch's own link — it must reach IGDB even though
+    a local match exists, which is exactly the case the plain miss check
+    (`not games`) would otherwise skip."""
+    monkeypatch.setattr(
+        IGDBClient,
+        "search_games",
+        lambda self, q, limit=10: [
+            {"id": 40477, "name": "Slay the Spire", "first_release_date": 1548201600}
+        ],
+    )
+    response = client.get(reverse("contributions:declare"), {"q": "Hollow Knight", "deep": "1"})
+    assert response.status_code == 200
+    assert b"Not in our catalogue yet" in response.content
+    assert b"Slay the Spire (2019)" in response.content
+
+
+def test_the_deeper_search_hatch_is_absent_when_igdb_is_unconfigured(
+    client: Client, game: Game
+) -> None:
+    """Default test settings blank the credentials — no deployment without
+    IGDB creds should offer a hatch that can never do anything."""
+    response = client.get(reverse("contributions:declare"), {"q": "Hollow Knight"})
+    assert b"Run a deeper search" not in response.content
+
+
+def test_the_deeper_search_hatch_is_not_offered_again_after_running_one(
+    client: Client, game: Game, igdb_configured: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A page that already ran a deep search must not offer to run another
+    one, and must say so plainly when it found nothing either."""
+    monkeypatch.setattr(IGDBClient, "search_games", lambda self, q, limit=10: [])
+    response = client.get(reverse("contributions:declare"), {"q": "Hollow Knight", "deep": "1"})
+    assert response.status_code == 200
+    assert b"Run a deeper search" not in response.content
+    assert b"The deeper search found nothing either." in response.content
 
 
 def test_picking_an_igdb_match_imports_it_and_moves_on(
@@ -404,7 +463,7 @@ def test_an_import_that_igdb_no_longer_has_says_so(
     )
     response = client.post(reverse("contributions:declare"), {"igdb": "40477", "q": "slay"})
     assert response.status_code == 200
-    assert b"no longer listed on IGDB" in response.content
+    assert b"no longer listed." in response.content
     assert b"Not in our catalogue yet" in response.content
 
 

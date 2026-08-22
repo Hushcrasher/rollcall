@@ -38,16 +38,23 @@
       visitor clicked a dead option onto an identical page with no explanation.
     {% endcomment %}
     {% if igdb_error == "unavailable" %}
-      <p class="muted">{% translate "IGDB is unavailable right now — try again later." %}</p>
+      <p class="muted">{% translate "The deeper search is unavailable right now — try again later." %}</p>
     {% elif igdb_error == "gone" %}
-      <p class="muted">{% translate "That game is no longer listed on IGDB." %}</p>
+      <p class="muted">{% translate "That game is no longer listed." %}</p>
     {% endif %}
     {% if igdb_options %}
       <h2>{% translate "Not in our catalogue yet" %}</h2>
       {% comment %}
         The same shape as the local picks above — one POST form per option —
         so keyboard and no-JS both work with no extra code. `q` rides along so
-        a failed import re-renders this list instead of an empty page.
+        a failed import re-renders this list instead of an empty page. `deep`
+        rides along too, hidden, for the same reason: these forms carry no
+        `action`, so the browser resubmits to the current URL and Django
+        happens to read `deep` back out of `request.GET` — true today, but
+        undocumented and not something to rely on implicitly, unlike `q`,
+        which is already explicit here. Needed now that a local-match-plus-
+        `deep` page can also fail an import and must re-render with its
+        options intact.
       {% endcomment %}
       <ul>
         {% for option in igdb_options %}
@@ -56,11 +63,24 @@
               {% csrf_token %}
               <input type="hidden" name="igdb" value="{{ option.igdb_id }}">
               <input type="hidden" name="q" value="{{ query }}">
+              {% if deep %}<input type="hidden" name="deep" value="1">{% endif %}
               <button class="pick" type="submit">{{ option.label }}</button>
             </form>
           </li>
         {% endfor %}
       </ul>
+    {% endif %}
+    {% if igdb_enabled and not deep %}
+      {% comment %}
+        Always available, not only on a local miss: at catalogue scale the
+        trigram search almost always returns something, so "no local rows" is
+        effectively unreachable and the funnel would otherwise never offer a
+        way out. A GET, because it is a search and repeating it is harmless.
+        The copy names no external service on purpose.
+      {% endcomment %}
+      <p><a href="?q={{ query|urlencode }}&amp;deep=1">{% blocktranslate %}Not your game? Run a deeper search for "{{ query }}"{% endblocktranslate %}</a></p>
+    {% elif deep and not igdb_options and not igdb_error %}
+      <p class="muted">{% translate "The deeper search found nothing either." %}</p>
     {% endif %}
     {% comment %}
       games:igdb_search is @login_required and stays that way — it is a write

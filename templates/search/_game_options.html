@@ -16,7 +16,7 @@
     <button type="button" class="igdb-trigger"
             hx-get="{% url 'games:igdb_search' %}?q={{ query|urlencode }}"
             hx-target="closest .results">
-      {% blocktranslate %}Not it? Search IGDB for "{{ query }}"{% endblocktranslate %}
+      {% blocktranslate %}Not your game? Run a deeper search for "{{ query }}"{% endblocktranslate %}
     </button>
   {% else %}
     {# Nothing locally: don't make the member find the escape hatch. htmx
@@ -24,7 +24,7 @@
        "No games found locally." above it stays. #}
     <div hx-get="{% url 'games:igdb_search' %}?q={{ query|urlencode }}"
          hx-trigger="load" hx-swap="outerHTML">
-      <p class="autocomplete-empty">{% translate "Searching IGDB…" %}</p>
+      <p class="autocomplete-empty">{% translate "Running a deeper search…" %}</p>
     </div>
   {% endif %}
 {% endif %}

@@ -18,7 +18,7 @@
              placeholder="{% translate 'Search a game…' %}"
              hx-get="{% url 'search:game_autocomplete' %}" hx-trigger="keyup changed delay:250ms"
              hx-target="next .results">
-      {# Local matches + an inline "Search IGDB" fallback appear here. #}
+      {# Local matches + an inline "run a deeper search" fallback appear here. #}
       <div class="results"></div>
       <p class="chosen">{% if form.game.value %}{{ form.instance.game }}{% endif %}</p>
       {{ form.game.errors }}
@@ -168,13 +168,13 @@
         const gameField = document.getElementById(GAME_FIELD);
         gameField.value = game.id;
         const wrapper = gameField.closest(".autocomplete");
-        wrapper.querySelector(".chosen").textContent = game.label + " {% translate '(imported from IGDB)' %}";
+        wrapper.querySelector(".chosen").textContent = game.label + " {% translate '(added to the catalogue)' %}";
         wrapper.querySelector(".results").innerHTML = "";
         loadEmployers(game.id, true);
       } catch (err) {
         option.textContent = original;
         option.disabled = false;
-        alert("{% translate 'Could not import from IGDB. Please try again.' %}");
+        alert("{% translate 'Could not add that game. Please try again.' %}");
       }
     });
 
