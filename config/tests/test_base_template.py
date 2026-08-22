@@ -19,6 +19,20 @@ def test_every_page_links_pico_then_app_css(client: Client) -> None:
     assert pico < app
 
 
+def test_every_page_loads_the_autocomplete_dismiss_script(client: Client) -> None:
+    """Every page carries a dropdown — the nav search box — so the module that
+    dismisses one is sitewide. Both properties asserted here are load-bearing:
+    `defer`, because it binds document-level listeners and must not run before
+    the DOM exists; and the order after htmx, because one of those listeners is
+    for htmx's own `htmx:afterSwap` event (spec 2026-08-22-autocomplete-dismiss
+    §1)."""
+    body = client.get(reverse("home")).content.decode()
+    htmx = body.index("vendor/htmx.min.js")
+    module = body.index("js/autocomplete.js")
+    assert htmx < module
+    assert "defer" in body[module : module + 40]
+
+
 def test_anonymous_nav_leads_with_the_declare_cta(client: Client) -> None:
     """The most visible nav control is the worker CTA (spec §1): role=button
     renders as Pico's one solid button on the bar. Sign up leaves the nav —
