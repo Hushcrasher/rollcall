@@ -30,8 +30,13 @@ _SEARCH_CACHE_PREFIX = "igdb:search:"
 _SEARCH_CACHE_TTL = 60 * 60 * 24  # the catalogue this backstops refreshes weekly
 _TIMEOUT = 10
 # Search now runs inside a page render (spec 2026-08-22-igdb-auto-fallback §1),
-# so it must not hold a worker for _TIMEOUT. get_game keeps the long one: it is
-# the import path, reached by one deliberate click.
+# so it must not hold a worker for _TIMEOUT. get_game keeps the long one, and
+# since the funnel opened to anonymous traffic (§4) its callers are no longer
+# only members: the worst case is now IGDB_RATELIMIT imports per IP per minute
+# each holding a worker for _TIMEOUT — 10 × 10s ≈ 100 worker-seconds a minute
+# per IP with IGDB hanging. Kept at 10s regardless: an import pulls a far
+# larger payload than a search, and a shorter deadline would fail legitimate
+# imports to bound a case the quota already bounds.
 _SEARCH_TIMEOUT = 4
 
 
@@ -179,6 +184,14 @@ def cached_search(
     cached = cache.get(key)
     if cached is not None:
         return cached
+    return _live_search(key, query, limit=limit, client=client)
+
+
+def _live_search(
+    key: str, query: str, limit: int = 10, client: IGDBClient | None = None
+) -> list[dict[str, Any]]:
+    # Split out of cached_search so search_options can decide on ONE cache read
+    # — see its docstring for why two reads were wrong.
     results = (client or IGDBClient()).search_games(query, limit=limit)
     cache.set(key, results, timeout=_SEARCH_CACHE_TTL)
     return results
@@ -194,10 +207,18 @@ def search_options(
     keeps answering after the allowance is spent (it costs IGDB nothing). Both
     call sites want exactly this trio (cache, quota, labels), which is why it
     is one function rather than three the callers must remember to combine.
+
+    The single `cache.get` is the point: reading once to decide the quota and
+    again inside `cached_search` let the two disagree across a TTL boundary —
+    a hit skips the quota, the entry then expires, and the second read misses
+    into an unmetered live call. One read decides both, so the live call below
+    is exactly the one the quota was charged for.
     """
-    if cache.get(_search_cache_key(query)) is None and quota_exceeded(request):
+    key = _search_cache_key(query)
+    cached = cache.get(key)
+    if cached is None and quota_exceeded(request):
         return None
-    results = cached_search(query, client=client)
+    results = cached if cached is not None else _live_search(key, query, client=client)
     return [{"igdb_id": r["id"], "label": igdb_label(r)} for r in results]
 
 

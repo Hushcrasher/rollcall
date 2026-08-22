@@ -239,6 +239,22 @@ def test_a_local_miss_offers_igdb_matches_to_an_anonymous_visitor(
     assert b'name="igdb" value="40477"' in response.content
 
 
+def test_igdb_finding_nothing_either_leaves_the_signup_line_alone(
+    client: Client, igdb_configured: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A title on neither Rollcall nor IGDB. `_offer_igdb_matches` sets nothing
+    on a falsy `options`, so the page must be the plain miss — no empty
+    `Not in our catalogue yet` heading, and no error message either, because
+    nothing failed."""
+    monkeypatch.setattr(IGDBClient, "search_games", lambda self, q, limit=10: [])
+    response = client.get(reverse("contributions:declare"), {"q": "Slay the Spire"})
+    assert response.status_code == 200
+    assert b"Not in our catalogue yet" not in response.content
+    assert b"IGDB is unavailable right now" not in response.content
+    assert b"No match." in response.content
+    assert b"Create your account" in response.content
+
+
 def test_local_matches_never_reach_igdb(
     client: Client, game: Game, igdb_configured: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
