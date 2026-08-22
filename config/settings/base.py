@@ -179,6 +179,12 @@ CACHES = {
 # backend that cache points at decides whether a limit actually holds.
 PROFILE_RATELIMIT = env("PROFILE_RATELIMIT", default="120/m")
 SEARCH_RATELIMIT = env("SEARCH_RATELIMIT", default="60/m")
+# IGDB live-fallback quota, per IP. Separate from SEARCH_RATELIMIT on purpose:
+# the local trigram search is cheap and ours to spend, while an IGDB call is a
+# third-party allowance we do not own (Twitch permits 4 requests/second across
+# the whole application). Unlike every other limit here this one does NOT
+# block — see games.igdb.quota_exceeded.
+IGDB_RATELIMIT = env("IGDB_RATELIMIT", default="10/m")
 
 # django-ratelimit fails CLOSED by default: a cache it cannot reach yields
 # `should_limit: True`, i.e. 403 on every rate-limited page at once. The limit

@@ -12,6 +12,7 @@ from typing import Any
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db import IntegrityError
 from django.db.models import QuerySet
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect
@@ -29,7 +30,7 @@ from accounts.registration import create_and_login
 from contributions.forms import ContributionForm
 from contributions.funnel import CREDIT_FIELDS, clear_draft, get_draft, set_draft
 from contributions.models import Contribution
-from games.igdb import IGDBClient
+from games.igdb import IGDBClient, IGDBError, import_igdb_game, quota_exceeded, search_options
 from games.models import Game
 from search.services import search_games
 
@@ -37,6 +38,24 @@ from search.services import search_games
 # django-ratelimit derives an unnamed decorator's group from the view's module
 # and qualname, so renaming this view would silently move the counter.
 _DECLARE_GAME_RATELIMIT_GROUP = "declare_game_search"
+
+# Postgres bigint — the widest id this schema holds — is 19 digits.
+_MAX_ID_DIGITS = 19
+
+
+def _is_row_id(raw: str) -> bool:
+    """True for a posted value safe to coerce with `int()` or filter a pk on.
+
+    Both halves guard a 500 on a page anonymous traffic posts to:
+
+    - `isdecimal()`, not `isdigit()`: "²" is a digit but `int()` rejects it.
+      `isdecimal()` is still True for "１"/"٣", which `int()` accepts.
+    - the length, because the alphabet alone does not bound it: CPython >= 3.11
+      refuses `int()` on a decimal string past 4300 digits, and Django's own
+      coercion raises the same on a `filter(pk=…)`. `POST /declare/` with a
+      5000-digit `igdb` or `game` was an unhandled `ValueError`.
+    """
+    return raw.isdecimal() and len(raw) <= _MAX_ID_DIGITS
 
 
 class DeclareGameView(TemplateView):
@@ -62,12 +81,18 @@ class DeclareGameView(TemplateView):
 
     template_name = "contributions/declare_game.html"
 
+    # Set on the instance by the IGDB paths below. Django builds one view
+    # instance per request, so this class default is never shared.
+    igdb_error: str = ""
+
     def get(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         self._meter_search_if_any(request)
         return super().get(request, *args, **kwargs)
 
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         game = self._picked_game(request)
+        if game is None and request.POST.get("igdb"):
+            game = self._import_picked_igdb_game(request)
         if game is not None:
             # `request.session` is added by middleware, which `ty` cannot see —
             # the same accommodation the codebase already uses elsewhere.
@@ -110,18 +135,100 @@ class DeclareGameView(TemplateView):
         context = super().get_context_data(**kwargs)
         query = self.request.POST.get("q", "") or self.request.GET.get("q", "")
         context["query"] = query
-        context["games"] = search_games(query) if query.strip() else []
+        games = search_games(query) if query.strip() else []
+        context["games"] = games
+        # IGDB only on a local miss, and only as an offer: everything that can
+        # stop it — unconfigured, over quota, IGDB down — leaves the page as it
+        # was before this existed (the miss plus the signup line). It is never
+        # an error page (spec 2026-08-22-igdb-auto-fallback §4).
+        if query.strip() and not games:
+            self._offer_igdb_matches(context, query)
+        if self.igdb_error:
+            # An explicit failure from the import path wins over anything the
+            # offer above may have set.
+            context["igdb_error"] = self.igdb_error
         return context
+
+    def _offer_igdb_matches(self, context: dict[str, Any], query: str) -> None:
+        if not IGDBClient().configured:
+            return
+        try:
+            options = search_options(self.request, query)
+        except IGDBError:
+            context["igdb_error"] = "unavailable"
+            return
+        # None is "over quota" — say nothing and let the signup line carry the
+        # page, exactly as it did before.
+        if options:
+            context["igdb_options"] = options
+
+    def _import_picked_igdb_game(self, request: HttpRequest) -> Game | None:
+        """Import the IGDB game the visitor picked, then behave like a local pick.
+
+        This is the funnel's one anonymous write path, and it amends the rule
+        in spec 2026-08-11 that kept these endpoints login-gated. What it can
+        cause is one row in the *games catalogue* created or refreshed from
+        IGDB's own data — no user data — through the seed's idempotent upsert
+        keyed on `igdb_id`, so a repeat is never a duplicate, marked
+        `source='igdb_live'`, and metered on the same IGDB quota as the search
+        that produced the option. An id already in the catalogue is the
+        *refresh* case: `source` flips `seed` -> `igdb_live` and the `[source]`
+        columns take IGDB's possibly sparser values (an empty summary blanks a
+        Steam-derived one) until the weekly seed restores them — the Steam
+        columns themselves are protected by the seed's write surface. Same
+        power the login-gated `igdb_import` already had, quota-bounded and
+        self-healing (spec §4). `igdb_import` and `company_create` stay
+        `@login_required`.
+        """
+        raw = request.POST.get("igdb", "")
+        # Junk re-renders rather than 500s — see _is_row_id for what "junk" has
+        # to cover on an endpoint anonymous traffic posts to.
+        if not _is_row_id(raw):
+            return None
+        if not IGDBClient().configured:
+            # The guard _offer_igdb_matches and games.views.igdb_search already
+            # carry. Without it, a deployment that never enabled IGDB still
+            # drives an outbound Twitch token request from an anonymous POST and
+            # can hold a worker for the full 10s import timeout. Spec §4: that
+            # deployment shows the signup line and nothing else.
+            return None
+        if quota_exceeded(request):
+            # Deliberately no igdb_error: spec §4 gives "throttled" no copy on
+            # this page, and setting it here would only clobber the
+            # "unavailable" that _offer_igdb_matches may legitimately set on the
+            # re-render.
+            #
+            # Known cost, not fixed here: a failed import with a cold search
+            # cache spends the quota twice in one request — once on this line,
+            # once inside search_options when get_context_data rebuilds the
+            # option list. Both are real IGDB calls, so neither check is wrong;
+            # collapsing them would mean threading per-request state through
+            # search_options, which games.views.igdb_search shares.
+            return None
+        try:
+            game = import_igdb_game(int(raw))
+        except IGDBError:
+            self.igdb_error = "unavailable"
+            return None
+        except IntegrityError:
+            # A double-click on the funnel's conversion button. Two simultaneous
+            # imports of an igdb_id nobody holds yet both preload an empty
+            # by-igdb_id map in games/seed/upsert.py and both bulk_create, so the
+            # unique index on Game.igdb_id turns the loser into an IntegrityError
+            # -> 500. Recovered here rather than in the seed, whose dedup is a
+            # non-negotiable test zone (docs/02 §7): the winner has written the
+            # very row this request wanted, so re-read it and carry on.
+            game = Game.objects.filter(igdb_id=int(raw)).first()
+        if game is None:
+            self.igdb_error = "gone"
+        return game
 
     @staticmethod
     def _picked_game(request: HttpRequest) -> Game | None:
         # Unauthenticated POST on a public page: `?game=abc` must re-render, not
-        # 500, so the pk is filtered rather than coerced. `isdecimal()`, not
-        # `isdigit()`: superscripts like "²" are digits but int() rejects them,
-        # which raised ValueError -> 500 here. isdecimal() is still True for
-        # "１"/"٣" (int() accepts those) and False for "²".
+        # 500, so the pk is guarded and filtered rather than coerced.
         pk = request.POST.get("game", "")
-        return Game.objects.filter(pk=pk).first() if pk.isdecimal() else None
+        return Game.objects.filter(pk=pk).first() if _is_row_id(pk) else None
 
 
 class DeclareDetailsView(FormView):

@@ -149,6 +149,40 @@ def test_game_autocomplete_hides_igdb_when_unconfigured(client: Client) -> None:
     assert b"igdb/search" not in response.content
 
 
+@pytest.fixture
+def igdb_configured(settings: Any) -> None:
+    settings.IGDB_CLIENT_ID = "cid"
+    settings.IGDB_CLIENT_SECRET = "secret"
+
+
+def test_a_local_miss_fetches_igdb_without_being_asked(
+    client: Client, igdb_configured: None
+) -> None:
+    """The escape hatch used to be an italic line the member had to notice.
+    Nothing found locally means the question was already asked — ask IGDB."""
+    response = client.get(reverse("search:game_autocomplete"), {"q": "Slay the Spire"})
+    assert b'hx-trigger="load"' in response.content
+    assert b"Searching IGDB" in response.content
+
+
+def test_local_matches_keep_igdb_behind_a_deliberate_click(
+    client: Client, igdb_configured: None
+) -> None:
+    """A search that found what it wanted must still cost zero IGDB calls."""
+    Game.objects.create(title="Slay the Spire", source=Game.Source.MANUAL)
+    response = client.get(reverse("search:game_autocomplete"), {"q": "Slay the Spire"})
+    assert b"igdb-trigger" in response.content
+    assert b'hx-trigger="load"' not in response.content
+
+
+def test_a_local_miss_offers_nothing_when_igdb_is_unconfigured(client: Client) -> None:
+    """Default test settings blank the credentials — the page must look
+    exactly as it did before this feature."""
+    response = client.get(reverse("search:game_autocomplete"), {"q": "Slay the Spire"})
+    assert b'hx-trigger="load"' not in response.content
+    assert b"igdb-trigger" not in response.content
+
+
 @pytest.mark.parametrize("url_name", ["search:game_autocomplete", "search:company_autocomplete"])
 def test_game_and_company_autocomplete_are_rate_limited_for_anonymous_visitors(
     client: Client, settings: Any, url_name: str

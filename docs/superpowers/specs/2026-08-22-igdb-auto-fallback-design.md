@@ -34,7 +34,7 @@ parquet, and is not what this spec is about.)*
 | Anonymous visitors | **Yes** — the declare funnel queries IGDB too |
 | What protects the API | A **24 h server-side cache** on the normalised query, plus a **dedicated per-IP quota** (`IGDB_RATELIMIT`, default `10/m`), independent of `SEARCH_RATELIMIT` |
 | Importing | Still a **deliberate pick**. `games:igdb_import` stays POST and stays login-gated; the funnel imports server-side, on its own POST |
-| When it cannot run | **Degrade silently** to today's copy — never an error page, never a 403 |
+| When it cannot run | **Degrade silently** to today's copy — never an error page, never a 403 (one caveat, §4) |
 | Companies | **No IGDB company search.** The seed covers them (§6) |
 
 ## 1. `games/igdb.py` — a cached search
@@ -102,6 +102,17 @@ means unmetered IGDB calls, bounded by the 4 s timeout. Accepted — the same
 trade-off the project already took for its other limits, and stated here so it
 is not a surprise.
 
+**A consequence worth stating plainly, because it is new here.** Every other
+surface `RATELIMIT_FAIL_OPEN` applies to is read-only, so "a cache outage
+costs metering, not availability" had no real downside to weigh. This quota is
+different: it is what bounds the funnel's one anonymous write (§4), the
+games-catalogue import. A Redis outage removes that bound along with every
+other one project-wide, leaving IGDB's own catalogue and the 4 s wire timeout
+as the only limits left on how many games an anonymous visitor can import in a
+window. Accepted for the same reason as above — availability over metering —
+but recorded here because, for the first time, that trade reaches a write
+path rather than only a search.
+
 ## 3. `/credits/new/` — automatic, in the same list
 
 `search/_game_options.html` renders local matches, then today's manual trigger.
@@ -148,8 +159,11 @@ a `Not in our catalogue yet` heading, then one `<form method="post">` per
 option carrying `<input type="hidden" name="igdb" value="…">` and a submit
 styled like the local picks (`.pick`, on `main` since PR #29). The same shape
 as the local list, so keyboard and no-JS both work with no extra code. The existing
-`Can't find it? Create your account…` line stays as the last resort and is the
-only thing shown when IGDB is off, throttled, or down.
+`Can't find it? Create your account…` line stays as the last resort and renders
+on every one of these paths. Only two of them are *silent* — i.e. leave the page
+exactly as it was before this feature: IGDB **unconfigured**, and **over quota**.
+`down` and `gone` each add their own message above the signup line (point 3
+below and §5), which is what the template renders.
 
 **`DeclareGameView.post`.** Before `_picked_game`, handle `igdb`:
 
@@ -164,6 +178,17 @@ only thing shown when IGDB is off, throttled, or down.
      the draft write, the employer-invalidation rule and the redirect to
      `declare_details` are shared rather than duplicated.
 
+**One caveat on "never an error page".** A *failed* import re-renders, and the
+re-render goes through the funnel's own `_meter_search_if_any` — the
+`SEARCH_RATELIMIT` counter that has guarded `/declare/` since the 2026-08-11
+spec. A visitor who has also exhausted *that* limit gets its usual 403, and the
+`igdb_error` message dies with the response. It takes two things at once (a
+failed import **and** an exhausted search quota), and it is the search limit
+behaving exactly as it always has, so it is recorded here rather than fixed:
+skipping the search metering on the IGDB path would open an unmetered trigram
+search over `Game` to an anonymous POST, which is a worse trade. The promise
+above is about `IGDB_RATELIMIT` specifically — *that* limit never 403s anything.
+
 ### The amendment, stated plainly
 
 The 2026-08-11 funnel spec says: *"`igdb_search`, `igdb_import` and
@@ -173,11 +198,19 @@ traffic."* This spec **amends that for the game path only**, and the reasoning
 is the trade it makes:
 
 - What an anonymous visitor can now cause is **one row in the games catalogue,
-  written from IGDB's own data**. No user data, no contribution, nothing about
-  a person. The credit itself still cannot be written before signup, and
-  `status='pending'` until email verification, exactly as before.
+  created or refreshed from IGDB's own data**. No user data, no contribution,
+  nothing about a person. The credit itself still cannot be written before
+  signup, and `status='pending'` until email verification, exactly as before.
 - It reuses the **seed's idempotent upsert keyed on `igdb_id`**, so a repeat is
-  an update, not a duplicate — the same guarantee the weekly seed relies on.
+  never a duplicate — the same guarantee the weekly seed relies on. **"Refreshed"
+  is the half worth stating plainly:** a crafted `igdb` id naming a game that is
+  *already* in the catalogue re-imports it, flipping `source` from `seed` to
+  `igdb_live` and rewriting the `[source]` columns with IGDB's values, which can
+  be sparser than what was there (an empty IGDB `summary` blanks a Steam-derived
+  one). The Steam-owned columns are protected by the seed's write surface
+  (docs/04 §13) and the weekly seed restores the rest on its next run, so it is
+  self-healing and quota-bounded — and it is exactly the power the login-gated
+  `igdb_import` has had since it shipped, not a new one.
 - Rows land with `source='igdb_live'`, distinguishable in admin, and the weekly
   seed overwrites their `[source]` columns on its next run.
 - It is bounded by the per-IP quota of §2 and by IGDB's own catalogue: a

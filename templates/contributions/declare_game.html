@@ -30,6 +30,39 @@
       <p>{% translate "No match." %}</p>
     {% endif %}
     {% comment %}
+      Alongside the option list, never instead of it: a failed import re-renders
+      the page, and the offer path then hits the 24h search cache this visitor's
+      own search just filled — so the options come back. Hanging this message off
+      `{% if igdb_options %}` as an `{% elif %}` meant the one case it exists for
+      (spec §5's `gone`) was exactly the case it never rendered in, and the
+      visitor clicked a dead option onto an identical page with no explanation.
+    {% endcomment %}
+    {% if igdb_error == "unavailable" %}
+      <p class="muted">{% translate "IGDB is unavailable right now — try again later." %}</p>
+    {% elif igdb_error == "gone" %}
+      <p class="muted">{% translate "That game is no longer listed on IGDB." %}</p>
+    {% endif %}
+    {% if igdb_options %}
+      <h2>{% translate "Not in our catalogue yet" %}</h2>
+      {% comment %}
+        The same shape as the local picks above — one POST form per option —
+        so keyboard and no-JS both work with no extra code. `q` rides along so
+        a failed import re-renders this list instead of an empty page.
+      {% endcomment %}
+      <ul>
+        {% for option in igdb_options %}
+          <li>
+            <form method="post">
+              {% csrf_token %}
+              <input type="hidden" name="igdb" value="{{ option.igdb_id }}">
+              <input type="hidden" name="q" value="{{ query }}">
+              <button class="pick" type="submit">{{ option.label }}</button>
+            </form>
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+    {% comment %}
       games:igdb_search is @login_required and stays that way — it is a write
       path to an external API. A miss therefore converts into a signup instead
       of a dead end.

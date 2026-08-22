@@ -1,6 +1,8 @@
 {% load i18n %}
 {% if error == "unconfigured" %}
   <p class="autocomplete-empty">{% translate "IGDB search is not configured on this server." %}</p>
+{% elif error == "throttled" %}
+  <p class="autocomplete-empty">{% translate "IGDB search is busy right now — try again in a minute." %}</p>
 {% elif error == "unavailable" %}
   <p class="autocomplete-empty">{% translate "IGDB is unavailable right now — try again later." %}</p>
 {% else %}

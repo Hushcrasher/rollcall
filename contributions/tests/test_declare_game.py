@@ -9,14 +9,28 @@ from typing import Any
 
 import pytest
 from django.core.cache import cache
+from django.db import IntegrityError
 from django.test import Client
 from django.urls import reverse
 
+import contributions.views
 from accounts.models import User
 from contributions.funnel import SESSION_KEY
+from games.igdb import IGDBClient, IGDBError
 from games.models import Game
 
 pytestmark = pytest.mark.django_db
+
+
+@pytest.fixture(autouse=True)
+def _clear_cache() -> None:
+    cache.clear()
+
+
+@pytest.fixture
+def igdb_configured(settings: Any) -> None:
+    settings.IGDB_CLIENT_ID = "cid"
+    settings.IGDB_CLIENT_SECRET = "secret"
 
 
 @pytest.fixture
@@ -60,11 +74,17 @@ def test_picking_a_game_stores_it_and_moves_on(client: Client, game: Game) -> No
 
 
 def test_a_junk_game_id_does_not_500(client: Client) -> None:
-    """Public page, unauthenticated POST — junk must re-render, never crash."""
-    for junk in ("abc", "-1", "999999999", "", "²"):
+    """Public page, unauthenticated POST — junk must re-render, never crash.
+
+    `"9" * 5000` is the case an alphabet check alone misses: it is decimal, so
+    it reached Django's own coercion, which raised `ValueError: Field 'id'
+    expected a number but got '999…'` (CPython >= 3.11 refuses str->int past
+    4300 digits) — a 500. The length is bounded now, not just the alphabet.
+    """
+    for junk in ("abc", "-1", "999999999", "", "²", "9" * 5000):
         response = client.post(reverse("contributions:declare"), {"game": junk})
-        assert response.status_code == 200, junk
-        assert SESSION_KEY not in client.session, junk
+        assert response.status_code == 200, junk[:32]
+        assert SESSION_KEY not in client.session, junk[:32]
 
 
 def test_repicking_a_different_game_clears_the_old_employer(client: Client, game: Game) -> None:
@@ -198,3 +218,239 @@ def test_home_does_not_pitch_a_member(client: Client) -> None:
     body = client.get(reverse("home")).content
     assert b"Worked on a game?" not in body
     assert b"Find people by what they" in body
+
+
+def test_a_local_miss_offers_igdb_matches_to_an_anonymous_visitor(
+    client: Client, igdb_configured: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The funnel is where a signed-out visitor first meets a missing game.
+    It used to be a dead end that offered signup (spec §4)."""
+    monkeypatch.setattr(
+        IGDBClient,
+        "search_games",
+        lambda self, q, limit=10: [
+            {"id": 40477, "name": "Slay the Spire", "first_release_date": 1548201600}
+        ],
+    )
+    response = client.get(reverse("contributions:declare"), {"q": "Slay the Spire"})
+    assert response.status_code == 200
+    assert b"Not in our catalogue yet" in response.content
+    assert b"Slay the Spire (2019)" in response.content
+    assert b'name="igdb" value="40477"' in response.content
+
+
+def test_igdb_finding_nothing_either_leaves_the_signup_line_alone(
+    client: Client, igdb_configured: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A title on neither Rollcall nor IGDB. `_offer_igdb_matches` sets nothing
+    on a falsy `options`, so the page must be the plain miss — no empty
+    `Not in our catalogue yet` heading, and no error message either, because
+    nothing failed."""
+    monkeypatch.setattr(IGDBClient, "search_games", lambda self, q, limit=10: [])
+    response = client.get(reverse("contributions:declare"), {"q": "Slay the Spire"})
+    assert response.status_code == 200
+    assert b"Not in our catalogue yet" not in response.content
+    assert b"IGDB is unavailable right now" not in response.content
+    assert b"No match." in response.content
+    assert b"Create your account" in response.content
+
+
+def test_local_matches_never_reach_igdb(
+    client: Client, game: Game, igdb_configured: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A local hit must never trigger the IGDB fallback. Asserting on the pick
+    form rather than bare page text: `b"Hollow Knight" in response.content` is
+    trivially true regardless of any match, because the search box's own
+    placeholder ("Hollow Knight, Dishonored…") renders on every response."""
+    calls: list[str] = []
+    monkeypatch.setattr(IGDBClient, "search_games", lambda self, q, limit=10: calls.append(q) or [])
+    response = client.get(reverse("contributions:declare"), {"q": "Hollow Knight"})
+    assert b'name="game" value="' in response.content
+    assert b"Not in our catalogue yet" not in response.content
+    assert calls == []
+
+
+def test_igdb_being_down_leaves_the_page_usable(
+    client: Client, igdb_configured: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Never an error page: the visitor still gets the signup route."""
+
+    def boom(self: IGDBClient, query: str, limit: int = 10) -> list[dict[str, Any]]:
+        raise IGDBError("down")
+
+    monkeypatch.setattr(IGDBClient, "search_games", boom)
+    response = client.get(reverse("contributions:declare"), {"q": "Slay the Spire"})
+    assert response.status_code == 200
+    assert b"IGDB is unavailable right now" in response.content
+    assert b"Create your account" in response.content
+
+
+def test_over_quota_falls_back_to_the_signup_line(
+    client: Client, igdb_configured: None, settings: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    settings.RATELIMIT_ENABLE = True
+    settings.IGDB_RATELIMIT = "0/m"
+    calls: list[str] = []
+    monkeypatch.setattr(IGDBClient, "search_games", lambda self, q, limit=10: calls.append(q) or [])
+    response = client.get(reverse("contributions:declare"), {"q": "Slay the Spire"})
+    assert response.status_code == 200
+    assert calls == []
+    assert b"Create your account" in response.content
+
+
+def test_unconfigured_igdb_changes_nothing(client: Client) -> None:
+    """Default test settings blank the credentials: byte-for-byte the old
+    behaviour."""
+    response = client.get(reverse("contributions:declare"), {"q": "Slay the Spire"})
+    assert b"Not in our catalogue yet" not in response.content
+    assert b"Create your account" in response.content
+
+
+def test_picking_an_igdb_match_imports_it_and_moves_on(
+    client: Client, igdb_configured: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        IGDBClient,
+        "get_game",
+        lambda self, igdb_id: {"id": 40477, "name": "Slay the Spire", "genres": []},
+    )
+    response = client.post(reverse("contributions:declare"), {"igdb": "40477"})
+    assert response.status_code == 302
+    assert response.url == reverse("contributions:declare_details")
+    game = Game.objects.get(igdb_id=40477)
+    assert game.title == "Slay the Spire"
+    assert game.source == Game.Source.IGDB_LIVE
+    assert client.session[SESSION_KEY]["game"] == str(game.pk)
+
+
+def test_picking_the_same_igdb_match_twice_creates_no_duplicate(
+    client: Client, igdb_configured: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """It reuses the seed's idempotent upsert, keyed on igdb_id — a repeat is
+    an update. This is most of why an anonymous write path is acceptable."""
+    monkeypatch.setattr(
+        IGDBClient,
+        "get_game",
+        lambda self, igdb_id: {"id": 40477, "name": "Slay the Spire", "genres": []},
+    )
+    url = reverse("contributions:declare")
+    client.post(url, {"igdb": "40477"})
+    client.post(url, {"igdb": "40477"})
+    assert Game.objects.filter(igdb_id=40477).count() == 1
+
+
+@pytest.mark.parametrize(
+    "raw",
+    ["abc", "²", "", pytest.param("9" * 5000, id="5000-digits")],
+)
+def test_a_junk_igdb_id_does_not_500(
+    client: Client, igdb_configured: None, monkeypatch: pytest.MonkeyPatch, raw: str
+) -> None:
+    """`²` is a digit to isdigit() but int() rejects it — the same trap
+    _picked_game and games.views.game_employers already guard against, on a
+    page anonymous traffic can post to. `"9" * 5000` is decimal and so passed
+    that guard, then blew up in `int()`: CPython >= 3.11 refuses str->int past
+    4300 digits, and the surrounding `except IGDBError` does not catch
+    ValueError — an unhandled 500, with the quota already spent.
+
+    `igdb_configured` on purpose: with the default blank credentials the
+    configured guard would stop the call anyway, and this test would pass
+    without exercising the id guard at all. `_http` is the module's single
+    network chokepoint, so stubbing it proves no call of any kind was made.
+    """
+    calls: list[Any] = []
+    monkeypatch.setattr(IGDBClient, "_http", lambda self, *a, **kw: calls.append(a) or {})
+    response = client.post(reverse("contributions:declare"), {"igdb": raw})
+    assert response.status_code == 200
+    assert calls == []
+
+
+def test_an_unconfigured_import_never_calls_igdb(
+    client: Client, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Default test settings blank the credentials. `_offer_igdb_matches` and
+    `games.views.igdb_search` both return early on `not configured`; this path
+    did not, so an anonymous POST on a deployment that never enabled IGDB still
+    drove a Twitch token request and could hold a worker for 10s (spec §4)."""
+    calls: list[Any] = []
+    monkeypatch.setattr(IGDBClient, "_http", lambda self, *a, **kw: calls.append(a) or {})
+    response = client.post(reverse("contributions:declare"), {"igdb": "40477"})
+    assert response.status_code == 200
+    assert calls == []
+
+
+def test_an_import_that_igdb_no_longer_has_says_so(
+    client: Client, igdb_configured: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The message has to render *alongside* the options, not instead of them.
+
+    A failed import re-renders, `get_context_data` re-runs `_offer_igdb_matches`,
+    and that hits the 24h search cache this visitor's own search just filled —
+    so the list comes back and an `{% elif %}` hanging off `{% if igdb_options %}`
+    suppressed the one message it exists for.
+
+    Stubbing `search_games` is also what keeps this test off the network: with
+    only `get_game` stubbed, the re-render reached `cached_search` ->
+    `search_games` -> `_get_token` -> a live POST to id.twitch.tv, and the
+    assertion below passed only because that call failed.
+    """
+    monkeypatch.setattr(IGDBClient, "get_game", lambda self, igdb_id: None)
+    monkeypatch.setattr(
+        IGDBClient,
+        "search_games",
+        lambda self, q, limit=10: [
+            {"id": 40477, "name": "Slay the Spire", "first_release_date": 1548201600}
+        ],
+    )
+    response = client.post(reverse("contributions:declare"), {"igdb": "40477", "q": "slay"})
+    assert response.status_code == 200
+    assert b"no longer listed on IGDB" in response.content
+    assert b"Not in our catalogue yet" in response.content
+
+
+def test_a_double_click_reuses_the_row_the_other_request_wrote(
+    client: Client, igdb_configured: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The funnel's conversion button is exactly where a double-click happens.
+    Two simultaneous imports of an unseen igdb_id both bulk_create through the
+    seed's upsert, and the unique index turns the loser into an IntegrityError
+    -> 500. The loser must re-read the winner's row and carry on instead."""
+    winner = Game.objects.create(
+        title="Slay the Spire", igdb_id=40477, source=Game.Source.IGDB_LIVE
+    )
+
+    def lose_the_race(igdb_id: int, client: IGDBClient | None = None) -> Game | None:
+        raise IntegrityError("duplicate key value violates unique constraint")
+
+    monkeypatch.setattr(contributions.views, "import_igdb_game", lose_the_race)
+    response = client.post(reverse("contributions:declare"), {"igdb": "40477"})
+    assert response.status_code == 302
+    assert response.url == reverse("contributions:declare_details")
+    assert client.session[SESSION_KEY]["game"] == str(winner.pk)
+
+
+def test_an_integrity_error_with_nothing_to_re_read_falls_back(
+    client: Client, igdb_configured: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """If the re-read finds nothing the row was never written, so this is a
+    failed import like any other — a re-render, not a 500."""
+
+    def lose_the_race(igdb_id: int, client: IGDBClient | None = None) -> Game | None:
+        raise IntegrityError("duplicate key value violates unique constraint")
+
+    monkeypatch.setattr(contributions.views, "import_igdb_game", lose_the_race)
+    response = client.post(reverse("contributions:declare"), {"igdb": "40477"})
+    assert response.status_code == 200
+    assert SESSION_KEY not in client.session
+
+
+def test_an_import_over_quota_does_not_call_igdb(
+    client: Client, igdb_configured: None, settings: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    settings.RATELIMIT_ENABLE = True
+    settings.IGDB_RATELIMIT = "0/m"
+    calls: list[int] = []
+    monkeypatch.setattr(IGDBClient, "get_game", lambda self, igdb_id: calls.append(igdb_id) or None)
+    response = client.post(reverse("contributions:declare"), {"igdb": "40477"})
+    assert response.status_code == 200
+    assert calls == []

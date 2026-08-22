@@ -176,6 +176,14 @@ are write paths — two create a `Game`, one creates a `Company` — and one cal
 the external IGDB API. Opening them to anonymous traffic would reopen exactly the
 unauthenticated-write surface the project has otherwise avoided.
 
+> **Amended 2026-08-22** (`2026-08-22-igdb-auto-fallback-design.md` §4): this
+> still holds for `igdb_import` and `company_create`, but **not** for the game
+> path. `DeclareGameView.post` now accepts an `igdb` id and imports it for an
+> anonymous visitor. The reasoning is in that spec: the write is one
+> games-catalogue row from IGDB's own data, through the idempotent upsert,
+> bounded by a per-IP quota — no user data, and the credit still cannot be
+> published before email verification.
+
 The consequences are handled in copy rather than by opening the endpoints:
 
 - **Game not in the catalogue.** The seed holds ~392k games, so this is rare.
