@@ -38,6 +38,24 @@ from search.services import search_games
 # and qualname, so renaming this view would silently move the counter.
 _DECLARE_GAME_RATELIMIT_GROUP = "declare_game_search"
 
+# Postgres bigint — the widest id this schema holds — is 19 digits.
+_MAX_ID_DIGITS = 19
+
+
+def _is_row_id(raw: str) -> bool:
+    """True for a posted value safe to coerce with `int()` or filter a pk on.
+
+    Both halves guard a 500 on a page anonymous traffic posts to:
+
+    - `isdecimal()`, not `isdigit()`: "²" is a digit but `int()` rejects it.
+      `isdecimal()` is still True for "１"/"٣", which `int()` accepts.
+    - the length, because the alphabet alone does not bound it: CPython >= 3.11
+      refuses `int()` on a decimal string past 4300 digits, and Django's own
+      coercion raises the same on a `filter(pk=…)`. `POST /declare/` with a
+      5000-digit `igdb` or `game` was an unhandled `ValueError`.
+    """
+    return raw.isdecimal() and len(raw) <= _MAX_ID_DIGITS
+
 
 class DeclareGameView(TemplateView):
     """Step 1 — turn a typed title into a chosen game.
@@ -156,10 +174,9 @@ class DeclareGameView(TemplateView):
         `@login_required`.
         """
         raw = request.POST.get("igdb", "")
-        # isdecimal(), not isdigit(): "²" is a digit but int() rejects it, so
-        # isdigit() would raise ValueError -> 500 on a page anonymous traffic
-        # posts to. The same guard _picked_game already carries.
-        if not raw.isdecimal():
+        # Junk re-renders rather than 500s — see _is_row_id for what "junk" has
+        # to cover on an endpoint anonymous traffic posts to.
+        if not _is_row_id(raw):
             return None
         if quota_exceeded(request):
             self.igdb_error = "throttled"
@@ -176,12 +193,9 @@ class DeclareGameView(TemplateView):
     @staticmethod
     def _picked_game(request: HttpRequest) -> Game | None:
         # Unauthenticated POST on a public page: `?game=abc` must re-render, not
-        # 500, so the pk is filtered rather than coerced. `isdecimal()`, not
-        # `isdigit()`: superscripts like "²" are digits but int() rejects them,
-        # which raised ValueError -> 500 here. isdecimal() is still True for
-        # "１"/"٣" (int() accepts those) and False for "²".
+        # 500, so the pk is guarded and filtered rather than coerced.
         pk = request.POST.get("game", "")
-        return Game.objects.filter(pk=pk).first() if pk.isdecimal() else None
+        return Game.objects.filter(pk=pk).first() if _is_row_id(pk) else None
 
 
 class DeclareDetailsView(FormView):

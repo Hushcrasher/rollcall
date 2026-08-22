@@ -72,11 +72,17 @@ def test_picking_a_game_stores_it_and_moves_on(client: Client, game: Game) -> No
 
 
 def test_a_junk_game_id_does_not_500(client: Client) -> None:
-    """Public page, unauthenticated POST — junk must re-render, never crash."""
-    for junk in ("abc", "-1", "999999999", "", "²"):
+    """Public page, unauthenticated POST — junk must re-render, never crash.
+
+    `"9" * 5000` is the case an alphabet check alone misses: it is decimal, so
+    it reached Django's own coercion, which raised `ValueError: Field 'id'
+    expected a number but got '999…'` (CPython >= 3.11 refuses str->int past
+    4300 digits) — a 500. The length is bounded now, not just the alphabet.
+    """
+    for junk in ("abc", "-1", "999999999", "", "²", "9" * 5000):
         response = client.post(reverse("contributions:declare"), {"game": junk})
-        assert response.status_code == 200, junk
-        assert SESSION_KEY not in client.session, junk
+        assert response.status_code == 200, junk[:32]
+        assert SESSION_KEY not in client.session, junk[:32]
 
 
 def test_repicking_a_different_game_clears_the_old_employer(client: Client, game: Game) -> None:
@@ -315,13 +321,30 @@ def test_picking_the_same_igdb_match_twice_creates_no_duplicate(
     assert Game.objects.filter(igdb_id=40477).count() == 1
 
 
-@pytest.mark.parametrize("raw", ["abc", "²", ""])
-def test_a_junk_igdb_id_does_not_500(client: Client, raw: str) -> None:
+@pytest.mark.parametrize(
+    "raw",
+    ["abc", "²", "", pytest.param("9" * 5000, id="5000-digits")],
+)
+def test_a_junk_igdb_id_does_not_500(
+    client: Client, igdb_configured: None, monkeypatch: pytest.MonkeyPatch, raw: str
+) -> None:
     """`²` is a digit to isdigit() but int() rejects it — the same trap
     _picked_game and games.views.game_employers already guard against, on a
-    page anonymous traffic can post to."""
+    page anonymous traffic can post to. `"9" * 5000` is decimal and so passed
+    that guard, then blew up in `int()`: CPython >= 3.11 refuses str->int past
+    4300 digits, and the surrounding `except IGDBError` does not catch
+    ValueError — an unhandled 500, with the quota already spent.
+
+    `igdb_configured` on purpose: with the default blank credentials the
+    configured guard would stop the call anyway, and this test would pass
+    without exercising the id guard at all. `_http` is the module's single
+    network chokepoint, so stubbing it proves no call of any kind was made.
+    """
+    calls: list[Any] = []
+    monkeypatch.setattr(IGDBClient, "_http", lambda self, *a, **kw: calls.append(a) or {})
     response = client.post(reverse("contributions:declare"), {"igdb": raw})
     assert response.status_code == 200
+    assert calls == []
 
 
 def test_an_import_that_igdb_no_longer_has_says_so(
