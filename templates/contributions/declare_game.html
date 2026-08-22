@@ -21,7 +21,7 @@
             <form method="post">
               {% csrf_token %}
               <input type="hidden" name="game" value="{{ game.pk }}">
-              <button type="submit">{{ game.title }}{% if game.release_date %} ({{ game.release_date|date:"Y" }}){% endif %}</button>
+              <button class="pick" type="submit">{{ game.title }}{% if game.release_date %} ({{ game.release_date|date:"Y" }}){% endif %}</button>
             </form>
           </li>
         {% endfor %}

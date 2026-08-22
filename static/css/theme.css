@@ -1,0 +1,196 @@
+/* Rollcall's visual identity — the ONE aesthetic stylesheet.
+
+   It is a thin layer, on purpose. Pico (vendored) supplies the palette and
+   lays out forms, nav and typography; this file changes two things and
+   nothing else:
+
+   1. **Density.** A credits register is a table of records, not a landing
+      page: one type size whatever the viewport, tighter rhythm, square
+      corners, no shadows, and every *datum* — labels, dates, badges, meta
+      lines — set in monospace while prose stays in Inter.
+   2. **Two colours** (chosen by the owner, 2026-08-22). Body text, headings
+      included, is `#3B0918` — a deep oxblood. Pico's default blue becomes
+      `#647BCA` wherever the blue appeared: links, the wordmark, and the
+      filled buttons. A handful of variables carry the pair; everything else
+      in Pico derives from them through `var()`, so this is the whole change.
+
+   `app.css` stays layout-only, as it was. Scoped `:root[data-theme=light]`
+   (0,2,0) so it outranks Pico's own `:root:not([data-theme=dark])` block
+   without a single `!important` — the site is light-only for now, declared
+   on `<html data-theme="light">`. */
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/Inter-Regular.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../fonts/Inter-Bold.woff2") format("woff2");
+}
+
+:root[data-theme=light] {
+  --rc-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  --rc-sans: "Inter", system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --pico-font-family-sans-serif: var(--rc-sans), var(--pico-font-family-emoji);
+  --pico-font-family-monospace: var(--rc-mono), var(--pico-font-family-emoji);
+
+  /* --- Density ---------------------------------------------------------- */
+  /* Pico scales the root font up to 131% on a wide screen; a register keeps
+     one size whatever the viewport. */
+  --pico-font-size: 93.75%;
+  --pico-line-height: 1.45;
+  --pico-spacing: .75rem;
+  --pico-typography-spacing-vertical: .75rem;
+  --pico-form-element-spacing-vertical: .45rem;
+  --pico-form-element-spacing-horizontal: .6rem;
+  --pico-border-radius: 0;
+  --pico-border-width: 1px;
+  --pico-outline-width: 2px;
+  --pico-box-shadow: none;
+  --pico-card-box-shadow: none;
+  --pico-button-box-shadow: none;
+  --pico-button-hover-box-shadow: none;
+  --pico-group-box-shadow: none;
+
+  /* --- Text ------------------------------------------------------------- */
+  /* #3B0918 for running text and for headings alike. Pico colours headings
+     from six variables of their own rather than inheriting --pico-color, so
+     setting only the first would leave every <h1>–<h6> on Pico's default
+     slate. 17:1 on white. */
+  --pico-color: #3B0918;
+  --pico-h1-color: #3B0918;
+  --pico-h2-color: #3B0918;
+  --pico-h3-color: #3B0918;
+  --pico-h4-color: #3B0918;
+  --pico-h5-color: #3B0918;
+  --pico-h6-color: #3B0918;
+
+  /* --- Highlight -------------------------------------------------------- */
+  /* #647BCA in place of Pico's #0172ad. These seven are the only blues Pico
+     states literally; --pico-primary-border, --pico-primary-hover-border,
+     --pico-primary-hover-underline, --pico-primary-inverse, the two
+     form-element focus colours, the switch, the range thumb and the progress
+     bar all resolve through var() and follow along.
+
+     Hover darkens to #4E609E, which is Pico's own convention (its hover is a
+     darker shade of its primary, not a different colour).
+
+     Contrast, measured: #647BCA is 4.0:1 on white. That clears WCAG AA for
+     large text and for UI components — the wordmark, the focus ring, a
+     button's fill — but sits just under the 4.5:1 that normal-size text
+     wants, which includes the small monospace labels inside buttons. It is
+     the owner's call, taken knowingly on 2026-08-22; #5A70C0 is the nearest
+     shade of the same hue that measures 4.65:1 if the rule is ever wanted.
+     Body text is unaffected either way: it is #3B0918 above, at 17:1. */
+  --pico-primary: #647BCA;
+  --pico-primary-background: #647BCA;
+  --pico-primary-underline: rgba(100, 123, 202, .5);
+  --pico-primary-hover: #4E609E;
+  --pico-primary-hover-background: #4E609E;
+  --pico-primary-focus: rgba(100, 123, 202, .5);
+  --pico-text-selection-color: rgba(100, 123, 202, .25);
+}
+
+/* One fixed content column instead of Pico's five breakpoints. */
+body > header, body > main, body > footer { max-width: 72rem; }
+/* Pico rounds search inputs into pills: a 5rem variable on [type=search],
+   and — not through the variable — explicit corner radii on the first and
+   last child of a [role=search] form. Both undone. */
+[type=search], [role=search] { --pico-border-radius: 0; }
+[role=search] > :first-child, [role=search] > :last-child { border-radius: 0; }
+
+/* --- Type ---------------------------------------------------------------- */
+:root[data-theme=light] h1 { --pico-font-size: 1.75rem; letter-spacing: -.015em; }
+:root[data-theme=light] h2 { --pico-font-size: 1.25rem; }
+:root[data-theme=light] h3 { --pico-font-size: 1.05rem; }
+:root[data-theme=light] h1, :root[data-theme=light] h2, :root[data-theme=light] h3 {
+  --pico-typography-spacing-vertical: .6rem;
+}
+
+/* Data reads in monospace: labels, dates, badges, meta lines, placeholders.
+   Prose and headings stay in Inter — that split is the whole idea. */
+:root[data-theme=light] label,
+:root[data-theme=light] legend,
+:root[data-theme=light] th,
+:root[data-theme=light] .dates,
+:root[data-theme=light] .badge,
+:root[data-theme=light] small,
+:root[data-theme=light] .muted,
+:root[data-theme=light] input::placeholder {
+  font-family: var(--rc-mono);
+}
+:root[data-theme=light] label,
+:root[data-theme=light] legend,
+:root[data-theme=light] th { font-size: .8rem; font-weight: 700; }
+:root[data-theme=light] .dates,
+:root[data-theme=light] small,
+:root[data-theme=light] .muted { font-size: .85rem; }
+:root[data-theme=light] .badge {
+  display: inline-block; font-size: .75rem; line-height: 1.4;
+  border: 1px solid var(--pico-color); padding: .05rem .35rem; margin: 0 .3rem;
+  vertical-align: middle;
+}
+:root[data-theme=light] a:not([role=button]) {
+  text-decoration-thickness: 1px; text-underline-offset: .15em;
+}
+
+/* --- Buttons ------------------------------------------------------------- */
+:root[data-theme=light] button,
+:root[data-theme=light] [role=button],
+:root[data-theme=light] [type=submit],
+:root[data-theme=light] [type=button] {
+  font-family: var(--rc-mono); font-weight: 700; font-size: .85rem;
+  padding: .45rem .9rem;
+}
+/* Link-weight buttons (app.css already strips their background): Log out,
+   the gallery's Delete, the share row's Copy link — plus `.pick`, one row of
+   a result list rendered as a POST button (the declare funnel's game picks),
+   which has to read as a record in a list and not as ten stacked CTAs. */
+:root[data-theme=light] nav form button[type=submit],
+:root[data-theme=light] .portfolio-grid form button[type=submit],
+:root[data-theme=light] .share-row button[type=button],
+:root[data-theme=light] .pick {
+  font-family: inherit; font-weight: 400; font-size: inherit; padding: 0;
+  text-decoration: underline; background: none; border: none; color: inherit;
+}
+:root[data-theme=light] nav form button[type=submit]:hover,
+:root[data-theme=light] .portfolio-grid form button[type=submit]:hover,
+:root[data-theme=light] .share-row button[type=button]:hover,
+:root[data-theme=light] .pick:hover { color: var(--pico-primary); background: none; }
+:root[data-theme=light] .pick { width: 100%; text-align: left; }
+
+/* --- Records ------------------------------------------------------------- */
+/* Lists of records (credits, contributors, the feed) carry no bullets: the
+   line already starts with a linked title. Chips and the gallery grid keep
+   their own layout. */
+:root[data-theme=light] main ul { padding-left: 0; }
+:root[data-theme=light] main li { list-style: none; padding: .4rem 0; }
+:root[data-theme=light] .chips li,
+:root[data-theme=light] .portfolio-grid li,
+:root[data-theme=light] ul.messages li { padding: 0; }
+/* Pico paints `article` as a card (background + shadow); here a result is
+   just a block of the page. */
+:root[data-theme=light] article {
+  background: transparent; padding: var(--pico-spacing) 0;
+  margin-bottom: var(--pico-spacing);
+}
+
+/* Django messages: a drawn notice in monospace. */
+:root[data-theme=light] ul.messages { list-style: none; padding: 0; }
+:root[data-theme=light] ul.messages li {
+  border: 1px solid var(--pico-muted-border-color); padding: .45rem .7rem;
+  margin-bottom: .75rem; font-family: var(--rc-mono); font-size: .85rem;
+}
+:root[data-theme=light] .errorlist {
+  font-family: var(--rc-mono); font-size: .8rem; color: var(--pico-primary);
+  list-style: none; padding: 0;
+}
+
+:root[data-theme=light] footer nav { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+:root[data-theme=light] footer nav a { font-family: var(--rc-mono); font-size: .85rem; }
