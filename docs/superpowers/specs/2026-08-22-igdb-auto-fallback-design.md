@@ -102,6 +102,17 @@ means unmetered IGDB calls, bounded by the 4 s timeout. Accepted — the same
 trade-off the project already took for its other limits, and stated here so it
 is not a surprise.
 
+**A consequence worth stating plainly, because it is new here.** Every other
+surface `RATELIMIT_FAIL_OPEN` applies to is read-only, so "a cache outage
+costs metering, not availability" had no real downside to weigh. This quota is
+different: it is what bounds the funnel's one anonymous write (§4), the
+games-catalogue import. A Redis outage removes that bound along with every
+other one project-wide, leaving IGDB's own catalogue and the 4 s wire timeout
+as the only limits left on how many games an anonymous visitor can import in a
+window. Accepted for the same reason as above — availability over metering —
+but recorded here because, for the first time, that trade reaches a write
+path rather than only a search.
+
 ## 3. `/credits/new/` — automatic, in the same list
 
 `search/_game_options.html` renders local matches, then today's manual trigger.
