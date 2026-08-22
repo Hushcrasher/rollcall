@@ -16,7 +16,7 @@ from django.views.generic import DetailView
 
 from cards.data import card_url, game_card
 from contributions.models import Contribution
-from games.igdb import IGDBClient, IGDBError, igdb_label, import_igdb_game
+from games.igdb import IGDBClient, IGDBError, import_igdb_game, search_options
 from games.models import Company, Game, GameCompany
 
 
@@ -86,11 +86,17 @@ def igdb_search(request: HttpRequest) -> HttpResponse:
         context["error"] = "unconfigured"
     elif query:
         try:
-            context["options"] = [
-                {"igdb_id": r["id"], "label": igdb_label(r)} for r in client.search_games(query)
-            ]
+            options = search_options(request, query)
         except IGDBError:
             context["error"] = "unavailable"
+        else:
+            # None is "over quota", which is not an error and not an empty
+            # result — it needs its own message, or the member reads "no games
+            # found on IGDB" about a game that is on IGDB.
+            if options is None:
+                context["error"] = "throttled"
+            else:
+                context["options"] = options
     return render(request, "games/_igdb_options.html", context)
 
 

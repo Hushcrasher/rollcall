@@ -184,6 +184,23 @@ def cached_search(
     return results
 
 
+def search_options(
+    request: HttpRequest, query: str, client: IGDBClient | None = None
+) -> list[dict[str, Any]] | None:
+    """IGDB matches for `query` as `{igdb_id, label}` dicts, or None when this
+    IP is over quota.
+
+    Cache first, quota second — in that order, so a repeat of a popular query
+    keeps answering after the allowance is spent (it costs IGDB nothing). Both
+    call sites want exactly this trio (cache, quota, labels), which is why it
+    is one function rather than three the callers must remember to combine.
+    """
+    if cache.get(_search_cache_key(query)) is None and quota_exceeded(request):
+        return None
+    results = cached_search(query, client=client)
+    return [{"igdb_id": r["id"], "label": igdb_label(r)} for r in results]
+
+
 def _release_date(timestamp: int | None) -> date | None:
     if not timestamp:
         return None
