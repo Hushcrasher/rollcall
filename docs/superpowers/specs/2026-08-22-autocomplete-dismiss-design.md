@@ -33,14 +33,15 @@
 | `.results` (engines / genres / countries) | `.autocomplete.typeahead` (`search/widgets/typeahead_select.html`) | the three `search:*_autocomplete` filter endpoints |
 
 Every panel is filled by htmx (`hx-target`), and every one of them sits inside
-a `position: relative` owner — `.autocomplete` for four of them, `.nav-search`
-for the fifth.
+a `position: relative` owner — `.autocomplete` for five of them, `.nav-search`
+for the sixth. Six panels in all, across four call-site templates (the filter
+typeahead widget renders three times).
 
 ## Decisions
 
 | Question | Decision |
 |---|---|
-| What closes it | **Outside `pointerdown`, `Escape`, and focus leaving the field group** |
+| What closes it | **Outside `pointerdown`, `Escape`, and focus moving to another control** (`focusin` elsewhere — focus leaving the document entirely closes nothing) |
 | Hide or clear | **Hide** (`hidden` attribute), never clear — refocusing the input shows the last results again; typing replaces them |
 | Where the code lives | **One shared `static/js/autocomplete.js`**, loaded from `base.html`, delegated at the document level — no per-template copy |
 | Width | The panel **matches its field**, and may still grow for long titles |
@@ -61,25 +62,44 @@ const PANEL = ".results, .nav-suggest";
 ```
 
 An owner has exactly one panel; a panel has exactly one owner. No template
-change is needed for this — the two selectors already describe all five sites,
+change is needed for this — the two selectors already describe all six panels,
 and `.autocomplete` is what `app.css` already positions against.
 
 **The four events:**
 
-- **`htmx:afterSwap`** — un-hide the panel that received the swap. A fresh
-  result set must appear even if the panel was dismissed a moment earlier;
-  without this, dismissing once would make the field look broken on the next
-  keystroke.
+- **`htmx:afterSwap`** — un-hide the panel that received the swap, **but only
+  while focus is still inside that panel's owner**. A fresh result set must
+  appear even if the panel was dismissed a moment earlier; without this,
+  dismissing once would make the field look broken on the next keystroke. The
+  focus guard is what keeps that from reopening a panel the user has already
+  left: between the debounce and the round trip they can press elsewhere, and
+  a late response must not pop the panel over whatever they moved to.
+  Escape-then-keep-typing is unaffected — focus is in the input for that.
 - **`pointerdown` on the document** — hide every panel whose *owner* does not
-  contain the event target. `pointerdown`, not `click`: `click` fires after
-  focus has already moved, and a `click` handler that also dismisses would
-  swallow the first press on whatever sits under the panel. With
-  `pointerdown` the panel is gone before the press lands, so the press
-  reaches the field underneath — which is the actual bug being fixed.
+  contain the event target. `pointerdown`, not `click` — and *not* because a
+  `click` dismisser would "swallow" the first press: hit-testing resolves the
+  event target before any handler runs, so a press on the covered region is a
+  press on the panel either way, and a press outside the owner never targeted
+  the panel at all. (That failure mode belongs to *blur*-based dismissers,
+  which close the panel before the click on its own option completes; this
+  module dismisses on owner-scoped `focusin`, so it never had it.) The three
+  reasons that do hold: closing at press time is what native menus and selects
+  do, where a `click` dismisser visibly lags to mouseup; a touch scroll started
+  outside the panel fires `pointerdown` but never `click`, so on mobile
+  starting to scroll dismisses instead of the panel riding the scroll (there is
+  no scroll listener); and a text-selection drag from inside the input released
+  outside the owner fires `click` on a common ancestor outside it, so a `click`
+  dismisser would close the panel of the very field being selected in, while
+  `pointerdown` — still inside the owner at press — keeps it.
 - **`keydown` `Escape`** — hide the panel of the focused input, and call
   `preventDefault()` **only if a panel was actually open**. Otherwise `Escape`
   must keep reaching the browser's own behaviour on a `type=search` input
   (clear the field). One `Escape` closes the list; a second clears the box.
+  "Open" is `!hidden` **and non-empty**: a panel that has never been filled, or
+  that an option-pick emptied, has `hidden === false` while being invisible
+  through `.results:empty { display: none }`, and treating it as open would eat
+  the clear on the very first `Escape` — pasted text or anything inside the
+  debounce window.
 - **`focusin`** — when focus enters an input inside an owner, un-hide that
   owner's panel if it has content, and hide all the others. This is what makes
   "hide, don't clear" work: coming back to a field you dismissed shows the
@@ -150,9 +170,14 @@ faked. What pytest *does* cover:
   gaining new ones.
 
 **Browser verification** (the acceptance checklist for the implementer, run on
-each of the five panels):
+each of the six panels):
 
-1. Open a panel, click a field below it → the click lands on that field.
+1. Open a panel over the field below it; press anywhere outside the owner →
+   the panel closes at the press, and that press interacts normally with
+   whatever it hit. The previously covered field is then clickable. A field
+   the panel does **not** cover takes the click directly. (A first press on a
+   *covered* field necessarily hits the panel — hit-testing resolves the
+   target before any handler runs — so it cannot be otherwise.)
 2. Open a panel, press `Escape` → it closes. Press `Escape` again on the nav
    search → the input clears.
 3. Open a panel, Tab away → it closes. Shift-Tab back → the same results
