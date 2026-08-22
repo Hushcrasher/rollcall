@@ -34,19 +34,19 @@
     }
   }
 
-  // A fresh result set must appear even if the panel was dismissed a keystroke
-  // ago, or the field looks broken on the next character typed. Only while
-  // focus is still inside the owner, though: between the debounce and the
-  // round trip the user can press elsewhere, and a late response must not pop
-  // the panel back open over whatever they moved to. Escape-then-keep-typing
-  // is unaffected — focus is in the input for that.
+  // A swap shows the panel when it delivered something and hides it when it
+  // delivered nothing. This keeps `hidden` agreeing with the other two handlers
+  // and does not depend on CSS :empty, whose whitespace blind spot would leave
+  // an invisible 2px sliver. Only while focus is still inside the owner, though:
+  // between the debounce and the round trip the user can press elsewhere, and a
+  // late response must not pop the panel back open over whatever they moved to.
   document.addEventListener("htmx:afterSwap", function (event) {
     var target = event.target;
     var panel = target && target.closest ? target.closest(PANEL) : null;
     panel = panel || panelFor(target);
     if (!panel) return;
     var owner = panel.closest(OWNER);
-    if (owner && owner.contains(document.activeElement)) panel.hidden = false;
+    if (owner && owner.contains(document.activeElement)) panel.hidden = panel.innerHTML.trim() === "";
   });
 
   // pointerdown, NOT click — but not for the usual "click would swallow the
