@@ -167,11 +167,17 @@ class DeclareGameView(TemplateView):
 
         This is the funnel's one anonymous write path, and it amends the rule
         in spec 2026-08-11 that kept these endpoints login-gated. What it can
-        cause is one row in the *games catalogue*, written from IGDB's own
-        data — no user data, through the seed's idempotent upsert keyed on
-        `igdb_id` (so a repeat is an update, not a duplicate), marked
+        cause is one row in the *games catalogue* created or refreshed from
+        IGDB's own data — no user data — through the seed's idempotent upsert
+        keyed on `igdb_id`, so a repeat is never a duplicate, marked
         `source='igdb_live'`, and metered on the same IGDB quota as the search
-        that produced the option. `igdb_import` and `company_create` stay
+        that produced the option. An id already in the catalogue is the
+        *refresh* case: `source` flips `seed` -> `igdb_live` and the `[source]`
+        columns take IGDB's possibly sparser values (an empty summary blanks a
+        Steam-derived one) until the weekly seed restores them — the Steam
+        columns themselves are protected by the seed's write surface. Same
+        power the login-gated `igdb_import` already had, quota-bounded and
+        self-healing (spec §4). `igdb_import` and `company_create` stay
         `@login_required`.
         """
         raw = request.POST.get("igdb", "")

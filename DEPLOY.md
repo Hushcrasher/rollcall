@@ -94,6 +94,47 @@ changing. If 403s appear on a search that worked yesterday, that is the limit
 holding for the first time. Both limits are env vars, so retuning needs no
 redeploy.
 
+## 4d. Verify `REMOTE_ADDR` is the visitor's IP — do this on the first deploy
+
+Every IP rate limit in the app keys on `REMOTE_ADDR` (`django_ratelimit`'s
+`key="ip"`). Behind an edge proxy that value can be *the proxy's* address
+instead of the visitor's, and then **every visitor shares one counter**:
+`SEARCH_RATELIMIT` starts 403-ing strangers for each other's searches, and
+`IGDB_RATELIMIT` — 10/m for the whole site — turns the IGDB fallback off under
+any real traffic. Since 2026-08-22 that same counter is also what bounds the
+funnel's anonymous games-catalogue import, so this is worth five minutes.
+
+The app trusts **no** forwarded header today (`SECURE_PROXY_SSL_HEADER` covers
+the scheme only), so the failure direction is *stricter than intended*, never
+looser — nothing here is spoofable as it stands. Verify, then decide:
+
+**How to check.** Add `--access-logfile -` to the gunicorn command in
+`railway.json` for one deploy and hit the site from a device whose public IP
+you know (`curl ifconfig.me`). Gunicorn logs the remote address it sees as the
+first field of each line:
+
+```
+railway logs | grep 'GET /'
+# 203.0.113.7 - - [22/Aug/2026:10:02:11 +0000] "GET / HTTP/1.1" 200 ...  ← the visitor: correct
+# 10.0.0.3    - - [22/Aug/2026:10:02:11 +0000] "GET / HTTP/1.1" 200 ...  ← a private/edge address: wrong
+```
+
+A private-range or identical-for-everyone address means `REMOTE_ADDR` is the
+proxy. Behaviourally the same check without touching the deploy: from two
+devices on **different** networks, exhaust `SEARCH_RATELIMIT` on one and search
+on the other — a 403 on the second device proves they share a counter.
+
+**If it is the proxy's address.** Do *not* reach for `X-Forwarded-For`
+blindly: a client can prepend arbitrary entries, so trusting the leftmost hands
+every limit in the app a spoofable key — strictly worse than one shared
+counter. Instead, find out how many proxies Railway puts in front of the
+service, then set `RATELIMIT_IP_META_KEY` to a callable that takes the entry
+**that many hops from the right** of `X-Forwarded-For` (the rightmost entries
+are the ones the trusted infrastructure appended; everything left of them is
+client-supplied). Verify with the two-device check above before believing it.
+Note that Django's own `SECURE_SSL_REDIRECT`/HSTS setup is unaffected either
+way — this is only about the rate-limit key.
+
 ## 5. Seed the games catalog
 
 Two steps — a **prepare** (join the raw source files into one parquet) and a

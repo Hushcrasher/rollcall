@@ -34,7 +34,7 @@
 | Object storage | **S3-compatible bucket** via `django-storages` — **Cloudflare R2** chosen (EU jurisdiction; SCCs/DPA to document) | Avatars only in POC (game images served from IGDB/Steam CDNs, never stored). PaaS disk is ephemeral → bucket mandatory. Provider switch = 3 env vars. |
 | Email | **Brevo** (alt: Postmark) | Transactional only: verification, reset, contact relay (Reply-To = sender), seed-failure alert. Never raw SMTP. |
 | Errors | **Sentry** (free tier) | Only observability beyond PaaS logs in POC. |
-| Rate limiting | **django-ratelimit** (IP-based on profiles/search) + DB-backed per-sender limit on contact relay (`contact_requests` table) | Anti-scraping & anti-spam, proportionate to POC. |
+| Rate limiting | **django-ratelimit** (IP-based on profiles/search, plus a separate per-IP quota on the live IGDB fallback) + DB-backed per-sender limit on contact relay (`contact_requests` table) | Anti-scraping & anti-spam, proportionate to POC. Counters live in the Redis cache (`REDIS_URL`, required in prod — see DEPLOY.md §4c); the limits themselves are env vars, listed in `.env.example`. **`IGDB_RATELIMIT` is the odd one out and deliberately so:** it guards a third party's quota rather than ours, so over quota it **skips the IGDB call and renders the page anyway** — never a 403. A page whose local results are perfectly good must not fail because a backstop is busy (spec `docs/superpowers/specs/2026-08-22-igdb-auto-fallback-design.md` §2). Every other limit here blocks. All of them key on `REMOTE_ADDR`, which the deploy has to verify (DEPLOY.md §4d). |
 
 ## Quality & repo
 
