@@ -5,7 +5,6 @@ page aggregates games (from IGDB `game_companies`) and contributors. The IGDB
 endpoints let a member pull in a game missing from the seed (docs §3.1).
 """
 
-from datetime import UTC, datetime
 from typing import Any
 
 from django.contrib.auth.decorators import login_required
@@ -17,7 +16,7 @@ from django.views.generic import DetailView
 
 from cards.data import card_url, game_card
 from contributions.models import Contribution
-from games.igdb import IGDBClient, IGDBError, import_igdb_game
+from games.igdb import IGDBClient, IGDBError, igdb_label, import_igdb_game
 from games.models import Company, Game, GameCompany
 
 
@@ -77,14 +76,6 @@ class CompanyDetailView(DetailView):
         return context
 
 
-def _igdb_label(result: dict[str, Any]) -> str:
-    name = result.get("name", "")
-    timestamp = result.get("first_release_date")
-    if timestamp:
-        return f"{name} ({datetime.fromtimestamp(timestamp, tz=UTC).year})"
-    return name
-
-
 @login_required
 def igdb_search(request: HttpRequest) -> HttpResponse:
     """htmx fragment: search IGDB live for games missing from the seed."""
@@ -96,7 +87,7 @@ def igdb_search(request: HttpRequest) -> HttpResponse:
     elif query:
         try:
             context["options"] = [
-                {"igdb_id": r["id"], "label": _igdb_label(r)} for r in client.search_games(query)
+                {"igdb_id": r["id"], "label": igdb_label(r)} for r in client.search_games(query)
             ]
         except IGDBError:
             context["error"] = "unavailable"

@@ -8,6 +8,7 @@ upsert path (docs/01-DESIGN.md §3.1, `Game.source = igdb_live`).
 The HTTP call is isolated in `_http` so tests can stub it — no network.
 """
 
+import hashlib
 import json
 import urllib.error
 import urllib.parse
@@ -23,7 +24,13 @@ from games.seed.schema import CanonicalGame
 from games.seed.upsert import upsert_games
 
 _TOKEN_CACHE_KEY = "igdb:access_token"
+_SEARCH_CACHE_PREFIX = "igdb:search:"
+_SEARCH_CACHE_TTL = 60 * 60 * 24  # the catalogue this backstops refreshes weekly
 _TIMEOUT = 10
+# Search now runs inside a page render (spec 2026-08-22-igdb-auto-fallback §1),
+# so it must not hold a worker for _TIMEOUT. get_game keeps the long one: it is
+# the import path, reached by one deliberate click.
+_SEARCH_TIMEOUT = 4
 
 
 class IGDBError(Exception):
@@ -50,7 +57,7 @@ class IGDBClient:
             f'search "{safe}"; fields id,name,first_release_date;'
             f" where version_parent = null; limit {limit};"
         )
-        return self._query("games", body)
+        return self._query("games", body, timeout=_SEARCH_TIMEOUT)
 
     def get_game(self, igdb_id: int) -> dict[str, Any] | None:
         body = (
@@ -63,14 +70,14 @@ class IGDBClient:
         results = self._query("games", body)
         return results[0] if results else None
 
-    def _query(self, endpoint: str, body: str) -> list[dict[str, Any]]:
+    def _query(self, endpoint: str, body: str, timeout: float = _TIMEOUT) -> list[dict[str, Any]]:
         token = self._get_token()
         headers = {
             "Client-ID": self.client_id,
             "Authorization": f"Bearer {token}",
             "Accept": "application/json",
         }
-        result = self._http(f"{self.API_BASE}/{endpoint}", body.encode(), headers)
+        result = self._http(f"{self.API_BASE}/{endpoint}", body.encode(), headers, timeout)
         return result if isinstance(result, list) else []
 
     def _get_token(self) -> str:
@@ -91,13 +98,58 @@ class IGDBClient:
         cache.set(_TOKEN_CACHE_KEY, token, timeout=max(60, int(data.get("expires_in", 3600)) - 60))
         return token
 
-    def _http(self, url: str, data: bytes, headers: dict[str, str]) -> Any:
+    def _http(
+        self, url: str, data: bytes, headers: dict[str, str], timeout: float = _TIMEOUT
+    ) -> Any:
         request = urllib.request.Request(url, data=data, headers=headers, method="POST")
         try:
-            with urllib.request.urlopen(request, timeout=_TIMEOUT) as response:  # noqa: S310
+            with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310
                 return json.loads(response.read().decode())
         except (urllib.error.URLError, TimeoutError, ValueError) as exc:
             raise IGDBError(f"IGDB request failed: {exc}") from exc
+
+
+def igdb_label(result: dict[str, Any]) -> str:
+    """`"Celeste (2018)"` — the label both callers show for an IGDB match.
+
+    Lives here rather than in a view: it formats an IGDB payload, not a view's
+    context, and it has two callers in two apps.
+    """
+    name = result.get("name", "")
+    timestamp = result.get("first_release_date")
+    if timestamp:
+        return f"{name} ({datetime.fromtimestamp(timestamp, tz=UTC).year})"
+    return name
+
+
+def _search_cache_key(query: str) -> str:
+    # Normalised so two spellings of one title share an entry, and hashed
+    # because an IGDB query is arbitrary user text and a cache key is not.
+    # usedforsecurity=False: this is a cache key, not a digest anyone trusts —
+    # without it ruff's S324 flags sha1 and CI fails.
+    normalised = " ".join(query.split()).casefold()
+    return (
+        _SEARCH_CACHE_PREFIX + hashlib.sha1(normalised.encode(), usedforsecurity=False).hexdigest()
+    )
+
+
+def cached_search(
+    query: str, limit: int = 10, client: IGDBClient | None = None
+) -> list[dict[str, Any]]:
+    """IGDB search behind a 24h cache keyed on the normalised query.
+
+    The empty list is cached too, deliberately: a title on neither Rollcall nor
+    IGDB is exactly what the next visitor will type, and suppressing that
+    repeat is most of what this cache is for. Raises IGDBError like the client
+    it wraps.
+    """
+    key = _search_cache_key(query)
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
+    results = (client or IGDBClient()).search_games(query, limit=limit)
+    cache.set(key, results, timeout=_SEARCH_CACHE_TTL)
+    return results
 
 
 def _release_date(timestamp: int | None) -> date | None:

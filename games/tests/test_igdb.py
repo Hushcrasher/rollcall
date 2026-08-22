@@ -7,8 +7,9 @@ from datetime import date
 from typing import Any
 
 import pytest
+from django.core.cache import cache
 
-from games.igdb import IGDBClient, igdb_to_canonical
+from games.igdb import IGDBClient, cached_search, igdb_label, igdb_to_canonical
 
 # A trimmed IGDB `games` response (Hades).
 HADES = {
@@ -31,7 +32,9 @@ HADES = {
 def test_search_builds_an_apicalypse_query(monkeypatch: pytest.MonkeyPatch) -> None:
     captured: dict[str, Any] = {}
 
-    def fake_http(self: IGDBClient, url: str, data: bytes, headers: dict[str, str]) -> Any:
+    def fake_http(
+        self: IGDBClient, url: str, data: bytes, headers: dict[str, str], timeout: float = 10
+    ) -> Any:
         captured["url"] = url
         captured["body"] = data.decode()
         return [{"id": 1, "name": "Hades"}]
@@ -53,7 +56,7 @@ def test_search_strips_quotes_to_avoid_query_injection(monkeypatch: pytest.Monke
     monkeypatch.setattr(
         IGDBClient,
         "_http",
-        lambda self, url, data, headers: captured.setdefault("b", data.decode()),
+        lambda self, url, data, headers, timeout=10: captured.setdefault("b", data.decode()),
     )
     monkeypatch.setattr(IGDBClient, "_get_token", lambda self: "tok")
 
@@ -93,3 +96,84 @@ def test_mapping_tolerates_sparse_data() -> None:
     assert canonical.cover_url == ""
     assert canonical.genres == []
     assert canonical.developers == []
+
+
+@pytest.fixture(autouse=True)
+def _clear_cache() -> None:
+    # LocMemCache is process-wide and nothing clears it between tests, so a
+    # query cached by one test would silently satisfy another's assertion
+    # about how many times IGDB was called.
+    cache.clear()
+
+
+def _counting_search(calls: list[str]) -> Any:
+    def search(self: IGDBClient, query: str, limit: int = 10) -> list[dict[str, Any]]:
+        calls.append(query)
+        return [{"id": 40477, "name": "Slay the Spire", "first_release_date": 1548201600}]
+
+    return search
+
+
+def test_cached_search_calls_igdb_once_for_a_repeated_query(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+    monkeypatch.setattr(IGDBClient, "search_games", _counting_search(calls))
+    assert cached_search("Slay the Spire")[0]["id"] == 40477
+    assert cached_search("Slay the Spire")[0]["id"] == 40477
+    assert len(calls) == 1
+
+
+def test_cached_search_normalises_case_and_whitespace(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Two people typing the same title differently must not cost two calls."""
+    calls: list[str] = []
+    monkeypatch.setattr(IGDBClient, "search_games", _counting_search(calls))
+    cached_search("  Slay   The Spire ")
+    cached_search("slay the spire")
+    assert len(calls) == 1
+
+
+def test_cached_search_caches_a_miss(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Repeated misses are exactly the traffic worth suppressing: a title on
+    neither Rollcall nor IGDB is what the next visitor types too."""
+    calls: list[str] = []
+
+    def empty(self: IGDBClient, query: str, limit: int = 10) -> list[dict[str, Any]]:
+        calls.append(query)
+        return []
+
+    monkeypatch.setattr(IGDBClient, "search_games", empty)
+    assert cached_search("nonexistent game") == []
+    assert cached_search("nonexistent game") == []
+    assert len(calls) == 1
+
+
+def test_search_uses_the_short_timeout_and_get_game_keeps_the_long_one(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A search now runs inside a page render and must not hold a worker for
+    ten seconds; the import path is one deliberate click and keeps its head
+    room."""
+    seen: list[float] = []
+
+    def fake_http(
+        self: IGDBClient,
+        url: str,
+        data: bytes,
+        headers: dict[str, str],
+        timeout: float = 10,
+    ) -> Any:
+        seen.append(timeout)
+        return []
+
+    monkeypatch.setattr(IGDBClient, "_http", fake_http)
+    monkeypatch.setattr(IGDBClient, "_get_token", lambda self: "tok")
+    client = IGDBClient(client_id="c", client_secret="s")
+    client.search_games("x")
+    client.get_game(1)
+    assert seen == [4, 10]
+
+
+def test_igdb_label_appends_the_release_year() -> None:
+    assert igdb_label({"name": "Celeste", "first_release_date": 1516924800}) == "Celeste (2018)"
+    assert igdb_label({"name": "Unreleased"}) == "Unreleased"
