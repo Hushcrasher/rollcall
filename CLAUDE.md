@@ -56,6 +56,13 @@ docker build .              # the image must build from a fresh clone
 
 ## Process
 
+- **Never commit to `main` directly — branch first, then open a PR.** Start the
+  branch (`feat/…`, `docs/…`, `fix/…`) *before* the first commit; the owner
+  merges. `main` carries a protection ruleset (PR required, 4 status checks),
+  but an owner-authenticated push can bypass it and GitHub only says so
+  afterwards — so nothing will stop you, and the checks simply never run.
+  Retrofitting a branch after committing to `main` is far messier than
+  branching up front.
 - Commits are DCO signed-off (`git commit -s`) — CI rejects unsigned PR commits.
 - A behavior change updates `docs/01-DESIGN.md` + `ROADMAP.md` in the same PR;
   substantial features get a design record in `docs/superpowers/specs/`.
