@@ -61,6 +61,13 @@ pitch assertion (`PITCH = b"Worked on a game?"`) keeps passing.
 
 ## 4. `Message` button
 
+> **Amended 2026-08-24** (spec
+> `2026-08-24-profile-message-and-layout-polish-design.md`): the result-card
+> button below is gone — the profile is the single contact entry point and
+> shows the button to every viewer but the owner, anonymous included. The
+> "Docs & tests" section's "`Message` on profile and cards" is likewise
+> superseded.
+
 - `accounts/profile.html` (visitor, `contactable`): `<a role="button" href="{% url 'contact:contact' … %}">{% translate "Message" %}</a>`.
   In preview mode the muted placeholder says `Message` too.
 - `search/people_search.html` result cards: the `— Contact` link becomes a
