@@ -16,6 +16,22 @@
 .nav-search { flex: 1; min-width: 0; }
 .nav-search input { width: 100%; min-width: 0; margin-bottom: 0; }
 
+/* Nav row alignment (spec 2026-08-24 §3.3). Two separate causes, both
+   measured: the input (35px), the CTA (34px) and the links (37px) carried
+   different heights, and `nav ul` centers on the MARGIN box, which Pico
+   leaves asymmetric for the CTA alone — `nav li :where(a,[role=link])`
+   sets a symmetric negative vertical margin, then `nav li [role=button]`
+   (higher specificity) zeroes only the bottom half, so the CTA's box
+   centered ~3px high. One 37px height for all three, and the CTA's bottom
+   margin restored to Pico's own variable rather than a literal. */
+.nav-search form { margin-bottom: 0; }
+header nav input[type="search"],
+header nav a[role="button"] { height: 37px; padding-block: 0; }
+header nav a[role="button"] {
+  display: inline-flex; align-items: center;
+  margin-bottom: calc(var(--pico-nav-link-spacing-vertical) * -1);
+}
+
 /* Pico lays `nav` and its `ul` groups out with `display:flex` and ships NO
    wrapping and no nav media query, so on a narrow screen the logged-in bar
    (brand + search + four items) overflows into itself. Wrapping is the fix,
