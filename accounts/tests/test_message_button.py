@@ -42,7 +42,7 @@ def test_owner_sees_no_message_button(client: Client) -> None:
 
 def test_uncontactable_profile_shows_no_message_button(client: Client) -> None:
     target = User.objects.create_user(email="t@example.com", password="x", display_name="Target")
-    target.contactable = False
+    target.contactable = False  # ty: ignore[invalid-assignment]
     target.save(update_fields=["contactable"])
     body = client.get(reverse("accounts:profile", args=[target.slug])).content.decode()
     main = body[body.index("<main") : body.index("</main>")]
