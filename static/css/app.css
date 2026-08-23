@@ -175,3 +175,13 @@ nav form button[type=submit] { background: none; border: none; color: var(--pico
    scaled. Sizes only — the image is the decoration. */
 .capsule { max-width: 460px; width: 100%; height: auto; display: block; margin-bottom: .5rem; }
 .capsule-sm { width: 92px; height: 43px; object-fit: cover; vertical-align: middle; margin-right: .5rem; }
+
+/* Footer on the viewport's bottom edge for short pages (spec 2026-08-24
+   §4) — via flow, never position:fixed: the page column fills the viewport
+   and <main> absorbs the slack. Safe with Pico's classless centering:
+   body > header/main/footer already carry width:100% + max-width + auto
+   inline margins, so becoming flex items changes nothing horizontally.
+   100vh first: dvh is the correct mobile unit, vh the fallback where dvh
+   is unknown. */
+body { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
+body > main { flex: 1 0 auto; }
