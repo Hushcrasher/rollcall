@@ -11,11 +11,12 @@
 <div class="autocomplete typeahead" data-typeahead data-name="{{ widget.name }}"
      data-remove-label="{% blocktranslate with label='%s' %}Remove {{ label }}{% endblocktranslate %}">
 
-  <ul class="chips" data-chips>
-    {% for value, label in widget.chips %}
-      {% include "search/widgets/_chip.html" with name=widget.name value=value label=label %}
-    {% endfor %}
-  </ul>
+  {% comment %}
+    One physical line, so an empty selection renders zero text nodes:
+    app.css hides the empty list with `.chips:empty`, and `:empty` fails
+    on a lone whitespace node (spec 2026-08-24 §3.1).
+  {% endcomment %}
+  <ul class="chips" data-chips>{% for value, label in widget.chips %}{% include "search/widgets/_chip.html" with name=widget.name value=value label=label %}{% endfor %}</ul>
 
   <input type="text" class="autocomplete-input js-only" name="q" autocomplete="off"
          placeholder="{{ widget.placeholder }}"

@@ -33,3 +33,12 @@ def test_data_caveats_are_one_footnote(client: Client) -> None:
     main = body[body.index("<main") : body.index("</main>")]
     assert main.count("Steam-linked games only") == 1
     assert "Matches games using any of the selected." not in main
+
+
+def test_empty_chips_list_renders_truly_empty(client: Client) -> None:
+    """`.chips:empty { display:none }` is the hiding mechanism (app.css) — a
+    lone whitespace text node defeats `:empty`, and the dead list's bottom
+    margin pushed the three typeahead inputs 5px under their row neighbours
+    (spec 2026-08-24 §3.1)."""
+    content = client.get(reverse("home")).content.decode()
+    assert content.count('<ul class="chips" data-chips></ul>') == 3
