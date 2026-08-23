@@ -320,3 +320,13 @@ def test_junk_page_param_does_not_error(client: Client) -> None:
     response = client.get(reverse("home"), {"discipline": design.pk, "page": "abc"})
     assert response.status_code == 200
     assert b"Great Candidate" in response.content
+
+
+def test_result_card_has_no_message_button(client: Client) -> None:
+    """Spec 2026-08-24 §2: the profile is the single contact entry point —
+    a card links to the person, never to the relay."""
+    user = _candidate()
+    design = Discipline.objects.get(name="Design")
+    content = client.get(reverse("home"), {"discipline": design.pk}).content.decode()
+    assert reverse("accounts:profile", args=[user.slug]) in content
+    assert reverse("contact:contact", args=[user.slug]) not in content

@@ -132,9 +132,6 @@
           <h3>
             <a href="{% url 'accounts:profile' r.user.slug %}">{{ r.user.display_name }}</a>
             {% if r.user.open_to_work %}<span class="badge">{% translate "Open to work" %}</span>{% endif %}
-            {% if r.user.contactable %}
-              <a role="button" href="{% url 'contact:contact' r.user.slug %}">{% translate "Message" %}</a>
-            {% endif %}
           </h3>
 
           {% if r.user.location_display %}
