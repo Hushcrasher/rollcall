@@ -92,13 +92,16 @@ def test_preview_param_is_inert_for_a_visitor(client: Client, user: User, other:
     assert reverse("contact:contact", kwargs={"slug": user.slug}) in body
 
 
-def test_anonymous_visitor_is_unaffected(client: Client, user: User) -> None:
+def test_preview_param_is_inert_for_an_anonymous_visitor(client: Client, user: User) -> None:
     """Pins the `is_visitor` half of the flag too: a flag computed as `not is_self`
-    instead of `is_authenticated and not is_self` would leak both affordances here,
-    and every other test in this file would stay green."""
+    instead of `is_authenticated and not is_self` would leak the member-only Report
+    affordance here, and every other test in this file would stay green.
+
+    The Message button is deliberately NOT pinned as absent any more — since spec
+    2026-08-24 §2 it renders for anonymous visitors as well, and its own matrix
+    lives in `test_message_button.py`."""
     response = client.get(user.get_absolute_url() + "?preview=member")
     assert response.status_code == 200
     body = response.content.decode()
     assert "Back to my profile" not in body
-    assert reverse("contact:contact", kwargs={"slug": user.slug}) not in body
     assert reverse("contact:report") not in body

@@ -69,7 +69,8 @@
     {% if profile_user.contactable %}
       {% if preview %}
         <p><span class="muted">{% translate "Message" %}</span></p>
-      {% elif is_visitor %}
+      {% elif not is_owner %}
+        {# Anonymous included (spec 2026-08-24 §2): the relay's login + verified-email gates do the guarding, not the button's visibility. #}
         <p><a role="button" href="{% url 'contact:contact' profile_user.slug %}">{% translate "Message" %}</a></p>
       {% endif %}
     {% endif %}
