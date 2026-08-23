@@ -72,7 +72,8 @@
     <fieldset class="filter-row">
       <legend>{% translate "About the person" %}</legend>
       {% for field in form.person_fields %}
-        <div class="filter">
+        {# The checkbox cell has no input row of its own — app.css bottom-aligns it onto the row's input line (spec 2026-08-24 §3.2). #}
+        <div class="filter{% if field.name == 'open_to_work' %} filter-checkbox{% endif %}">
           {% if field.name == "open_to_work" %}
             <label>{{ field }} {{ field.label }}</label>{{ field.errors }}
           {% else %}

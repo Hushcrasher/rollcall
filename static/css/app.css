@@ -97,6 +97,15 @@ nav form button[type=submit] { background: none; border: none; color: var(--pico
 /* People search (home): filter blocks and typeahead chips. */
 .filter { margin: .6rem 0; }
 .filter > label { font-weight: bold; display: block; }
+/* The inline checkbox has no input box under its label, so at the grid's
+   `align-items: start` it floats at label height. Bottom-aligning the cell
+   makes its bottom edge meet its neighbours' — from there the padding lifts
+   the checkbox onto their input line. The value is measured, not derived:
+   the label's line box adds leading below the 19px box that no formula over
+   the input's own height accounts for. Re-measure if the row's font or
+   input sizing changes. One-column layouts are unaffected: a cell alone in
+   its row has nothing to align against. */
+.filter-checkbox { align-self: end; padding-bottom: 1rem; }
 .chips { list-style: none; margin: 0 0 .3rem; padding: 0; display: flex; flex-wrap: wrap; gap: .3rem; }
 .chips:empty { display: none; }
 .chip {
