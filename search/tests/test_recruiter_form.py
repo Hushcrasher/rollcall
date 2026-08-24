@@ -158,10 +158,22 @@ def test_discipline_does_not_conflict_with_specific_games() -> None:
 
 def test_a_field_error_does_not_also_report_the_conflict() -> None:
     """Same reasoning as the zero-filter rule: a field-level error already told
-    the user what is wrong."""
-    game = Game.objects.create(title="Hades", source=Game.Source.MANUAL)
+    the user what is wrong.
 
-    form = RecruiterSearchForm({"games": [str(game.pk)], "min_rating": "200"})
+    The broken field is `countries`, deliberately NOT one of the three
+    criteria. An invalid `min_rating` would pin nothing here: Django drops a
+    field that failed validation from `cleaned_data`, so `criteria` would be
+    False on its own and the conflict could not fire whether the errors guard
+    ran, moved, or vanished. With a real genre AND a real game submitted, the
+    conflict is live and only the guard's early return suppresses it.
+    """
+    game = Game.objects.create(title="Hades", source=Game.Source.MANUAL)
+    genre = Genre.objects.create(name="RPG")
+
+    form = RecruiterSearchForm(
+        {"games": [str(game.pk)], "genres": [str(genre.pk)], "countries": ["ZZ"]}
+    )
 
     assert not form.is_valid()
+    assert "countries" in form.errors
     assert _CONFLICT not in form.non_field_errors()
