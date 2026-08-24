@@ -270,45 +270,79 @@
     <section id="results">
       <h2>{% blocktranslate count counter=results_page.total %}{{ counter }} result{% plural %}{{ counter }} results{% endblocktranslate %}</h2>
 
-      {% for r in results_page.results %}
-        <article>
-          <h3>
-            <a href="{% url 'accounts:profile' r.user.slug %}">{{ r.user.display_name }}</a>
-            {% if r.user.open_to_work %}<span class="badge">{% translate "Open to work" %}</span>{% endif %}
-          </h3>
+      {% if results_page.results %}
+      {% comment %}
+        A register, not a stack of cards: a recruiter compares people, and
+        comparing is what a table is for. Column rules are off and only the row
+        separators show — the grid should sit under the data, not around it.
 
-          {% if r.user.location_display %}
-            <p class="muted">{{ r.user.location_display }}</p>
-          {% endif %}
-
-          <ul>
-            {% for c in r.matching_credits %}
-              <li>
-                <a href="{% url 'games:game' c.game.slug %}">{{ c.game.title }}</a>
-                — {{ c.job_title }} <em>({{ c.discipline.name }})</em>
-                <span class="dates">{{ c.start_date|date:"m/Y" }}–{% if c.end_date %}{{ c.end_date|date:"m/Y" }}{% else %}{% translate "present" %}{% endif %}</span>
-              </li>
+        Every cell carries data-label so the narrow-screen rules can reinstate
+        the header beside its value once the columns stack (app.css). The
+        wrapper is the horizontal-overflow container: a seven-column table has
+        to scroll inside its own box rather than push the page sideways.
+      {% endcomment %}
+      <div class="table-scroll">
+        <table class="results-table">
+          <thead>
+            <tr>
+              <th scope="col">{% translate "Name" %}</th>
+              <th scope="col">{% translate "Based in" %}</th>
+              <th scope="col">{% translate "Experience" %}</th>
+              <th scope="col">{% translate "Credits" %}</th>
+              <th scope="col">{% translate "Games" %}</th>
+              <th scope="col">{% translate "In the industry" %}</th>
+              {% comment %}
+                Named in full, not just "Engines". A bare percentage next to a
+                person reads as a score OF them; this measures their credited
+                GAMES, and the header is what keeps that factual (docs/00 #7 —
+                no numeric scores of people).
+              {% endcomment %}
+              <th scope="col">{% translate "Engines on credited games" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in results_page.results %}
+              <tr>
+                <th scope="row" data-label="{% translate 'Name' %}">
+                  <a href="{% url 'accounts:profile' r.user.slug %}">{{ r.user.display_name }}</a>
+                  {% if r.user.open_to_work %}<span class="badge">{% translate "Open to work" %}</span>{% endif %}
+                </th>
+                <td data-label="{% translate 'Based in' %}">{{ r.user.location_display|default:"—" }}</td>
+                <td data-label="{% translate 'Experience' %}">
+                  <ul class="experience">
+                    {% for c in r.matching_credits %}
+                      {% url 'games:game' c.game.slug as game_url %}
+                      <li>
+                        <span class="dates">{{ c.start_date|date:"m/Y" }}–{% if c.end_date %}{{ c.end_date|date:"m/Y" }}{% else %}{% translate "present" %}{% endif %}</span>:
+                        {% comment %}
+                          One blocktranslate, not a translate call sandwiched
+                          around the link — a fragmented sentence cannot be
+                          reordered for a language that does not share
+                          English's word order.
+                        {% endcomment %}
+                        {% blocktranslate with job=c.job_title discipline=c.discipline.name title=c.game.title %}{{ job }} <em>({{ discipline }})</em> at <a href="{{ game_url }}">{{ title }}</a>{% endblocktranslate %}
+                      </li>
+                    {% endfor %}
+                  </ul>
+                  {% if r.more_credits_count %}
+                    {# The rest are on the profile, which is where the whole career lives. #}
+                    <a class="more-credits" href="{% url 'accounts:profile' r.user.slug %}">{% blocktranslate count counter=r.more_credits_count %}+{{ counter }} more matching credit{% plural %}+{{ counter }} more matching credits{% endblocktranslate %}</a>
+                  {% endif %}
+                </td>
+                <td class="num" data-label="{% translate 'Credits' %}">{{ r.credits_count }}</td>
+                <td class="num" data-label="{% translate 'Games' %}">{{ r.games_count }}</td>
+                <td data-label="{% translate 'In the industry' %}"><span class="dates">{{ r.first_year }}–{% if r.last_year %}{{ r.last_year }}{% else %}{% translate "present" %}{% endif %}</span></td>
+                <td data-label="{% translate 'Engines on credited games' %}">
+                  {% for name, pct in r.engine_shares %}{{ name }} {{ pct }}%{% if not forloop.last %} · {% endif %}{% empty %}—{% endfor %}
+                </td>
+              </tr>
             {% endfor %}
-          </ul>
-          {% if r.more_credits_count %}
-            <p class="muted">{% blocktranslate count counter=r.more_credits_count %}+{{ counter }} more matching credit{% plural %}+{{ counter }} more matching credits{% endblocktranslate %}</p>
-          {% endif %}
-
-          {# One source line: the " · " separators are content, so template indentation must not land inside them. #}
-          <p class="muted">{% blocktranslate count counter=r.credits_count %}{{ counter }} credit{% plural %}{{ counter }} credits{% endblocktranslate %} · {% blocktranslate count counter=r.games_count %}{{ counter }} game{% plural %}{{ counter }} games{% endblocktranslate %} · {{ r.first_year }}–{% if r.last_year %}{{ r.last_year }}{% else %}{% translate "present" %}{% endif %}</p>
-
-          {% comment %}
-            Labelled, and not optional: unlabelled percentages sitting under a career
-            stats line read as a proficiency score for the person. These describe the
-            person's credited GAMES — the label is what keeps that factual.
-          {% endcomment %}
-          {% if r.engine_shares %}
-            <p class="muted">{% translate "Engines on credited games" %}: {% for name, pct in r.engine_shares %}{{ name }} {{ pct }}%{% if not forloop.last %} · {% endif %}{% endfor %}</p>
-          {% endif %}
-        </article>
-      {% empty %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
         <p>{% translate "No people match these filters." %}</p>
-      {% endfor %}
+      {% endif %}
 
       {% if results_page.num_pages > 1 %}
         {% comment %}

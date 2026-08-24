@@ -180,6 +180,13 @@ body > header, body > main, body > footer { max-width: 72rem; }
 :root[data-theme=light] .pick:hover { color: var(--pico-primary); background: none; }
 :root[data-theme=light] .pick { width: 100%; text-align: left; }
 
+/* The header a stacked table cell reinstates on a narrow screen. Same register
+   as a real <th> — monospace, small, bold — so a phone reads like the table it
+   replaces rather than like unlabelled prose. */
+:root[data-theme=light] .results-table [data-label]::before {
+  font-family: var(--rc-mono); font-size: .7rem; font-weight: 700; opacity: .65;
+}
+
 /* --- Records ------------------------------------------------------------- */
 /* Lists of records (credits, contributors, the feed) carry no bullets: the
    line already starts with a linked title. Chips and the gallery grid keep

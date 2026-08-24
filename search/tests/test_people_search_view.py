@@ -104,12 +104,16 @@ def test_result_card_shows_credit_location_and_stats(client: Client) -> None:
     assert "(Design)</em>" in content  # the discipline of the matching credit
     assert "2020–2021" in content  # the credit's dates
     assert "Lyon · France" in content
-    # Career stats. Asserted as the whole rendered line, singulars included:
-    # a `{% blocktranslate count %}` that silently lost its {% plural %} branch
-    # would print "1 credits" and still satisfy a loose `"1 credit" in content`.
-    assert "1 credit · 1 game · 2020–2021" in content
+    # Career stats live in their own columns now (spec 2026-08-24-results-table),
+    # so the old combined line is gone and with it the {% plural %} branch it
+    # guarded — a count column is a bare number under a header, which has no
+    # singular. Asserted per cell, header included, so a column silently losing
+    # its data-label (which is what reinstates the header on a phone) fails here.
+    assert '<td class="num" data-label="Credits">1</td>' in content
+    assert '<td class="num" data-label="Games">1</td>' in content
+    assert "2020–2021" in content  # the industry span column
     # An unguarded {% if r.more_credits_count %} renders "+0 more" on every
-    # card that has <=3 credits — i.e. on most of them.
+    # row that has <=3 credits — i.e. on most of them.
     assert "+0 more" not in content
 
 
@@ -131,13 +135,16 @@ def test_card_renders_present_and_engine_shares_and_never_none(client: Client) -
 
     assert "2020–present" in content  # career years, open end
     assert "2022–present" in content  # the ongoing credit's own dates
-    assert "2 credits · 2 games" in content
+    assert '<td class="num" data-label="Credits">2</td>' in content
+    assert '<td class="num" data-label="Games">2</td>' in content
     assert "None" not in content
-    # The label is load-bearing, not decoration: bare "Unreal Engine 100%" under
-    # a career-stats line reads as a proficiency score for the person, which the
-    # "no numeric public score" non-negotiable exists to prevent. The words are
-    # what make the number factual — about games, not about the person.
-    assert "Engines on credited games: Unreal Engine 100%" in content
+    # The label is load-bearing, not decoration: a bare "Unreal Engine 100%"
+    # beside a person reads as a proficiency score for them, which the "no
+    # numeric public score" non-negotiable exists to prevent. In a table the
+    # COLUMN HEADER carries that job, so it has to name what the number measures
+    # — the person's credited games, not the person.
+    assert '<th scope="col">Engines on credited games</th>' in content
+    assert "Unreal Engine 100%" in content
 
 
 def test_more_credits_count_is_shown_beyond_three(client: Client) -> None:
@@ -364,3 +371,109 @@ def test_games_facet_filters_the_page(client: Client) -> None:
     assert "Hades Dev" in content
     assert "Other Dev" not in content
     assert "Latest credits" not in content
+
+
+# --- The results table (spec 2026-08-24-results-table) ----------------------
+
+
+def test_results_render_as_one_table_with_named_columns(client: Client) -> None:
+    """A recruiter compares people, and comparing is what a table is for. The
+    seven headers are the contract the narrow-screen rules restore per cell."""
+    _candidate()
+    design = Discipline.objects.get(name="Design")
+
+    content = client.get(reverse("home"), {"discipline": design.pk}).content.decode()
+
+    assert '<table class="results-table">' in content
+    for header in (
+        "Name",
+        "Based in",
+        "Experience",
+        "Credits",
+        "Games",
+        "In the industry",
+        "Engines on credited games",
+    ):
+        assert f'<th scope="col">{header}</th>' in content, header
+    assert content.count("<tbody>") == 1
+
+
+def test_every_cell_carries_its_header_for_narrow_screens(client: Client) -> None:
+    """Below 768px the columns stack and app.css reinstates each header from
+    `data-label`. A cell without one loses its meaning on a phone, and no CSS
+    test can catch that — this is the guard."""
+    _candidate()
+    design = Discipline.objects.get(name="Design")
+
+    content = client.get(reverse("home"), {"discipline": design.pk}).content.decode()
+    row = content[content.index("<tbody>") : content.index("</tbody>")]
+
+    cells = re.findall(r"<t[hd][^>]*>", row)
+    assert cells, "no cells rendered"
+    assert all("data-label=" in cell for cell in cells), row
+
+
+def test_the_table_can_scroll_inside_its_own_box(client: Client) -> None:
+    """Seven columns must not push the page sideways — wide content scrolls in
+    its own container, never the document."""
+    _candidate()
+    design = Discipline.objects.get(name="Design")
+
+    content = client.get(reverse("home"), {"discipline": design.pk}).content.decode()
+
+    assert '<div class="table-scroll">' in content
+
+
+def test_an_experience_line_reads_dates_role_then_game(client: Client) -> None:
+    _candidate(location="Lyon", country="FR")
+    design = Discipline.objects.get(name="Design")
+
+    content = client.get(reverse("home"), {"discipline": design.pk}).content.decode()
+
+    assert "01/2020–06/2021" in content
+    assert "Level Designer <em>(Design)</em> at" in content
+
+
+def test_the_extra_credits_count_links_to_the_profile(client: Client) -> None:
+    """ "+N more" is where the rest of a career is — it has to be reachable, not
+    a dead count."""
+    user = _candidate()
+    design = Discipline.objects.get(name="Design")
+    for n in range(4):
+        game = Game.objects.create(title=f"Extra {n}", source=Game.Source.MANUAL)
+        Contribution.objects.create(
+            user=user,
+            game=game,
+            discipline=design,
+            job_title="Designer",
+            start_date=date(2015, 1, 1),
+        )
+
+    content = client.get(reverse("home"), {"discipline": design.pk}).content.decode()
+
+    profile = reverse("accounts:profile", args=[user.slug])
+    assert f'<a class="more-credits" href="{profile}">' in content
+    assert "more matching credits" in content
+
+
+def test_a_person_with_no_location_gets_a_dash_not_a_blank(client: Client) -> None:
+    """An empty cell in a table reads as missing data rather than "not given",
+    and leaves the row looking broken."""
+    _candidate()  # no location, no country
+    design = Discipline.objects.get(name="Design")
+
+    content = client.get(reverse("home"), {"discipline": design.pk}).content.decode()
+
+    assert '<td data-label="Based in">—</td>' in content
+
+
+def test_no_results_shows_the_message_and_no_empty_table(client: Client) -> None:
+    """An empty table is a header row with nothing under it — worse than a
+    sentence."""
+    _candidate()
+    other = Discipline.objects.get(name="Audio")
+
+    content = client.get(reverse("home"), {"discipline": other.pk}).content.decode()
+
+    assert "No people match these filters." in content
+    assert '<table class="results-table">' not in content
