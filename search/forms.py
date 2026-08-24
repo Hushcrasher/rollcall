@@ -179,16 +179,28 @@ class RecruiterSearchForm(forms.Form):
         so the two cards can never be looped into one row by accident."""
         return [self["genres"], self["min_rating"], self["engines"]]
 
-    def engine_chips(self) -> list[tuple[str, str, Any]]:
-        """(param, value, label) for every engine-facet chip, families first.
+    def engine_chips(self) -> list[tuple[str, str, Any, str]]:
+        """(param, value, label, family) for every engine-facet chip, families
+        first.
 
         The facet posts to two fields but draws as one box, so the template
         needs both sets in one list — and each chip has to remember which field
         will clean it, or a value comes back as the wrong kind on submit.
+
+        `family` is the family pk for a version chip and "" for a family chip:
+        picking a family removes the version chips it covers, and the page can
+        only find them if each one says which family it belongs to.
         """
+        versions = self._chips_of("engines")
+        families = {
+            str(pk): str(family_pk or "")
+            for pk, family_pk in Engine.objects.filter(pk__in=[v for v, _ in versions]).values_list(
+                "pk", "family_id"
+            )
+        }
         return [
-            *(("engine_families", v, lb) for v, lb in self._chips_of("engine_families")),
-            *(("engines", v, lb) for v, lb in self._chips_of("engines")),
+            *(("engine_families", v, lb, "") for v, lb in self._chips_of("engine_families")),
+            *(("engines", v, lb, families.get(v, "")) for v, lb in versions),
         ]
 
     def _chips_of(self, name: str) -> list[tuple[str, Any]]:

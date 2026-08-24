@@ -7,7 +7,12 @@
   page's script (from the <template> in typeahead_select.html) for values picked
   since. One definition, so the two can't drift.
 {% endcomment %}
-<li class="chip">
+{% comment %}
+  `family` is set only for engine-version chips: picking a family has to find
+  and drop the versions it covers, and a chip that does not say which family it
+  belongs to cannot be found. Empty everywhere else.
+{% endcomment %}
+<li class="chip"{% if family %} data-family="{{ family }}"{% endif %}>
   <input type="hidden" name="{{ name }}" value="{{ value }}">
   <span class="chip-label">{{ label }}</span>
   <button type="button" class="chip-remove js-only"

@@ -264,9 +264,25 @@ def _engine_options(query: str) -> list[dict[str, Any]]:
         options.append(
             {"param": "engine_families", "value": family.pk, "label": family.name, "child": False}
         )
-        members = [e for e in matches if e.family_id == family.pk][:_ENGINE_MEMBERS_SHOWN]
+        # The member whose name IS the family name is dropped: "Unity" under
+        # "Unity" reads as a version of itself and offers nothing the family
+        # above it does not already cover. The consequence is deliberate — that
+        # unversioned row (the catalogue's largest) is reachable only through
+        # its family, which is the right place for it.
+        members = [e for e in matches if e.family_id == family.pk and e.name != family.name][
+            :_ENGINE_MEMBERS_SHOWN
+        ]
         options += [
-            {"param": "engines", "value": e.pk, "label": e.name, "child": True} for e in members
+            {
+                "param": "engines",
+                "value": e.pk,
+                "label": e.name,
+                "child": True,
+                # Which family covers this version, so the page can tick and
+                # lock it when that family is picked.
+                "family": family.pk,
+            }
+            for e in members
         ]
 
     loose = [e for e in matches if e.family_id is None][:_FILTER_OPTIONS_SHOWN]
