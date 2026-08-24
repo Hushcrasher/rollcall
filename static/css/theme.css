@@ -95,6 +95,19 @@
   --pico-primary-hover-background: #4E609E;
   --pico-primary-focus: rgba(100, 123, 202, .5);
   --pico-text-selection-color: rgba(100, 123, 202, .25);
+
+  /* --- Filled surface ---------------------------------------------------- */
+  /* The filter bento is drawn as one object rather than an outline (changed
+     2026-08-24). NOT a third colour: this is `--pico-primary-hover` above,
+     promoted to a surface. Chosen over the highlight itself on measurement —
+     white on #647BCA is 4.02:1, under the 4.5:1 the form's 12px bold labels
+     need; this is 6.02:1. */
+  --rc-surface: #4E609E;
+  --rc-on-surface: #fff;
+  /* The ink used on light ground, same value the six heading variables carry. */
+  --rc-ink: #3B0918;
+  /* Hairlines drawn ON the surface. A tint rather than a second colour. */
+  --rc-surface-line: rgba(255, 255, 255, .45);
 }
 
 /* One fixed content column instead of Pico's five breakpoints. */
@@ -185,6 +198,75 @@ body > header, body > main, body > footer { max-width: 72rem; }
    replaces rather than like unlabelled prose. */
 :root[data-theme=light] .results-table [data-label]::before {
   font-family: var(--rc-mono); font-size: .7rem; font-weight: 700; opacity: .65;
+}
+
+/* --- The filled filter bento --------------------------------------------- */
+/* One drawn object instead of an outline. Everything below exists because the
+   surface changed underneath type and controls that were designed against
+   white — none of it is decoration on top of the background rule. */
+:root[data-theme=light] .filters {
+  background: var(--rc-surface);
+  border-color: var(--rc-surface);
+  /* The variable, not just `color`. Pico writes `color: var(--pico-color)`
+     onto <p>, <ul>, <label>, <legend> and more, which breaks inheritance the
+     moment the ground changes: setting `color` here left the group headings and
+     the chip labels oxblood on blue. Rebinding the variable inside the bento
+     re-points every one of those rules at once, instead of chasing them tag by
+     tag — walked the ancestor chain to find where white turned back, rather
+     than guessing which elements Pico paints. */
+  --pico-color: var(--rc-on-surface);
+  color: var(--rc-on-surface);
+}
+/* `.muted`'s .7 was calibrated against white; on this surface it drops the
+   group headings and the data caveat to 3.88:1. .8 measures 4.53:1 — over the
+   line, and still a visible step below the labels above them. */
+:root[data-theme=light] .filters .muted { opacity: .8; }
+/* Field errors are the highlight blue, which all but disappears here. */
+:root[data-theme=light] .filters .errorlist { color: var(--rc-on-surface); }
+
+/* Controls keep their own ground: a filled input on a filled card would leave
+   nothing to aim at, and the text inside them is the member's, not ours. */
+:root[data-theme=light] .filters input:not([type=checkbox]),
+:root[data-theme=light] .filters select {
+  background: var(--rc-on-surface);
+  color: var(--rc-ink);
+  border-color: var(--rc-surface-line);
+}
+/* Placeholders resolve from Pico's own variable, which the rebinding above
+   would otherwise have turned white inside a white field. */
+:root[data-theme=light] .filters input::placeholder {
+  color: var(--pico-form-element-placeholder-color);
+  opacity: 1;
+}
+/* The submit button was solid highlight — on this surface it read as a hole.
+   Inverted, it becomes the one bright thing in the card, which is right for
+   the only action in it. */
+/* Literal values, not `var(--pico-background-color)`: Pico REDEFINES that
+   variable on the button itself (to the primary), so reading it here returns
+   the highlight and the button stayed blue. Measured, not assumed. */
+:root[data-theme=light] .filters button[type=submit] {
+  background: var(--rc-on-surface);
+  color: var(--rc-ink);
+  border-color: var(--rc-on-surface);
+}
+:root[data-theme=light] .filters button[type=submit]:hover {
+  background: var(--rc-ink);
+  color: var(--rc-on-surface);
+  border-color: var(--rc-ink);
+}
+
+/* Hairlines: the two sub-cards, the OR rule and the chips. */
+:root[data-theme=light] .filters .filter-group,
+:root[data-theme=light] .filters .chip { border-color: var(--rc-surface-line); }
+:root[data-theme=light] .filters .filter-or::before { border-color: var(--rc-surface-line); }
+/* The OR label punches through its own rule with the ground behind it. */
+:root[data-theme=light] .filters .filter-or span { background: var(--rc-surface); }
+
+/* The dropdown panel keeps a white ground of its own, so it must NOT inherit
+   the surface's white text — that would be white on white. */
+:root[data-theme=light] .filters .results {
+  --pico-color: var(--rc-ink);
+  color: var(--rc-ink);
 }
 
 /* --- Records ------------------------------------------------------------- */
