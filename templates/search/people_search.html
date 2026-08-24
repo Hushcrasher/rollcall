@@ -81,6 +81,13 @@
           <div class="filter-row">
             {% for field in form.criteria_fields %}{% include "search/_filter_field.html" %}{% endfor %}
           </div>
+          {% comment %}
+            Under the two fields it is actually about. Genre and rating are the
+            facets the gap affects (ROADMAP "Non-Steam facet coverage"); as a
+            page-level footnote it read as a caveat on the whole form, engine
+            and games included, which it is not.
+          {% endcomment %}
+          <p class="filters-note"><small class="muted">{% translate "Genre and rating data currently cover Steam-linked games only." %}</small></p>
         </div>
         {% comment %}
           Not decorative: OR states the relationship between the two cards, so
@@ -95,8 +102,6 @@
         </div>
       </div>
     </fieldset>
-    {# The data caveat once, not per field: genre and rating data cover Steam-linked games only (ROADMAP "Non-Steam facet coverage"). #}
-    <p class="filters-note"><small class="muted">{% translate "Genre and rating data currently cover Steam-linked games only." %}</small></p>
     <button type="submit">{% translate "Search" %}</button>
   </form>
 

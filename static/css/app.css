@@ -185,8 +185,10 @@ nav form button[type=submit] { background: none; border: none; color: var(--pico
    full-width form controls do (excluding the open_to_work checkbox, which
    sits inline with its label). */
 .filter-row input:not([type=checkbox]), .filter-row select { width: 100%; }
-/* The shared data-caveat footnote under the two sections (§2). */
-.filters-note { margin: 0 0 .5rem; }
+/* The data caveat, now inside the criteria card under the two fields it is
+   about (changed 2026-08-24). Tight above so it reads as attached to them,
+   not as a new paragraph. */
+.filters-note { margin: .1rem 0 .3rem; }
 
 /* Enough to keep the bento usable on a narrow screen — the cards stack and the
    OR rule turns horizontal. The real narrow-viewport pass is a follow-up
