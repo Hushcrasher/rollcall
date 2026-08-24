@@ -341,9 +341,13 @@ def test_specific_games_cross_with_person_filters(disciplines: dict[str, Discipl
 def test_two_credits_on_one_listed_game_yield_one_result(
     disciplines: dict[str, Discipline],
 ) -> None:
-    """Contribution.game is a ForeignKey, so an __in over it cannot fan a credit
-    into several joined rows the way the game__engines M2M does — this pins that
-    no distinct() guard is needed here."""
+    """One person credited twice on one listed game is one result, carrying
+    both credits — not two rows, and not a card that drops the second credit.
+    (Why `game_id__in` itself needs no `distinct()` guard, unlike
+    `game__engines`/`game__genres`, is argued beside that filter in
+    `search/services.py`; `_assemble_results`' own blanket `.distinct()` sits
+    downstream of it and would mask a duplication here regardless, so this
+    test can't isolate that claim — only that this end-to-end shape works.)"""
     hades = Game.objects.create(title="Hades", source=Game.Source.MANUAL)
     person = _make_person("p@example.com", "One Person")
     _credit(person, hades, disciplines["Art"])

@@ -1,5 +1,7 @@
-"""Two named filter rows (spec 2026-08-21-search-chrome §2): the game row and
-the person row, every filter visible without scrolling on a laptop."""
+"""The filter bento (spec 2026-08-24-filter-bento-and-game-facet-design §2):
+the games section — split into two alternative sub-cards, criteria versus
+named games — and the person row, every filter visible without scrolling on
+a laptop."""
 
 import html
 import re

@@ -51,11 +51,18 @@ def test_unknown_game_id_renders_no_chip() -> None:
 
 @pytest.mark.parametrize("junk", ["abc", "1;DROP", "-1", "²", "99999999999999999999"])
 def test_junk_game_id_does_not_break_the_public_page(client: Client, junk: str) -> None:
-    """The public page returns 200 for junk in `?games=`, but not today via
-    `_chips()`: no template renders `form["games"]` yet, so this request
-    never reaches the widget. `ModelMultipleChoiceField`'s own validation
-    rejects the junk first and the page renders with a field error instead.
-    See test_junk_game_id_is_filtered_before_the_query for the guard itself.
+    """The public page returns 200 for junk in `?games=`, exercising
+    `_chips()` for real: `templates/search/people_search.html` renders
+    `form["games"]` unconditionally, so this request reaches the widget with
+    the raw, unclean value regardless of what `ModelMultipleChoiceField`'s own
+    pk validation decides separately. That validation does reject the junk and
+    the page renders with a field error too, but it runs in `full_clean()`,
+    independent of `_chips()` reading the widget's raw data during render —
+    without the guard this would still 500 rendering the field. That makes
+    this the strongest guard against a 500 from a hand-typed URL, not a weak
+    sibling of the widget-level test below: it goes through the real view, not
+    the widget in isolation. See test_junk_game_id_is_filtered_before_the_query
+    for the guard itself.
 
     The out-of-range value is here to pin the surprise rather than a fix:
     Postgres promotes the literal instead of overflowing, so `id IN (10^20)`
@@ -78,8 +85,12 @@ def test_junk_game_id_is_filtered_before_the_query(junk: str) -> None:
     its own cases. `"²"` earns the `isascii()` half specifically: it is a digit
     to Python and not to `int()`.
 
-    Driven through the widget rather than through the page: no template renders
-    this field yet, so an HTTP request never reaches `_chips()` at all.
+    Driven through the widget directly rather than through an HTTP round-trip:
+    `templates/search/people_search.html` renders `form["games"]` now, so
+    test_junk_game_id_does_not_break_the_public_page above also exercises this
+    guard end to end — but it only asserts a 200. This test isolates the guard
+    and asserts on the markup, so a rewrite that stops filtering but happens
+    to still 200 some other way would still be caught here.
     """
     rendered = str(RecruiterSearchForm({"games": [junk]})["games"])
 

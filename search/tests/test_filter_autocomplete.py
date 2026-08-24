@@ -215,8 +215,8 @@ def test_chip_remove_control_names_its_value(client: Client) -> None:
 
 
 def test_typeahead_input_has_a_real_label(client: Client) -> None:
-    """The countries control sits inside a <fieldset><legend> (the "About the
-    person" row, spec 2026-08-21-search-chrome §2), but that legend only names
+    """The countries control sits inside a <fieldset><legend> (the "The person"
+    row, spec 2026-08-24-filter-bento-and-game-facet-design §5), but that legend only names
     the GROUP — countries keeps its own <label for>, unlike the old checkbox
     list where the legend was the only accessible name 249 checkboxes shared.
     No more aria-describedby: the per-field help text that used to attach here
