@@ -330,3 +330,37 @@ def test_result_card_has_no_message_button(client: Client) -> None:
     content = client.get(reverse("home"), {"discipline": design.pk}).content.decode()
     assert reverse("accounts:profile", args=[user.slug]) in content
     assert reverse("contact:contact", args=[user.slug]) not in content
+
+
+def test_games_facet_filters_the_page(client: Client) -> None:
+    """?games=<pk> is a real search: it binds the form, replaces the feed, and
+    returns only people credited on that game."""
+    hades = Game.objects.create(title="Hades", source=Game.Source.MANUAL)
+    other = Game.objects.create(title="Other", source=Game.Source.MANUAL)
+    discipline = Discipline.objects.get(name="Design")
+    on_hades = User.objects.create_user(
+        email="h@example.com", password="x", display_name="Hades Dev"
+    )
+    Contribution.objects.create(
+        user=on_hades,
+        game=hades,
+        discipline=discipline,
+        job_title="Dev",
+        start_date=date(2020, 1, 1),
+    )
+    elsewhere = User.objects.create_user(
+        email="o@example.com", password="x", display_name="Other Dev"
+    )
+    Contribution.objects.create(
+        user=elsewhere,
+        game=other,
+        discipline=discipline,
+        job_title="Dev",
+        start_date=date(2020, 1, 1),
+    )
+
+    content = client.get(reverse("home"), {"games": str(hades.pk)}).content.decode()
+
+    assert "Hades Dev" in content
+    assert "Other Dev" not in content
+    assert "Latest credits" not in content

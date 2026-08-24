@@ -17,7 +17,7 @@ from django.utils.translation import gettext_lazy as _
 from django_countries import countries
 
 from contributions.models import Discipline
-from games.models import Engine, Genre
+from games.models import Engine, Game, Genre
 
 
 def _country_choices() -> list[tuple[str, str]]:
@@ -74,6 +74,33 @@ class TypeaheadSelectMultiple(forms.SelectMultiple):
         return [(v, labels[v]) for v in map(str, value or []) if v in labels]
 
 
+class GameTypeaheadSelectMultiple(TypeaheadSelectMultiple):
+    """Chip labels from a targeted query instead of from `self.choices`.
+
+    `TypeaheadSelectMultiple._chips()` builds a {value: label} map by iterating
+    every choice — fine for Engine, Genre and the 249 countries, ruinous for
+    Game: the catalogue is ~391k rows and would be materialised on every render
+    of the home page. Looking up only the selected ids keeps the property the
+    base class exists for — a label is never derived from the raw value, so an
+    unknown id renders no chip — at a cost bounded by the selection.
+    """
+
+    def _chips(self, value: Any) -> list[tuple[str, Any]]:
+        # Filtered BEFORE the query, not after: `?games=abc` reaching `pk__in`
+        # as a string raises ValueError — a 500 on a public page from a
+        # hand-typed URL. isascii() is part of the guard, not decoration:
+        # "²".isdigit() is True and int("²") raises.
+        ids = [v for v in map(str, value or []) if v.isascii() and v.isdigit()]
+        if not ids:
+            return []
+        labels = {
+            str(pk): title
+            for pk, title in Game.objects.filter(pk__in=ids).values_list("pk", "title")
+        }
+        # `ids` order, not the queryset's: chips render in querystring order.
+        return [(v, labels[v]) for v in ids if v in labels]
+
+
 class RecruiterSearchForm(forms.Form):
     discipline = forms.ModelChoiceField(
         queryset=Discipline.objects.all(), required=False, label=_("Discipline")
@@ -97,6 +124,16 @@ class RecruiterSearchForm(forms.Form):
         # carry no genre data (ROADMAP "Non-Steam facet coverage"), so this
         # filter excludes credits on non-Steam games. Surfaced once, in the
         # template's shared footnote, not per field (spec 2026-08-21-search-chrome §2).
+    )
+    games = forms.ModelMultipleChoiceField(
+        queryset=Game.objects.all(),
+        required=False,
+        label=_("Specific games"),
+        widget=GameTypeaheadSelectMultiple(
+            url_name="search:game_filter_autocomplete", placeholder=_("Search games…")
+        ),
+        # The alternative to engines/genres/min_rating, not a companion to
+        # them — clean() below refuses both at once (spec 2026-08-24 §7).
     )
     countries = forms.MultipleChoiceField(
         choices=_country_choices,
@@ -144,6 +181,7 @@ class RecruiterSearchForm(forms.Form):
                 cleaned.get("discipline"),
                 cleaned.get("engines"),
                 cleaned.get("genres"),
+                cleaned.get("games"),
                 cleaned.get("countries"),
                 cleaned.get("min_rating"),
                 cleaned.get("year_from"),

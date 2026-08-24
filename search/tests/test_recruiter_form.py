@@ -10,7 +10,7 @@ import pytest
 from django.utils import translation
 
 from contributions.models import Discipline
-from games.models import Engine, Genre
+from games.models import Engine, Game, Genre
 from search.forms import RecruiterSearchForm
 
 pytestmark = pytest.mark.django_db
@@ -28,22 +28,34 @@ def test_page_param_alone_is_still_zero_filters() -> None:
 
 def test_each_filter_alone_satisfies_the_rule() -> None:
     """Every field must count as a filter on its own. Parametrized in spirit
-    over all 7 — dropping any one from clean()'s any([...]) must fail HERE.
+    over all 8 — dropping any one from clean()'s any([...]) must fail HERE.
     (Task 5's review mutation-tested this: with only the plan's original
     tests, 4 of the 7 entries could be deleted with the suite still green.)"""
     engine = Engine.objects.create(name="Unreal Engine")
     genre = Genre.objects.create(name="RPG")
+    game = Game.objects.create(title="Hades", source=Game.Source.MANUAL)
     discipline = Discipline.objects.get(name="Design")
     for data in (
         {"discipline": str(discipline.pk)},
         {"engines": [str(engine.pk)]},
         {"genres": [str(genre.pk)]},
+        {"games": [str(game.pk)]},
         {"countries": ["FR"]},
         {"min_rating": "70"},
         {"year_from": "2015"},
         {"open_to_work": "on"},
     ):
         assert RecruiterSearchForm(data).is_valid(), f"{data} should be enough"
+
+
+def test_games_is_multi_select() -> None:
+    hades = Game.objects.create(title="Hades", source=Game.Source.MANUAL)
+    celeste = Game.objects.create(title="Celeste", source=Game.Source.MANUAL)
+
+    form = RecruiterSearchForm({"games": [str(hades.pk), str(celeste.pk)]})
+
+    assert form.is_valid()
+    assert set(form.cleaned_data["games"]) == {hades, celeste}
 
 
 def test_min_rating_zero_is_rejected_by_the_field() -> None:

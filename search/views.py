@@ -104,6 +104,7 @@ class PeopleSearchView(TemplateView):
                 discipline_id=cleaned["discipline"].pk if cleaned.get("discipline") else None,
                 engine_ids=[engine.pk for engine in cleaned.get("engines") or []],
                 genre_ids=[genre.pk for genre in cleaned.get("genres") or []],
+                game_ids=[game.pk for game in cleaned.get("games") or []],
                 countries=list(cleaned.get("countries") or []),
                 min_rating=cleaned.get("min_rating"),
                 year_from=cleaned.get("year_from"),
