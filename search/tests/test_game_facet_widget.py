@@ -7,23 +7,16 @@ the home page. These tests pin the targeted lookup that replaces it, and the
 querystring shapes that must not reach the database as-is.
 """
 
-from datetime import date
 from typing import Any
 
 import pytest
 from django.test import Client
 from django.urls import reverse
 
-from accounts.models import User
-from contributions.models import Contribution, Discipline
 from games.models import Game
 from search.forms import RecruiterSearchForm
 
 pytestmark = pytest.mark.django_db
-
-
-def _home(client: Client, query: str) -> str:
-    return client.get(reverse("home") + query).content.decode()
 
 
 def test_selected_games_render_as_chips(client: Client) -> None:
@@ -56,8 +49,11 @@ def test_unknown_game_id_renders_no_chip() -> None:
 
 @pytest.mark.parametrize("junk", ["abc", "1;DROP", "-1", "²", "99999999999999999999"])
 def test_junk_game_id_does_not_break_the_public_page(client: Client, junk: str) -> None:
-    """`?games=abc` reaching pk__in as a string raises ValueError — a 500 on a
-    public page from a hand-typed URL.
+    """The public page returns 200 for junk in `?games=`, but not today via
+    `_chips()`: no template renders `form["games"]` yet, so this request
+    never reaches the widget. `ModelMultipleChoiceField`'s own validation
+    rejects the junk first and the page renders with a field error instead.
+    See test_junk_game_id_is_filtered_before_the_query for the guard itself.
 
     The out-of-range value is here to pin the surprise rather than a fix:
     Postgres promotes the literal instead of overflowing, so `id IN (10^20)`
@@ -68,9 +64,21 @@ def test_junk_game_id_does_not_break_the_public_page(client: Client, junk: str) 
     assert response.status_code == 200
 
 
-def test_chip_lookup_does_not_scale_with_the_catalogue(
-    client: Client, django_assert_num_queries: Any
-) -> None:
+@pytest.mark.parametrize("junk", ["abc", "1;DROP", "-1", "²"])
+def test_junk_game_id_is_filtered_before_the_query(junk: str) -> None:
+    """The guard `_chips()` applies, pinned where it actually runs.
+
+    `Game.objects.filter(pk__in=["abc"])` raises ValueError, so without the
+    filter this render would raise rather than return markup. Driven through
+    the widget rather than through the page: no template renders this field
+    yet, so an HTTP request never reaches `_chips()` at all.
+    """
+    rendered = str(RecruiterSearchForm({"games": [junk]})["games"])
+
+    assert f'value="{junk}"' not in rendered
+
+
+def test_chip_lookup_does_not_scale_with_the_catalogue(django_assert_num_queries: Any) -> None:
     """The regression this widget exists for. Two selected games must cost the
     same number of queries whether the catalogue holds 3 games or 391k — pinned
     by query count, so any rewrite that re-iterates self.choices fails here
@@ -78,23 +86,7 @@ def test_chip_lookup_does_not_scale_with_the_catalogue(
     picked = [Game.objects.create(title=f"Picked {n}", source=Game.Source.MANUAL) for n in range(2)]
     for n in range(20):
         Game.objects.create(title=f"Noise {n}", source=Game.Source.MANUAL)
-    # The home-page assertions below need a real match to render, not just an
-    # unfiltered widget: recruiter_search only surfaces people with an active
-    # credit on a selected game.
-    discipline = Discipline.objects.get(name="Design")
-    credited = User.objects.create_user(
-        email="picked-dev@example.com", password="x", display_name="Picked Dev"
-    )
-    for game in picked:
-        Contribution.objects.create(
-            user=credited,
-            game=game,
-            discipline=discipline,
-            job_title="Dev",
-            start_date=date(2020, 1, 1),
-        )
 
-    query = f"?games={picked[0].pk}&games={picked[1].pk}"
     # 2, not 1: BoundField.build_widget_attrs reads self.errors to set
     # aria-invalid (Django >=5.2), which runs full_clean() and so
     # ModelMultipleChoiceField's own `pk__in` validation query — a query this
@@ -103,7 +95,3 @@ def test_chip_lookup_does_not_scale_with_the_catalogue(
     # invariant this test exists for — no per-Noise-row cost — still holds.
     with django_assert_num_queries(2):
         RecruiterSearchForm({"games": [str(g.pk) for g in picked]})["games"].as_widget()
-
-    content = _home(client, query)
-    assert "Picked 0" in content and "Picked 1" in content
-    assert "Noise 0" not in content
