@@ -14,7 +14,7 @@ from django.test import Client, RequestFactory
 from django.urls import reverse
 from django.utils import translation
 
-from games.models import Engine, Genre
+from games.models import Engine, Game, Genre
 from search.views import country_autocomplete
 
 pytestmark = pytest.mark.django_db
@@ -103,12 +103,51 @@ def test_country_autocomplete_touches_no_database(
         client.get(reverse("search:country_autocomplete"), {"q": "fra"})
 
 
+def test_game_filter_autocomplete_returns_matching_options(client: Client) -> None:
+    Game.objects.create(title="Hades", source=Game.Source.MANUAL)
+    Game.objects.create(title="Celeste", source=Game.Source.MANUAL)
+
+    response = client.get(reverse("search:game_filter_autocomplete"), {"q": "hade"})
+
+    assert response.status_code == 200
+    assert b"Hades" in response.content
+    assert b"Celeste" not in response.content
+
+
+def test_game_filter_option_carries_the_pk(client: Client) -> None:
+    hades = Game.objects.create(title="Hades", source=Game.Source.MANUAL)
+    response = client.get(reverse("search:game_filter_autocomplete"), {"q": "hades"})
+    assert f'data-id="{hades.pk}"'.encode() in response.content
+
+
+def test_game_filter_autocomplete_offers_no_deeper_search(client: Client) -> None:
+    """Deliberately NOT search:game_autocomplete, which offers the IGDB import:
+    importing a game nobody is credited on cannot make this filter match a
+    single person, and it would spend an IGDB call and the owner's per-IP quota
+    to add an option guaranteed to return zero results (spec 2026-08-24 §6)."""
+    response = client.get(reverse("search:game_filter_autocomplete"), {"q": "nothing here"})
+
+    assert response.status_code == 200
+    assert b"igdb-trigger" not in response.content
+    assert b"deeper search" not in response.content
+
+
+def test_game_filter_autocomplete_blank_query_is_empty(client: Client) -> None:
+    Game.objects.create(title="Hades", source=Game.Source.MANUAL)
+
+    response = client.get(reverse("search:game_filter_autocomplete"), {"q": "   "})
+
+    assert response.status_code == 200
+    assert b"autocomplete-option" not in response.content
+
+
 @pytest.mark.parametrize(
     "url_name",
     [
         "search:engine_autocomplete",
         "search:genre_autocomplete",
         "search:country_autocomplete",
+        "search:game_filter_autocomplete",
     ],
 )
 def test_filter_autocomplete_is_rate_limited(client: Client, settings: Any, url_name: str) -> None:

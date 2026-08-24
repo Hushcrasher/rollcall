@@ -12,4 +12,5 @@ urlpatterns: list[URLPattern | URLResolver] = [
     path("filters/engines/", views.engine_autocomplete, name="engine_autocomplete"),
     path("filters/genres/", views.genre_autocomplete, name="genre_autocomplete"),
     path("filters/countries/", views.country_autocomplete, name="country_autocomplete"),
+    path("filters/games/", views.game_filter_autocomplete, name="game_filter_autocomplete"),
 ]

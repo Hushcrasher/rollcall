@@ -251,3 +251,22 @@ def country_autocomplete(request: HttpRequest) -> HttpResponse:
             :_FILTER_OPTIONS_SHOWN
         ]
     return render(request, "search/_filter_options.html", {"options": options})
+
+
+@ratelimit(key="ip", rate=_search_rate, method="GET", block=True)
+def game_filter_autocomplete(request: HttpRequest) -> HttpResponse:
+    """The recruiter filter's game picker.
+
+    Deliberately not `game_autocomplete` above: that one offers the IGDB
+    "deeper search" import, and importing a game nobody is credited on cannot
+    make this filter match a single person — it would spend an IGDB call, and
+    the operator's per-IP quota, on an option guaranteed to return nothing.
+
+    It searches the whole catalogue rather than only games carrying an active
+    credit: restricting it would cost a join and a DISTINCT on every keystroke,
+    and it is not what the sibling facets do — picking an engine nobody used
+    already returns zero results.
+    """
+    games = search_games(request.GET.get("q", ""), limit=_FILTER_OPTIONS_SHOWN)
+    options: list[tuple[Any, str]] = [(game.pk, game.title) for game in games]
+    return render(request, "search/_filter_options.html", {"options": options})
