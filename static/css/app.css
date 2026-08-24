@@ -268,6 +268,43 @@ nav form button[type=submit] { background: none; border: none; color: var(--pico
 .noscript-note { display: none; }
 .pagination { margin: 1rem 0; }
 
+/* Results table (spec 2026-08-24-results-table). A register, not a stack of
+   cards: a recruiter compares people, and comparing is what a table is for. */
+.table-scroll { overflow-x: auto; }
+.results-table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; }
+/* Column rules off, row rules on and faint: the grid should sit under the data,
+   not draw a box around every value. Pico rules both axes by default. */
+.results-table th, .results-table td {
+  border: 0; border-bottom: 1px solid var(--pico-muted-border-color);
+  padding: .5rem .6rem; text-align: left; vertical-align: top;
+}
+.results-table thead th { border-bottom-width: 2px; }
+.results-table td.num { text-align: right; }
+/* Counts and spans should never wrap mid-value into a second line. */
+.results-table .num, .results-table .dates { white-space: nowrap; }
+.experience { list-style: none; margin: 0; padding: 0; }
+/* theme.css gives every `main li` .4rem of vertical padding; inside a table cell
+   that turns three credits into a very tall row. Written at (0,2,2) to tie that
+   rule — app.css loads later, so the tie lands here. Same trap the chip padding
+   fell into. */
+:root main .experience li { padding: 0; }
+.more-credits { display: inline-block; margin-top: .2rem; }
+
+/* Below the table's own breakpoint the columns stack and each cell reinstates
+   its header from `data-label` — a bare value with no header means nothing on a
+   phone. The real narrow-screen work is that, not shrinking the grid. */
+@media (max-width: 767px) {
+  .results-table, .results-table tbody, .results-table tr,
+  .results-table th, .results-table td { display: block; }
+  .results-table thead { display: none; }
+  .results-table tr {
+    border-bottom: 1px solid var(--pico-muted-border-color); padding: .5rem 0;
+  }
+  .results-table th, .results-table td { border: 0; padding: .1rem 0; }
+  .results-table td.num { text-align: left; }
+  .results-table [data-label]::before { content: attr(data-label); display: block; }
+}
+
 /* Profile gallery (spec 2026-08-20-profile-gallery) — layout only. */
 .portfolio-grid {
   list-style: none; padding: 0;

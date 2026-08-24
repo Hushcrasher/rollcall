@@ -292,6 +292,14 @@ def _assemble_results(users: list[User], credits: QuerySet[Contribution]) -> lis
 
     # Engine repartition over distinct (game, engine) pairs, career-wide: three
     # credits on one Unreal game are one Unreal game, not three.
+    #
+    # Counted by FAMILY where one exists (spec 2026-08-24-engine-families), so a
+    # career split across `Unity` and `Unity 6` reads "Unity 100%" rather than
+    # "Unity 67% · Unity 6 33%" — two names for one engine, which said nothing
+    # true about the person. The SQL `.distinct()` only dedupes (user, game,
+    # engine); a game tagged with two spellings of the same family still yields
+    # two rows, so the family key is deduped again here or that game would count
+    # twice toward its own family.
     engine_counts: dict[int, dict[str, int]] = defaultdict(dict)
     pairs = (
         Contribution.objects.filter(
@@ -299,12 +307,17 @@ def _assemble_results(users: list[User], credits: QuerySet[Contribution]) -> lis
             user_id__in=user_ids,
             game__engines__isnull=False,
         )
-        .values_list("user_id", "game_id", "game__engines__name")
+        .values_list("user_id", "game_id", "game__engines__name", "game__engines__family__name")
         .distinct()
     )
-    for user_id, _game_id, engine_name in pairs:
+    seen: set[tuple[int, int, str]] = set()
+    for user_id, game_id, engine_name, family_name in pairs:
+        key = family_name or engine_name
+        if (user_id, game_id, key) in seen:
+            continue
+        seen.add((user_id, game_id, key))
         counts = engine_counts[user_id]
-        counts[engine_name] = counts.get(engine_name, 0) + 1
+        counts[key] = counts.get(key, 0) + 1
 
     results: list[PersonResult] = []
     for user in users:
