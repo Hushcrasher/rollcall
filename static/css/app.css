@@ -120,7 +120,18 @@ nav form button[type=submit] { background: none; border: none; color: var(--pico
   border: 1px solid var(--pico-muted-border-color);
   padding: .55rem .75rem .35rem;
 }
-.filter-group > .filter-row { margin-bottom: 0; }
+/* Inside a card the cells share the card's width instead of a fixed maximum.
+   `auto-fit` counts repetitions against the track MAXIMUM when that maximum is
+   definite, so the 13.5rem below fits only two 216px columns in this card's
+   ~629px and dropped the third criterion onto its own line at 1280px — measured
+   in the browser, where the page-wide row it was copied from had no such
+   problem. `1fr` makes the count fall back to the 9rem minimum and share what
+   is actually there. The page-wide row keeps its maximum: that one spans 72rem,
+   which is the stretch this whole rule set exists to stop. */
+.filter-group > .filter-row {
+  margin-bottom: 0;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+}
 .filter-group-head { margin: 0 0 .1rem; }
 /* A full-height line with the word sitting on it: ::before draws the rule,
    and the <span> punches through it with the page's own background. */
