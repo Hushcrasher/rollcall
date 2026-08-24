@@ -236,8 +236,15 @@ nav form button[type=submit] { background: none; border: none; color: var(--pico
 .chips:empty { display: none; }
 .chip {
   display: inline-flex; align-items: center; gap: .3rem;
-  border: 1px solid var(--pico-muted-border-color); padding: .1rem .3rem .1rem .6rem;
+  border: 1px solid var(--pico-muted-border-color);
 }
+/* The chip's padding, written past theme.css's `.chips li { padding: 0 }`. That
+   reset exists to undo Pico's list padding, but at (0,3,1) it also flattened
+   this padding when it lived on `.chip` (0,1,0) — so chip labels have sat 1px
+   from their own border since theme.css landed. `:root` here buys specificity
+   and nothing else: it ties that rule at (0,3,1), and app.css loads after
+   theme.css, so the tie goes to this file. */
+:root .chips li.chip { padding: .15rem .4rem .15rem .7rem; }
 .chip-remove {
   background: none; border: none; cursor: pointer; color: inherit;
   font: inherit; line-height: 1; padding: .1rem .3rem;
