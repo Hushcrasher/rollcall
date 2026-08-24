@@ -99,8 +99,14 @@ The owner picked the descriptive register over an interrogative one.
 
 New strings: `Games matching all of:`, `Credited on any of:`, `OR`, `Search
 games…`, and the exclusion error in §7. All through `gettext` (non-negotiable
-#10); the existing `locale/` catalogues gain the new msgids and lose the
-renamed ones.
+#10). `locale/` holds no `.po` catalogue yet — only a `.gitkeep` — so there is
+nothing to re-extract; the requirement is that every string be *wrapped*, so
+the first `makemessages` finds them.
+
+One escaping consequence: `{% translate %}` autoescapes, so the legend `The
+games they've worked on` reaches the HTML as `they&#x27;ve`. The legend-reading
+helper in `test_filter_rows.py` must `html.unescape()` before comparing, or the
+renamed legends will look absent.
 
 ## 6. The `games` facet
 
