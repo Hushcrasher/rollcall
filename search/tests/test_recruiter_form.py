@@ -103,3 +103,65 @@ def test_engines_and_genres_are_multi_select() -> None:
 def test_countries_accepts_iso_codes_and_rejects_junk() -> None:
     assert RecruiterSearchForm({"countries": ["FR", "SE"]}).is_valid()
     assert not RecruiterSearchForm({"countries": ["ZZ"]}).is_valid()
+
+
+_CONFLICT = "Filter either by game criteria or by specific games, not both."
+
+
+@pytest.mark.parametrize("criteria", ["genres", "min_rating", "engines"])
+def test_each_game_criterion_conflicts_with_specific_games(criteria: str) -> None:
+    """The two ways of naming games are alternatives, not filters that compose:
+    adding a genre to a list of named games can only narrow it into nonsense.
+    Parametrized so dropping any one of the three from clean() fails here."""
+    game = Game.objects.create(title="Hades", source=Game.Source.MANUAL)
+    values = {
+        "genres": [str(Genre.objects.create(name="RPG").pk)],
+        "engines": [str(Engine.objects.create(name="Unreal Engine").pk)],
+        "min_rating": "70",
+    }
+
+    form = RecruiterSearchForm({"games": [str(game.pk)], criteria: values[criteria]})
+
+    assert not form.is_valid()
+    assert _CONFLICT in form.non_field_errors()
+
+
+@pytest.mark.parametrize(
+    "person_filter",
+    [
+        {"countries": ["FR"]},
+        {"year_from": "2015"},
+        {"open_to_work": "on"},
+    ],
+)
+def test_person_filters_do_not_conflict_with_specific_games(
+    person_filter: dict[str, object],
+) -> None:
+    """The whole person section answers a different question and stays
+    available in both modes (spec 2026-08-24 §7)."""
+    game = Game.objects.create(title="Hades", source=Game.Source.MANUAL)
+
+    form = RecruiterSearchForm({"games": [str(game.pk)], **person_filter})
+
+    assert form.is_valid(), form.errors
+
+
+def test_discipline_does_not_conflict_with_specific_games() -> None:
+    """Separate from the parametrized cases above: discipline needs a real row."""
+    game = Game.objects.create(title="Hades", source=Game.Source.MANUAL)
+    discipline = Discipline.objects.get(name="Design")
+
+    form = RecruiterSearchForm({"games": [str(game.pk)], "discipline": str(discipline.pk)})
+
+    assert form.is_valid(), form.errors
+
+
+def test_a_field_error_does_not_also_report_the_conflict() -> None:
+    """Same reasoning as the zero-filter rule: a field-level error already told
+    the user what is wrong."""
+    game = Game.objects.create(title="Hades", source=Game.Source.MANUAL)
+
+    form = RecruiterSearchForm({"games": [str(game.pk)], "min_rating": "200"})
+
+    assert not form.is_valid()
+    assert _CONFLICT not in form.non_field_errors()

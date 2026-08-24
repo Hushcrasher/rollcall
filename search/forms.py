@@ -173,6 +173,15 @@ class RecruiterSearchForm(forms.Form):
             # A field-level error already told the user what's wrong; adding
             # "pick a filter" on top would tell them to do what they just did.
             return cleaned
+        # The two ways of naming games are alternatives, not filters that
+        # compose: adding a genre to a list of named games can only narrow it
+        # into nonsense. Enumerated, like has_filter below — a loop over the
+        # criteria would fail OPEN the day a fourth one is added.
+        criteria = any([cleaned.get("genres"), cleaned.get("min_rating"), cleaned.get("engines")])
+        if criteria and cleaned.get("games"):
+            raise forms.ValidationError(
+                _("Filter either by game criteria or by specific games, not both.")
+            )
         # Every field on this form is a filter — add new ones here. Kept
         # explicit on purpose: a generic loop over self.fields fails OPEN the
         # moment a non-filter field (say, `sort`) is added.
