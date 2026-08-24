@@ -6,7 +6,7 @@
 {% block extra_head %}
 <link rel="canonical" href="{% url 'home' %}">
 {% comment %}
-  No-JS is an ACCEPTED limitation for these three facets, not a graceful
+  No-JS is an ACCEPTED limitation for these four facets, not a graceful
   degradation — the typeahead is htmx, and htmx is JavaScript. Rather than leave
   a dead search box and inert remove buttons on the page, hide them and say so.
   Everything else still works: discipline, rating, year and open-to-work are
@@ -47,41 +47,46 @@
   <form id="typeahead-scratch" hidden></form>
 
   <p class="noscript-note">
-    {% translate "The engine, genre and country filters need JavaScript. Without it you can still filter by discipline, rating, year and open-to-work." %}
+    {% translate "The genre, game, engine and country filters need JavaScript. Without it you can still filter by role, rating, year and open-to-work." %}
   </p>
 
   <form class="filters" method="get" action="{% url 'home' %}#results">
     {{ form.non_field_errors }}
     {% comment %}
-      A <label for> per facet, not just a <fieldset><legend>: a legend alone
-      would be the only accessible name every control inside it shares — the
-      old checkbox list's helptext-per-checkbox problem. Two legends here are
-      fine because each control still keeps its own <label for>; the legend
-      only names the group. The help texts that caused the old repetition are
-      gone (see the shared footnote below).
+      Two sections, each a <fieldset> whose <legend> names the group; the field
+      cells keep their own <label for> (see _filter_field.html). The first
+      section splits into two cards that are ALTERNATIVES — the three criteria,
+      or the games named outright — which is the rule the form's clean()
+      enforces (spec 2026-08-24 §7). Drawing it is what makes the rule
+      discoverable before the visitor trips it.
     {% endcomment %}
-    <fieldset class="filter-row">
-      <legend>{% translate "Games they worked on" %}</legend>
-      {% for field in form.game_fields %}
-        <div class="filter">
-          <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-          {{ field.errors }}{{ field }}
+    <fieldset class="filter-section">
+      <legend>{% translate "The games they've worked on" %}</legend>
+      <div class="filter-split">
+        <div class="filter-group" data-filter-group>
+          <p class="filter-group-head"><small class="muted">{% translate "Games matching all of:" %}</small></p>
+          <div class="filter-row">
+            {% for field in form.criteria_fields %}{% include "search/_filter_field.html" %}{% endfor %}
+          </div>
         </div>
-      {% endfor %}
+        {% comment %}
+          Not decorative: OR states the relationship between the two cards, so
+          it stays in the accessibility tree rather than being aria-hidden.
+        {% endcomment %}
+        <div class="filter-or"><span>{% translate "OR" %}</span></div>
+        <div class="filter-group" data-filter-group>
+          <p class="filter-group-head"><small class="muted">{% translate "Credited on any of:" %}</small></p>
+          <div class="filter-row">
+            {% include "search/_filter_field.html" with field=form.games %}
+          </div>
+        </div>
+      </div>
     </fieldset>
-    <fieldset class="filter-row">
-      <legend>{% translate "About the person" %}</legend>
-      {% for field in form.person_fields %}
-        {# The checkbox cell has no input row of its own — app.css bottom-aligns it onto the row's input line (spec 2026-08-24 §3.2). #}
-        <div class="filter{% if field.name == 'open_to_work' %} filter-checkbox{% endif %}">
-          {% if field.name == "open_to_work" %}
-            <label>{{ field }} {{ field.label }}</label>{{ field.errors }}
-          {% else %}
-            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-            {{ field.errors }}{{ field }}
-          {% endif %}
-        </div>
-      {% endfor %}
+    <fieldset class="filter-section">
+      <legend>{% translate "The person" %}</legend>
+      <div class="filter-row">
+        {% for field in form.person_fields %}{% include "search/_filter_field.html" %}{% endfor %}
+      </div>
     </fieldset>
     {# The data caveat once, not per field: genre and rating data cover Steam-linked games only (ROADMAP "Non-Steam facet coverage"). #}
     <p class="filters-note"><small class="muted">{% translate "Genre and rating data currently cover Steam-linked games only." %}</small></p>
@@ -89,7 +94,7 @@
   </form>
 
   <script>
-    // Chips for the engines / genres / countries typeahead. Each chip carries the
+    // Chips for the engines / genres / countries / games typeahead. Each chip carries the
     // hidden input that actually posts the value, so adding and removing chips IS
     // adding and removing `?engines=3` params — there is no separate state to sync.
     (function () {
@@ -107,6 +112,37 @@
         chips.appendChild(chip);
       }
 
+      // The OR between the two game cards (spec 2026-08-24 §7). The filled side
+      // stays live and the empty one is disabled — disabled controls are not
+      // submitted, so this IS the mechanism in the browser, not a hint on top
+      // of one. The form's clean() is still the boundary: this only spares the
+      // visitor from reaching it.
+      function isFilled(group) {
+        if (group.querySelector(".chips input")) return true;
+        const numbers = group.querySelectorAll("input[type=number]");
+        for (const number of numbers) {
+          if (number.value.trim() !== "") return true;
+        }
+        return false;
+      }
+
+      function syncExclusion() {
+        const groups = Array.from(document.querySelectorAll(".filters [data-filter-group]"));
+        const filled = groups.filter(isFilled);
+        // Exactly one filled is the only state that disables anything. Neither
+        // filled is the empty form; BOTH filled is only reachable from a
+        // crafted querystring, and there the server's error is what should
+        // speak — disabling half of it would hide the value being complained
+        // about.
+        groups.forEach(function (group) {
+          const off = filled.length === 1 && !filled.includes(group);
+          group.toggleAttribute("data-off", off);
+          group.querySelectorAll("input, select, button").forEach(function (control) {
+            control.disabled = off;
+          });
+        });
+      }
+
       document.addEventListener("click", function (event) {
         const option = event.target.closest(".typeahead .autocomplete-option");
         if (option) {
@@ -116,11 +152,27 @@
           const input = widget.querySelector(".autocomplete-input");
           input.value = "";
           input.focus();  // keep picking without reaching for the mouse
+          syncExclusion();
           return;
         }
         const remove = event.target.closest(".typeahead .chip-remove");
-        if (remove) remove.closest(".chip").remove();
+        if (remove) {
+          remove.closest(".chip").remove();
+          syncExclusion();
+        }
       });
+
+      // Typing in the rating box is the other way a side becomes filled. The
+      // typeahead's own `q` box is a DOM descendant of the form even though
+      // <form id="typeahead-scratch"> owns it for submission, so its events
+      // bubble here too — harmless, since only chips count as filled.
+      document.addEventListener("input", function (event) {
+        const target = event.target;
+        if (target && target.closest && target.closest(".filters")) syncExclusion();
+      });
+
+      // Server-rendered chips are a filled state the page arrives in.
+      syncExclusion();
     })();
   </script>
 

@@ -104,6 +104,7 @@ class PeopleSearchView(TemplateView):
                 discipline_id=cleaned["discipline"].pk if cleaned.get("discipline") else None,
                 engine_ids=[engine.pk for engine in cleaned.get("engines") or []],
                 genre_ids=[genre.pk for genre in cleaned.get("genres") or []],
+                game_ids=[game.pk for game in cleaned.get("games") or []],
                 countries=list(cleaned.get("countries") or []),
                 min_rating=cleaned.get("min_rating"),
                 year_from=cleaned.get("year_from"),
@@ -183,7 +184,7 @@ def company_autocomplete(request: HttpRequest) -> HttpResponse:
 
 # --- Recruiter-filter typeahead ---------------------------------------------
 #
-# These three back the engines/genres/countries filters on the public
+# These four back the genres/games/engines/countries filters on the public
 # recruiter search and carry `key="ip"` unconditionally, unlike
 # game_autocomplete/company_autocomplete just above. Those two key by
 # `"user_or_ip"` instead (django_ratelimit.core._SIMPLE_KEYS's built-in
@@ -200,7 +201,7 @@ def company_autocomplete(request: HttpRequest) -> HttpResponse:
 # account instead of exempting it keeps both properties — every member is
 # still metered, on `settings.SEARCH_RATELIMIT` like everyone else, just
 # never on a counter shared with whoever else is behind the same router.
-# These three engine/genre/country endpoints have no such already-
+# These four genre/game/engine/country endpoints have no such already-
 # authenticated caller to protect, so there is nothing to carve out.
 #
 # `suggest`, above, is the one endpoint in this module that stays unmetered:
@@ -250,4 +251,23 @@ def country_autocomplete(request: HttpRequest) -> HttpResponse:
         options = [(code, str(name)) for code, name in countries if needle in str(name).casefold()][
             :_FILTER_OPTIONS_SHOWN
         ]
+    return render(request, "search/_filter_options.html", {"options": options})
+
+
+@ratelimit(key="ip", rate=_search_rate, method="GET", block=True)
+def game_filter_autocomplete(request: HttpRequest) -> HttpResponse:
+    """The recruiter filter's game picker.
+
+    Deliberately not `game_autocomplete` above: that one offers the IGDB
+    "deeper search" import, and importing a game nobody is credited on cannot
+    make this filter match a single person — it would spend an IGDB call, and
+    the operator's per-IP quota, on an option guaranteed to return nothing.
+
+    It searches the whole catalogue rather than only games carrying an active
+    credit: restricting it would cost a join and a DISTINCT on every keystroke,
+    and it is not what the sibling facets do — picking an engine nobody used
+    already returns zero results.
+    """
+    games = search_games(request.GET.get("q", ""), limit=_FILTER_OPTIONS_SHOWN)
+    options: list[tuple[Any, str]] = [(game.pk, game.title) for game in games]
     return render(request, "search/_filter_options.html", {"options": options})

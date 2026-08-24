@@ -1,0 +1,22 @@
+{% comment %}
+  One filter cell. Written once because it is now used in three places (the two
+  game sub-cards and the person row), and because the open_to_work exception
+  has to live in exactly one of them.
+
+  A <label for> per field, not just the section's <legend>: the legend only
+  names the group, and a group name is not an accessible name every control
+  inside it can share (that was the old checkbox list's problem).
+{% endcomment %}
+<div class="filter{% if field.name == 'open_to_work' %} filter-checkbox{% endif %}">
+  {% if field.name == "open_to_work" %}
+    {% comment %}
+      The box lives inside its label, so box and text are one hit target; the
+      cell has no input row of its own, and app.css bottom-aligns it onto the
+      row's input line (spec 2026-08-24 §3.2).
+    {% endcomment %}
+    <label>{{ field }} {{ field.label }}</label>{{ field.errors }}
+  {% else %}
+    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+    {{ field.errors }}{{ field }}
+  {% endif %}
+</div>
