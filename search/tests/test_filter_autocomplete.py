@@ -178,15 +178,18 @@ def test_empty_form_does_not_ship_a_choice_per_country(client: Client) -> None:
     empty home page carries 12 `<input>` tags and 10,021 bytes (measured via
     this same client/route, empty test db — not the dev server, whose local
     Postgres has seeded "Latest credits" rows that inflate byte count for
-    reasons unrelated to the filters). Caps are those measured values plus
-    ~10% headroom — wide enough for incidental copy changes, still far below
-    what 249 re-inlined choices would cost (was 253 inputs / 39,234 bytes).
+    reasons unrelated to the filters). Caps sit at roughly twice those values,
+    not just above them: the regression this guards against costs 253 inputs
+    and 39,234 bytes, so anything under ~24/20k catches it just as decisively,
+    while a cap two inputs above the measurement would fail on the next
+    legitimate filter and teach whoever hits it to raise the number rather
+    than ask why it moved.
     """
     content = _search(client, "")
 
     assert "France" not in content  # no country is named on the empty form
-    assert content.count("<input") < 14  # measured 12
-    assert len(content) < 11_100  # measured 10,021 bytes
+    assert content.count("<input") < 24  # measured 12; 249 choices would be 253
+    assert len(content) < 20_000  # measured 10,021 bytes; the old list was 39,234
 
 
 def test_selected_values_render_as_chips(client: Client) -> None:

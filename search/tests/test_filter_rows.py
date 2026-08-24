@@ -60,15 +60,29 @@ def test_game_criteria_are_ordered_genre_rating_engine(client: Client) -> None:
 
 def test_the_two_game_cards_are_alternatives(client: Client) -> None:
     """The three criteria and the named games are drawn as two cards with OR
-    between them — the layout IS the rule clean() enforces (spec §2, §7)."""
+    between them — the layout IS the rule clean() enforces (spec §2, §7).
+
+    The split is asserted per side, not over the whole section: counting cards
+    and headings across the fieldset would still pass with `games` sitting in
+    the criteria card beside genres, which is the one arrangement the drawing
+    exists to rule out.
+
+    Split on the OR marker rather than by matching the card elements. A
+    non-greedy `<div class="filter-group">.*?</div></div>` stops at the first
+    cell's closing tags, not the card's, and silently hands back a fragment
+    that satisfies every assertion below — which is how the first version of
+    this test passed with `games` deliberately misplaced.
+    """
     body = client.get(reverse("home")).content.decode()
     row = _fieldsets(body)["Games they worked on"]
+    criteria, _or, games = row.partition('class="filter-or"')
 
     assert row.count('class="filter-group"') == 2
-    assert "Games matching all of:" in row
-    assert "Credited on any of:" in row
     assert ">OR<" in row
-    assert 'id="id_games"' in row
+    assert "Games matching all of:" in criteria
+    assert 'id="id_genres"' in criteria and 'id="id_games"' not in criteria
+    assert "Credited on any of:" in games
+    assert 'id="id_games"' in games and 'id="id_genres"' not in games
 
 
 def test_the_games_facet_is_not_in_the_person_row(client: Client) -> None:
