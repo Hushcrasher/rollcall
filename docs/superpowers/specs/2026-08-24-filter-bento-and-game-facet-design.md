@@ -220,10 +220,18 @@ TDD, failing test first. New or changed:
 - `test_filter_rows.py` — renamed legends and labels; row-1 order is genres,
   min_rating, engines; the two sub-cards exist; `.chips:empty` count rises
   from 3 to 4.
-- New `test_game_facet_widget.py` — the chip lookup is bounded
-  (`assertNumQueries`-style: rendering with two selected games must not scale
-  with the catalogue), an unknown id renders no chip, and `?games=abc`
-  renders the page instead of raising.
+- New `test_game_facet_widget.py` — an unknown id renders no chip, and
+  `?games=abc` renders the page instead of raising. The catalogue-boundedness
+  claim needs two tests, not one: `assertNumQueries` on the *bound* render
+  (two selected games costs the same query count whether the catalogue holds
+  3 rows or 391k) pins something real but can't tell the targeted lookup from
+  the base class's `self.choices` iteration — that iteration is itself one
+  query on the bound path, so the count is identical either way. The
+  discriminating case is the *unbound* path: capture the queries a plain
+  `GET /` issues and assert none of them selects from `games_game` as its
+  source table without a `WHERE ... IN` — the base class's unconditional
+  `self.choices` iteration on the empty home page is what a query count
+  can't see.
 
 ## 10. Out of scope
 

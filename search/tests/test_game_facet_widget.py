@@ -10,7 +10,9 @@ querystring shapes that must not reach the database as-is.
 from typing import Any
 
 import pytest
+from django.db import connection
 from django.test import Client
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from games.models import Game
@@ -101,3 +103,35 @@ def test_chip_lookup_does_not_scale_with_the_catalogue(django_assert_num_queries
     # invariant this test exists for — no per-Noise-row cost — still holds.
     with django_assert_num_queries(2):
         RecruiterSearchForm({"games": [str(g.pk) for g in picked]})["games"].as_widget()
+
+
+def test_home_page_never_selects_the_full_game_table(client: Client) -> None:
+    """The actual regression, caught where it actually happens — not on the
+    bound path above.
+
+    A query COUNT can't tell `GameTypeaheadSelectMultiple` from the base
+    `TypeaheadSelectMultiple` on the bound path: the base class's
+    `self.choices` iteration is itself one query there, so
+    `django_assert_num_queries(2)` in the test above passes unchanged even
+    with the guard deleted (verified by swapping the widget: all other tests
+    stayed green too). The base class's real defect only shows on the
+    UNBOUND path — `_chips()` builds its full `{value: label}` map
+    unconditionally, even when nothing is selected — and the home page's
+    default render (a bare `GET /`, no querystring) is exactly that: an
+    unbound form. With the base widget it issues a second, unfiltered
+    `SELECT` over every `games_game` row and column, summary included.
+
+    So this asserts on SQL shape instead of a count: no query may select from
+    `games_game` as its source table without a `WHERE ... IN` narrowing it to
+    a selection. The `INNER JOIN` the "latest credits" feed makes into
+    `games_game` doesn't trip this — only a query with `games_game` as the
+    `FROM` table does, and today that only happens through `_chips()`.
+    """
+    with CaptureQueriesContext(connection) as queries:
+        response = client.get(reverse("home"))
+
+    assert response.status_code == 200
+    for query in queries.captured_queries:
+        sql = query["sql"]
+        if 'FROM "games_game"' in sql:
+            assert "WHERE" in sql and " IN (" in sql, sql
