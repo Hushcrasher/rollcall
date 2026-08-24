@@ -33,6 +33,20 @@ def test_two_rows_hold_the_right_filters(client: Client) -> None:
         assert f'name="{name}"' in person or f'id="id_{name}"' in person
 
 
+def test_the_person_section_comes_first(client: Client) -> None:
+    """The person is the half a recruiter can always fill — role, country,
+    seniority. The game half asks them to already know a genre, an engine or a
+    title, so leading with it made the form read as a quiz (changed 2026-08-24).
+
+    Asserted on document order rather than membership: `_fieldsets` keys in the
+    order `re.findall` walked the page, and the set-equality assertion above is
+    true whichever way round the two sections sit.
+    """
+    body = client.get(reverse("home")).content.decode()
+
+    assert list(_fieldsets(body)) == ["The person", "The games they've worked on"]
+
+
 def test_data_caveats_are_one_footnote(client: Client) -> None:
     body = client.get(reverse("home")).content.decode()
     main = body[body.index("<main") : body.index("</main>")]
