@@ -64,14 +64,20 @@ def test_junk_game_id_does_not_break_the_public_page(client: Client, junk: str) 
     assert response.status_code == 200
 
 
-@pytest.mark.parametrize("junk", ["abc", "1;DROP", "-1", "²"])
+@pytest.mark.parametrize("junk", ["abc", "1;DROP", "²"])
 def test_junk_game_id_is_filtered_before_the_query(junk: str) -> None:
     """The guard `_chips()` applies, pinned where it actually runs.
 
     `Game.objects.filter(pk__in=["abc"])` raises ValueError, so without the
-    filter this render would raise rather than return markup. Driven through
-    the widget rather than through the page: no template renders this field
-    yet, so an HTTP request never reaches `_chips()` at all.
+    filter this render would raise rather than return markup. Every value here
+    was mutation-checked against a guard-less `_chips()`; `"-1"` was dropped
+    because it survives one (`int("-1")` doesn't raise, and no game has that
+    pk), which would have made this docstring's claim false for a quarter of
+    its own cases. `"²"` earns the `isascii()` half specifically: it is a digit
+    to Python and not to `int()`.
+
+    Driven through the widget rather than through the page: no template renders
+    this field yet, so an HTTP request never reaches `_chips()` at all.
     """
     rendered = str(RecruiterSearchForm({"games": [junk]})["games"])
 
