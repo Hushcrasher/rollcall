@@ -174,6 +174,7 @@ def recruiter_search(
     discipline_id: int | None = None,
     engine_ids: Sequence[int] = (),
     genre_ids: Sequence[int] = (),
+    game_ids: Sequence[int] = (),
     countries: Sequence[str] = (),
     min_rating: float | None = None,
     open_to_work: bool | None = None,
@@ -185,11 +186,15 @@ def recruiter_search(
     discipline. Credit-level filters apply to the SAME active contribution
     ("Unreal × Programming" means one credit is both); multi-value facets are
     OR within the facet, AND across facets; `countries` filters the person.
+    `game_ids` names games outright and is the recruiter-facing alternative to
+    engine/genre/rating rather than a companion to them — the form refuses both
+    at once (search/forms.py), but nothing here depends on that.
     Rating is a filter, never a sort — results order by display_name."""
     credits = _matching_credits(
         discipline_id=discipline_id,
         engine_ids=engine_ids,
         genre_ids=genre_ids,
+        game_ids=game_ids,
         countries=countries,
         min_rating=min_rating,
         open_to_work=open_to_work,
@@ -211,6 +216,7 @@ def _matching_credits(
     discipline_id: int | None,
     engine_ids: Sequence[int],
     genre_ids: Sequence[int],
+    game_ids: Sequence[int],
     countries: Sequence[str],
     min_rating: float | None,
     open_to_work: bool | None,
@@ -229,6 +235,11 @@ def _matching_credits(
         credits = credits.filter(game__engines__in=list(engine_ids))
     if genre_ids:
         credits = credits.filter(game__genres__in=list(genre_ids))
+    if game_ids:
+        # A ForeignKey, unlike game__engines / game__genres above: an __in over
+        # it matches at most one row per credit, so this needs no distinct()
+        # guard of its own.
+        credits = credits.filter(game_id__in=list(game_ids))
     if countries:
         credits = credits.filter(user__country__in=list(countries))
     if min_rating is not None:

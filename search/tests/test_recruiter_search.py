@@ -308,6 +308,53 @@ def test_credits_without_a_game_are_not_searchable(disciplines: dict[str, Discip
     assert results[0].games_count == 1
 
 
+def test_filters_by_specific_games(disciplines: dict[str, Discipline]) -> None:
+    """OR within the facet, like engines and genres: credited on EITHER named
+    game is a match. Names are chosen so display_name order is deterministic —
+    results are ordered by display_name, never by rating."""
+    hades = Game.objects.create(title="Hades", source=Game.Source.MANUAL)
+    celeste = Game.objects.create(title="Celeste", source=Game.Source.MANUAL)
+    unlisted = Game.objects.create(title="Unlisted", source=Game.Source.MANUAL)
+
+    on_hades = _make_person("h@example.com", "A Hades Dev")
+    _credit(on_hades, hades, disciplines["Programming"])
+    on_celeste = _make_person("c@example.com", "B Celeste Dev")
+    _credit(on_celeste, celeste, disciplines["Art"])
+    elsewhere = _make_person("u@example.com", "C Unlisted Dev")
+    _credit(elsewhere, unlisted, disciplines["Art"])
+
+    assert _users(game_ids=[hades.pk, celeste.pk]) == [on_hades, on_celeste]
+
+
+def test_specific_games_cross_with_person_filters(disciplines: dict[str, Discipline]) -> None:
+    """AND across facets: the person section stays available alongside the
+    games facet (spec 2026-08-24 §7)."""
+    hades = Game.objects.create(title="Hades", source=Game.Source.MANUAL)
+    in_france = _make_person("f@example.com", "A In France", country="FR")
+    _credit(in_france, hades, disciplines["Art"])
+    in_sweden = _make_person("s@example.com", "B In Sweden", country="SE")
+    _credit(in_sweden, hades, disciplines["Art"])
+
+    assert _users(game_ids=[hades.pk], countries=["FR"]) == [in_france]
+
+
+def test_two_credits_on_one_listed_game_yield_one_result(
+    disciplines: dict[str, Discipline],
+) -> None:
+    """Contribution.game is a ForeignKey, so an __in over it cannot fan a credit
+    into several joined rows the way the game__engines M2M does — this pins that
+    no distinct() guard is needed here."""
+    hades = Game.objects.create(title="Hades", source=Game.Source.MANUAL)
+    person = _make_person("p@example.com", "One Person")
+    _credit(person, hades, disciplines["Art"])
+    _credit(person, hades, disciplines["Programming"])
+
+    page = recruiter_search(game_ids=[hades.pk])
+
+    assert page.total == 1
+    assert len(page.results[0].matching_credits) == 2
+
+
 # ---------------------------------------------------------------- cards
 
 
