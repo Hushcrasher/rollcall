@@ -105,11 +105,17 @@
     // hidden input that actually posts the value, so adding and removing chips IS
     // adding and removing `?engines=3` params — there is no separate state to sync.
     (function () {
-      function addChip(widget, value, label) {
+      function addChip(widget, value, label, param) {
         const chips = widget.querySelector("[data-chips]");
-        // Picking the same option twice must not post the value twice.
-        if (chips.querySelector('input[value="' + CSS.escape(value) + '"]')) return;
-        const template = widget.querySelector("[data-chip-template]");
+        const name = param || widget.dataset.name;
+        // Scoped by NAME as well as value: the engine box holds chips for two
+        // fields, and an engine pk and a family pk can be the same number.
+        // Matching on value alone would refuse the second of a colliding pair.
+        if (chips.querySelector('input[name="' + name + '"][value="' + CSS.escape(value) + '"]')) return;
+        // Keyed templates exist only in the engine box; everywhere else there
+        // is one unnamed template and `param` is undefined.
+        const template = widget.querySelector('[data-chip-template="' + name + '"]')
+          || widget.querySelector("[data-chip-template]");
         const chip = template.content.firstElementChild.cloneNode(true);
         chip.querySelector("input").value = value;
         chip.querySelector(".chip-label").textContent = label;
@@ -154,7 +160,7 @@
         const option = event.target.closest(".typeahead .autocomplete-option");
         if (option) {
           const widget = option.closest(".typeahead");
-          addChip(widget, option.dataset.id, option.dataset.label);
+          addChip(widget, option.dataset.id, option.dataset.label, option.dataset.param);
           widget.querySelector(".results").innerHTML = "";
           const input = widget.querySelector(".autocomplete-input");
           input.value = "";
