@@ -281,20 +281,34 @@ label.autocomplete-check { display: flex; align-items: center; gap: .5rem; width
 .noscript-note { display: none; }
 .pagination { margin: 1rem 0; }
 
-/* Results table (spec 2026-08-24-results-table). A register, not a stack of
-   cards: a recruiter compares people, and comparing is what a table is for. */
-.table-scroll { overflow-x: auto; }
-.results-table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; }
-/* Column rules off, row rules on and faint: the grid should sit under the data,
-   not draw a box around every value. Pico rules both axes by default. */
-.results-table th, .results-table td {
+/* Out of sight, still announced. A table whose headers are hidden outright
+   announces as an unlabelled grid; hiding them this way keeps the column names
+   for a screen reader while the eye reads the rows. */
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0;
+}
+
+/* A register of records — the search results and a profile's credit list are
+   the same object seen twice, so they share one look rather than drifting into
+   two. Column rules off, row rules on and faint: the grid should sit under the
+   data, not draw a box around every value. Pico rules both axes by default, so
+   both are reset and only border-bottom is put back. */
+.record-table { width: 100%; border-collapse: collapse; }
+.record-table th, .record-table td {
   border: 0; border-bottom: 1px solid var(--pico-muted-border-color);
   padding: .5rem .6rem; text-align: left; vertical-align: top;
 }
+.record-table .dates { white-space: nowrap; }
+
+/* Search results (spec 2026-08-24-results-table): a recruiter compares people,
+   and comparing is what a table is for. */
+.table-scroll { overflow-x: auto; }
+.results-table { margin-bottom: 1rem; }
 .results-table thead th { border-bottom-width: 2px; }
 .results-table td.num { text-align: right; }
-/* Counts and spans should never wrap mid-value into a second line. */
-.results-table .num, .results-table .dates { white-space: nowrap; }
+/* Counts should never wrap mid-value into a second line. */
+.results-table .num { white-space: nowrap; }
 .experience { list-style: none; margin: 0; padding: 0; }
 /* theme.css gives every `main li` .4rem of vertical padding; inside a table cell
    that turns three credits into a very tall row. Written at (0,2,2) to tie that
@@ -303,19 +317,31 @@ label.autocomplete-check { display: flex; align-items: center; gap: .5rem; width
 :root main .experience li { padding: 0; }
 .more-credits { display: inline-block; margin-top: .2rem; }
 
-/* Below the table's own breakpoint the columns stack and each cell reinstates
-   its header from `data-label` — a bare value with no header means nothing on a
-   phone. The real narrow-screen work is that, not shrinking the grid. */
+/* A profile's own credit list. One row is one credit and every cell is a single
+   line, so the capsule and its text sit on a shared centre line. The cover
+   column sizes to the capsule; the title takes what is left, so a long one
+   wraps rather than squeezing the columns after it. */
+.credits-table th, .credits-table td { vertical-align: middle; }
+.credits-table .credit-cover { width: 92px; padding-right: 0; }
+.credits-table .credit-cover img { margin: 0; }
+.credits-table .credit-actions { white-space: nowrap; }
+
 @media (max-width: 767px) {
-  .results-table, .results-table tbody, .results-table tr,
-  .results-table th, .results-table td { display: block; }
-  .results-table thead { display: none; }
-  .results-table tr {
+  .record-table, .record-table tbody, .record-table tr,
+  .record-table th, .record-table td { display: block; }
+  .record-table tr {
     border-bottom: 1px solid var(--pico-muted-border-color); padding: .5rem 0;
   }
-  .results-table th, .results-table td { border: 0; padding: .1rem 0; }
+  .record-table th, .record-table td { border: 0; padding: .1rem 0; }
+  /* The search results reinstate each header beside its value — a bare number
+     with no header means nothing on a phone. The profile's credits do not: those
+     columns read fine in order (title, role, company, dates), which is what the
+     card they replaced did. */
+  .results-table thead { display: none; }
   .results-table td.num { text-align: left; }
   .results-table [data-label]::before { content: attr(data-label); display: block; }
+  .credits-table .credit-cover { width: auto; }
+}
 }
 
 /* Profile gallery (spec 2026-08-20-profile-gallery) — layout only. */
