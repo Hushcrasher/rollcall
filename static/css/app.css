@@ -88,22 +88,78 @@ nav form button[type=submit] { background: none; border: none; color: var(--pico
 .muted { opacity: .7; }
 .preview-bar, .notice { border: 1px solid var(--pico-muted-border-color); padding: .4rem .6rem; }
 
-/* Filter rows (spec 2026-08-21-search-chrome §2): four columns on a laptop,
-   fewer as the width shrinks, one on a phone. Tightened vertical rhythm (.25rem,
-   was .5rem) so the two-row form fits 1280×800 with margin to spare. */
-.filter-row { border: 0; padding: 0; margin: 0 0 .25rem; display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0 1rem; align-items: start; }
+/* The filter bento (spec 2026-08-24 §2). One drawn card around the form, and
+   inside it two sub-cards that are alternatives rather than neighbours. The
+   border colours are Pico variables, same as .chip and .notice above — this
+   file still states no colour of its own. */
+.filters {
+  border: 1px solid var(--pico-muted-border-color);
+  padding: 1rem 1.1rem .5rem;
+  /* The air between Search and "Latest credits" (§2). */
+  margin-bottom: 2.75rem;
+}
+.filter-section { border: 0; padding: 0; margin: 0 0 1.1rem; }
+.filter-section:last-of-type { margin-bottom: .6rem; }
 /* A <legend> is not a grid item (it's the fieldset's accessible name, rendered
-   outside the box it labels), so `grid-column` on it was a no-op. */
-.filter-row legend { font-weight: bold; padding: 0; margin-bottom: .25rem; }
+   outside the box it labels), so grid-column on it is a no-op. Size and weight
+   are theme.css's — this is spacing only. */
+.filter-section > legend { padding: 0; margin-bottom: .55rem; }
+
+/* The two cards and the rule between them. Left column wider: it holds three
+   fields to the right column's one. */
+.filter-split {
+  display: grid; grid-template-columns: minmax(0, 1.9fr) auto minmax(0, 1fr);
+  gap: .8rem;
+}
+/* start on the CARDS, not on the grid: a card holding one field would
+   otherwise stretch to the tall one's height and be mostly empty space (§2).
+   The grid itself must keep stretching, or .filter-or has no height to draw
+   its rule down. */
+.filter-group {
+  align-self: start;
+  border: 1px solid var(--pico-muted-border-color);
+  padding: .55rem .75rem .35rem;
+}
+.filter-group > .filter-row { margin-bottom: 0; }
+.filter-group-head { margin: 0 0 .1rem; }
+/* A full-height line with the word sitting on it: ::before draws the rule,
+   and the <span> punches through it with the page's own background. */
+.filter-or { position: relative; display: flex; align-items: center; justify-content: center; }
+.filter-or::before {
+  content: ""; position: absolute; top: 0; bottom: 0; left: 50%;
+  border-left: 1px solid var(--pico-muted-border-color);
+}
+.filter-or span { position: relative; background: var(--pico-background-color); padding: .35rem 0; }
+/* The empty half of the OR, disabled by the page's script (§7). An opacity,
+   never a colour — the controls inside are already inert. */
+.filter-group[data-off] { opacity: .45; }
+
+/* Field cells. Was minmax(13rem, 1fr): the 1fr stretched four controls across
+   the whole 72rem column and left the ragged gaps between them (§2). A max
+   track plus justify-content packs them left at a readable width instead. */
+.filter-row { border: 0; padding: 0; margin: 0 0 .25rem; display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 13.5rem));
+  justify-content: start; gap: 0 .8rem; align-items: start; }
 /* The typeahead's text input and the plain <select>s otherwise size to
    content, leaving a ragged column; fill the grid cell like Pico's other
    full-width form controls do (excluding the open_to_work checkbox, which
    sits inline with its label). */
 .filter-row input:not([type=checkbox]), .filter-row select { width: 100%; }
-/* The shared data-caveat footnote under the two rows (spec §2) — same
-   tightened rhythm as .filter-row above. */
+/* The shared data-caveat footnote under the two sections (§2). */
 .filters-note { margin: 0 0 .5rem; }
+
+/* Enough to keep the bento usable on a narrow screen — the cards stack and the
+   OR rule turns horizontal. The real narrow-viewport pass is a follow-up
+   (spec 2026-08-24 §10), deliberately not attempted here. */
+@media (max-width: 767px) {
+  .filter-split { grid-template-columns: 1fr; }
+  .filter-or { padding: .2rem 0; }
+  .filter-or::before {
+    top: 50%; bottom: auto; left: 0; right: 0;
+    border-left: 0; border-top: 1px solid var(--pico-muted-border-color);
+  }
+  .filter-or span { padding: 0 .6rem; }
+}
 
 /* Spec §2: "the Search button sits under the second row, left-aligned" —
    Pico's [type=submit] is full-width by default; scoped to the filter form

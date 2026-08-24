@@ -128,6 +128,14 @@ body > header, body > main, body > footer { max-width: 72rem; }
 :root[data-theme=light] label,
 :root[data-theme=light] legend,
 :root[data-theme=light] th { font-size: .8rem; font-weight: 700; }
+/* The filter section names outrank the field labels (spec 2026-08-24 §4):
+   before this, `legend` and `label` shared one .8rem mono bold and the group
+   names grouped nothing. Written at this specificity on purpose — the
+   `:root[data-theme=light] legend` rule above is (0,2,1) and would beat a bare
+   `.filter-section > legend` however late it appeared. */
+:root[data-theme=light] .filter-section > legend {
+  font-size: 1.05rem; letter-spacing: -.01em;
+}
 :root[data-theme=light] .dates,
 :root[data-theme=light] small,
 :root[data-theme=light] .muted { font-size: .85rem; }
