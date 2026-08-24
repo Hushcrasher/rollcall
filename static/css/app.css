@@ -144,6 +144,12 @@ nav form button[type=submit] { background: none; border: none; color: var(--pico
 /* The empty half of the OR, disabled by the page's script (§7). An opacity,
    never a colour — the controls inside are already inert. */
 .filter-group[data-off] { opacity: .45; }
+/* The heading isn't a control, so it doesn't share the disabled controls'
+   exemption from WCAG 1.4.3 — and it already carries .muted's opacity .7, so
+   compounding that with the card's .45 above lands at effective alpha .315
+   (1.42:1 contrast): invisible, not de-emphasised. Held at full opacity here
+   so the card's own .45 is the only dimming it gets. */
+.filter-group[data-off] .filter-group-head small { opacity: 1; }
 
 /* Field cells. Was minmax(13rem, 1fr): the 1fr stretched four controls across
    the whole 72rem column and left the ragged gaps between them (§2). A max
