@@ -23,11 +23,8 @@
       <img src="{{ profile_user.avatar.url }}" alt="" width="120" height="120">
     {% endif %}
 
-    <h1>{{ profile_user.display_name }}</h1>
-
-    {% if profile_user.open_to_work %}
-      <p class="badge">{% translate "Open to work" %}</p>
-    {% endif %}
+    {# The badge belongs beside the name, not under it: it qualifies the person, and on its own line it read as a heading of its own. #}
+    <h1>{{ profile_user.display_name }}{% if profile_user.open_to_work %} <span class="badge">{% translate "Open to work" %}</span>{% endif %}</h1>
     {% if profile_user.location_display %}<p>{{ profile_user.location_display }}</p>{% endif %}
     {% if profile_user.public_email %}
       {# The member's own choice to publish this address (spec 2026-08-21-public-contact-email §3). The account email is never rendered. #}
@@ -88,26 +85,48 @@
       <p><a href="{% url 'contributions:create' %}">{% translate "Add your credit" %}</a></p>
     {% endif %}
 
-    {% for c in contributions %}
-      <div class="credit">
-        {% if c.game.capsule_url %}<img class="capsule-sm" src="{{ c.game.capsule_url }}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">{% endif %}
-        <a href="{% url 'games:game' c.game.slug %}">{{ c.game.title }}</a>
-        — {{ c.job_title }} <em>({{ c.discipline.name }})</em>
-        {% if c.company %}
-          @ <a href="{% url 'games:company' c.company.slug %}">{{ c.company.name }}</a>
-        {% endif %}
-        <span class="dates">
-          {{ c.start_date|date:"m/Y" }} – {% if c.end_date %}{{ c.end_date|date:"m/Y" }}{% else %}{% translate "present" %}{% endif %}{% if c.country %} · {{ c.country.name }}{% endif %}
-        </span>
-        <span class="badge">{% translate "Declared" %}</span>
-        {% if is_owner %}
-          <a href="{% url 'contributions:edit' c.pk %}">{% translate "Edit" %}</a>
-          <a href="{% url 'contributions:delete' c.pk %}">{% translate "Delete" %}</a>
-        {% endif %}
-      </div>
-    {% empty %}
+    {% if contributions %}
+      {% comment %}
+        A register of one career, so a table — same shape as the search results.
+        Column names are carried for screen readers and hidden from sight: a
+        credit line reads perfectly well without them, but a table with no
+        headers at all announces as an unlabelled grid.
+
+        The "Declared" badge is gone: every credit on this page is declared, so
+        it marked nothing and only competed with the row it sat in.
+      {% endcomment %}
+      <table class="record-table credits-table">
+        <thead class="visually-hidden">
+          <tr>
+            <th scope="col">{% translate "Cover" %}</th>
+            <th scope="col">{% translate "Game" %}</th>
+            <th scope="col">{% translate "Role" %}</th>
+            <th scope="col">{% translate "Company" %}</th>
+            <th scope="col">{% translate "Dates" %}</th>
+            {% if is_owner %}<th scope="col">{% translate "Actions" %}</th>{% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in contributions %}
+            <tr>
+              <td class="credit-cover">{% if c.game.capsule_url %}<img class="capsule-sm" src="{{ c.game.capsule_url }}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">{% endif %}</td>
+              <th scope="row"><a href="{% url 'games:game' c.game.slug %}">{{ c.game.title }}</a></th>
+              <td>{{ c.job_title }} <em>({{ c.discipline.name }})</em></td>
+              <td>{% if c.company %}<a href="{% url 'games:company' c.company.slug %}">{{ c.company.name }}</a>{% endif %}</td>
+              <td><span class="dates">{{ c.start_date|date:"m/Y" }}–{% if c.end_date %}{{ c.end_date|date:"m/Y" }}{% else %}{% translate "present" %}{% endif %}{% if c.country %} · {{ c.country.name }}{% endif %}</span></td>
+              {% if is_owner %}
+                <td class="credit-actions">
+                  <a href="{% url 'contributions:edit' c.pk %}">{% translate "Edit" %}</a>
+                  <a href="{% url 'contributions:delete' c.pk %}">{% translate "Delete" %}</a>
+                </td>
+              {% endif %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
       <p>{% translate "No credits yet." %}</p>
-    {% endfor %}
+    {% endif %}
   </section>
 
   {% if portfolio_images %}

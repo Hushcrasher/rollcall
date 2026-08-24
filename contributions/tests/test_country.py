@@ -81,8 +81,11 @@ def test_profile_and_game_lines_show_the_country(
         start_date=date(2024, 8, 1),
         country="FR",
     )
+    # The profile's credit list is a table now (spec 2026-08-24-profile-credits-table),
+    # so the dates cell is tighter than the old inline sentence — the country
+    # still rides with the dates, which is the property this pins.
     assert (
-        "08/2024 – present · France"
+        "08/2024–present · France"
         in client.get(reverse("accounts:profile", args=[user.slug])).content.decode()
     )
     assert "· France" in client.get(reverse("games:game", args=[game.slug])).content.decode()

@@ -384,7 +384,7 @@ def test_results_render_as_one_table_with_named_columns(client: Client) -> None:
 
     content = client.get(reverse("home"), {"discipline": design.pk}).content.decode()
 
-    assert '<table class="results-table">' in content
+    assert '<table class="record-table results-table">' in content
     for header in (
         "Name",
         "Based in",
@@ -476,4 +476,4 @@ def test_no_results_shows_the_message_and_no_empty_table(client: Client) -> None
     content = client.get(reverse("home"), {"discipline": other.pk}).content.decode()
 
     assert "No people match these filters." in content
-    assert '<table class="results-table">' not in content
+    assert '<table class="record-table results-table">' not in content
