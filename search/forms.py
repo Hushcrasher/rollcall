@@ -159,9 +159,13 @@ class RecruiterSearchForm(forms.Form):
     )
     open_to_work = forms.BooleanField(required=False, label=_("Open to work only"))
 
-    def game_fields(self) -> list[forms.BoundField]:
-        """Row 1 — what they worked on (spec 2026-08-21-search-chrome §2)."""
-        return [self["engines"], self["genres"], self["min_rating"]]
+    def criteria_fields(self) -> list[forms.BoundField]:
+        """The three game criteria, in the order a recruiter reaches for them
+        (spec 2026-08-24 §3): genre is the coarsest facet, engine the
+        specialist's. `games` is deliberately absent — it is the alternative to
+        this group, not a member of it, and the template renders it on its own
+        so the two cards can never be looped into one row by accident."""
+        return [self["genres"], self["min_rating"], self["engines"]]
 
     def person_fields(self) -> list[forms.BoundField]:
         """Row 2 — who they are."""

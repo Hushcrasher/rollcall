@@ -173,12 +173,20 @@ def test_empty_form_does_not_ship_a_choice_per_country(client: Client) -> None:
 
     Pinned by payload, not by markup — any rewrite that re-inlines the choices
     fails here however it spells them.
+
+    Caps re-measured for the fourth (games) typeahead added in Task 5: the
+    empty home page carries 12 `<input>` tags and 10,021 bytes (measured via
+    this same client/route, empty test db — not the dev server, whose local
+    Postgres has seeded "Latest credits" rows that inflate byte count for
+    reasons unrelated to the filters). Caps are those measured values plus
+    ~10% headroom — wide enough for incidental copy changes, still far below
+    what 249 re-inlined choices would cost (was 253 inputs / 39,234 bytes).
     """
     content = _search(client, "")
 
     assert "France" not in content  # no country is named on the empty form
-    assert content.count("<input") < 20  # was 253
-    assert len(content) < 15_000  # was 39,234 bytes
+    assert content.count("<input") < 14  # measured 12
+    assert len(content) < 11_100  # measured 10,021 bytes
 
 
 def test_selected_values_render_as_chips(client: Client) -> None:
@@ -241,13 +249,13 @@ def test_chip_labels_follow_the_active_language() -> None:
 
 
 def test_typeahead_search_box_stays_out_of_the_querystring(client: Client) -> None:
-    """The box is named `q` for htmx, but owned by an empty scratch form — three
-    boxes submitting `?q=&q=&q=` would ride along in every shareable and
+    """The box is named `q` for htmx, but owned by an empty scratch form — four
+    boxes submitting `?q=&q=&q=&q=` would ride along in every shareable and
     paginated URL."""
     content = _search(client, "")
 
     assert '<form id="typeahead-scratch" hidden></form>' in content
-    assert content.count('form="typeahead-scratch"') == 3
+    assert content.count('form="typeahead-scratch"') == 4
 
 
 def test_no_js_hides_the_dead_controls_and_says_so(client: Client) -> None:
@@ -259,4 +267,4 @@ def test_no_js_hides_the_dead_controls_and_says_so(client: Client) -> None:
     assert "<noscript>" in content
     assert ".js-only { display: none; }" in content
     assert "need JavaScript" in content
-    assert content.count('class="autocomplete-input js-only"') == 3
+    assert content.count('class="autocomplete-input js-only"') == 4
