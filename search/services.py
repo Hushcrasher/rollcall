@@ -173,6 +173,7 @@ def recruiter_search(
     *,
     discipline_id: int | None = None,
     engine_ids: Sequence[int] = (),
+    engine_family_ids: Sequence[int] = (),
     genre_ids: Sequence[int] = (),
     game_ids: Sequence[int] = (),
     countries: Sequence[str] = (),
@@ -193,6 +194,7 @@ def recruiter_search(
     credits = _matching_credits(
         discipline_id=discipline_id,
         engine_ids=engine_ids,
+        engine_family_ids=engine_family_ids,
         genre_ids=genre_ids,
         game_ids=game_ids,
         countries=countries,
@@ -215,6 +217,7 @@ def _matching_credits(
     *,
     discipline_id: int | None,
     engine_ids: Sequence[int],
+    engine_family_ids: Sequence[int],
     genre_ids: Sequence[int],
     game_ids: Sequence[int],
     countries: Sequence[str],
@@ -231,8 +234,15 @@ def _matching_credits(
     )
     if discipline_id is not None:
         credits = credits.filter(discipline_id=discipline_id)
-    if engine_ids:
-        credits = credits.filter(game__engines__in=list(engine_ids))
+    if engine_ids or engine_family_ids:
+        # One facet, two ways of naming a value in it, so they OR together like
+        # any other multi-value facet: "Unity (the family) or Godot 4" is one
+        # filter. A family reaches every spelling the catalogue carries for that
+        # engine — the whole reason it exists (spec 2026-08-24-engine-families).
+        credits = credits.filter(
+            Q(game__engines__in=list(engine_ids))
+            | Q(game__engines__family_id__in=list(engine_family_ids))
+        )
     if genre_ids:
         credits = credits.filter(game__genres__in=list(genre_ids))
     if game_ids:

@@ -7,6 +7,10 @@
   names the group, and a group name is not an accessible name every control
   inside it can share (that was the old checkbox list's problem).
 {% endcomment %}
+{% if field.name == "engines" %}
+  {# One box, two fields — see _engine_field.html. #}
+  {% include "search/_engine_field.html" %}
+{% else %}
 <div class="filter{% if field.name == 'open_to_work' %} filter-checkbox{% endif %}">
   {% if field.name == "open_to_work" %}
     {% comment %}
@@ -20,3 +24,4 @@
     {{ field.errors }}{{ field }}
   {% endif %}
 </div>
+{% endif %}

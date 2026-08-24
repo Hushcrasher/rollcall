@@ -17,7 +17,7 @@ from django.utils.translation import gettext_lazy as _
 from django_countries import countries
 
 from contributions.models import Discipline
-from games.models import Engine, Game, Genre
+from games.models import Engine, EngineFamily, Game, Genre
 
 
 def _country_choices() -> list[tuple[str, str]]:
@@ -113,6 +113,18 @@ class RecruiterSearchForm(forms.Form):
             url_name="search:engine_autocomplete", placeholder=_("Search engines…")
         ),
     )
+    engine_families = forms.ModelMultipleChoiceField(
+        queryset=EngineFamily.objects.all(),
+        required=False,
+        label=_("Game engine family"),
+        # No typeahead widget of its own: `engines` and `engine_families` are
+        # two ways of naming a value in ONE facet, and the page draws them as a
+        # single "Game engine" box (spec 2026-08-24-engine-families §6). The
+        # template renders both fields' chips into that box; this field only has
+        # to clean and post them. Its label never renders, but a field without
+        # one is a field no error message can name.
+        widget=forms.MultipleHiddenInput,
+    )
     genres = forms.ModelMultipleChoiceField(
         queryset=Genre.objects.all(),
         required=False,
@@ -167,6 +179,33 @@ class RecruiterSearchForm(forms.Form):
         so the two cards can never be looped into one row by accident."""
         return [self["genres"], self["min_rating"], self["engines"]]
 
+    def engine_chips(self) -> list[tuple[str, str, Any]]:
+        """(param, value, label) for every engine-facet chip, families first.
+
+        The facet posts to two fields but draws as one box, so the template
+        needs both sets in one list — and each chip has to remember which field
+        will clean it, or a value comes back as the wrong kind on submit.
+        """
+        return [
+            *(("engine_families", v, lb) for v, lb in self._chips_of("engine_families")),
+            *(("engines", v, lb) for v, lb in self._chips_of("engines")),
+        ]
+
+    def _chips_of(self, name: str) -> list[tuple[str, Any]]:
+        field = self.fields[name]
+        raw = field.widget.value_from_datadict(self.data, self.files, self.add_prefix(name))
+        ids = [v for v in map(str, raw or []) if v.isascii() and v.isdigit()]
+        if not ids:
+            return []
+        labels = {
+            str(pk): row_name
+            for pk, row_name in field.queryset.filter(pk__in=ids).values_list("pk", "name")
+        }
+        # `ids` order, and the label looked up rather than derived from the raw
+        # value: junk in the querystring renders no chip at all, the same rule
+        # every other facet follows.
+        return [(v, labels[v]) for v in ids if v in labels]
+
     def person_fields(self) -> list[forms.BoundField]:
         """Row 2 — who they are."""
         return [self["discipline"], self["countries"], self["year_from"], self["open_to_work"]]
@@ -181,7 +220,14 @@ class RecruiterSearchForm(forms.Form):
         # compose: adding a genre to a list of named games can only narrow it
         # into nonsense. Enumerated, like has_filter below — a loop over the
         # criteria would fail OPEN the day a fourth one is added.
-        criteria = any([cleaned.get("genres"), cleaned.get("min_rating"), cleaned.get("engines")])
+        criteria = any(
+            [
+                cleaned.get("genres"),
+                cleaned.get("min_rating"),
+                cleaned.get("engines"),
+                cleaned.get("engine_families"),
+            ]
+        )
         if criteria and cleaned.get("games"):
             raise forms.ValidationError(
                 _("Filter either by game criteria or by specific games, not both.")
@@ -193,6 +239,7 @@ class RecruiterSearchForm(forms.Form):
             [
                 cleaned.get("discipline"),
                 cleaned.get("engines"),
+                cleaned.get("engine_families"),
                 cleaned.get("genres"),
                 cleaned.get("games"),
                 cleaned.get("countries"),

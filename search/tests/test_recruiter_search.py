@@ -14,7 +14,7 @@ from django.utils.functional import Promise
 
 from accounts.models import User
 from contributions.models import Contribution, Discipline
-from games.models import Company, Engine, Game, GameEngine, GameGenre, Genre
+from games.models import Company, Engine, EngineFamily, Game, GameEngine, GameGenre, Genre
 from search.services import (
     MATCHING_CREDITS_SHOWN,
     RESULTS_PER_PAGE,
@@ -786,3 +786,78 @@ def test_game_summary_is_not_fetched_for_matching_credits(
         # ty resolves FK descriptors to the Field, not the related model — the
         # same accommodation accounts/github.py:189 makes.
         assert credit.game.summary == "A very long marketing blurb."  # ty: ignore[unresolved-attribute]
+
+
+# ---------------------------------------------------------------- engine families
+
+
+def _family(name: str, *engine_names: str) -> EngineFamily:
+    family = EngineFamily.objects.create(name=name)
+    for engine_name in engine_names:
+        Engine.objects.create(name=engine_name, family=family)
+    return family
+
+
+def test_an_engine_family_reaches_every_spelling(disciplines: dict[str, Discipline]) -> None:
+    """The whole point (spec 2026-08-24-engine-families): the catalogue spells
+    one engine thirteen ways, and picking the family must reach all of them —
+    including the ones that are not versions at all, like `Unity3D`."""
+    family = _family("Unity", "Unity", "Unity3D", "Unity 2021")
+    unity, unity3d, unity2021 = family.engines.order_by("name")
+    other = Engine.objects.create(name="Godot")
+
+    people = []
+    for label, engine in [("A", unity), ("B", unity3d), ("C", unity2021)]:
+        person = _make_person(f"{label.lower()}@example.com", f"{label} Dev")
+        _credit(person, _engine_game(f"{label} Game", engine), disciplines["Art"])
+        people.append(person)
+    elsewhere = _make_person("z@example.com", "Z Dev")
+    _credit(elsewhere, _engine_game("Godot Game", other), disciplines["Art"])
+
+    assert _users(engine_family_ids=[family.pk]) == people
+    assert elsewhere not in _users(engine_family_ids=[family.pk])
+
+
+def test_a_family_and_a_loose_engine_or_together(disciplines: dict[str, Discipline]) -> None:
+    """One facet, two ways of naming a value in it — so they OR, like every
+    other multi-value facet."""
+    family = _family("Unity", "Unity 2021")
+    unity2021 = family.engines.get()
+    godot = Engine.objects.create(name="Godot")
+
+    on_unity = _make_person("u@example.com", "A Unity Dev")
+    _credit(on_unity, _engine_game("Unity Game", unity2021), disciplines["Art"])
+    on_godot = _make_person("g@example.com", "B Godot Dev")
+    _credit(on_godot, _engine_game("Godot Game", godot), disciplines["Art"])
+
+    results = _users(engine_family_ids=[family.pk], engine_ids=[godot.pk])
+
+    assert results == [on_unity, on_godot]
+
+
+def test_a_family_crosses_with_person_filters(disciplines: dict[str, Discipline]) -> None:
+    """AND across facets still holds once the engine facet has two inputs."""
+    family = _family("Unity", "Unity 2021")
+    engine = family.engines.get()
+    game = _engine_game("Unity Game", engine)
+
+    in_france = _make_person("f@example.com", "A In France", country="FR")
+    _credit(in_france, game, disciplines["Art"])
+    in_sweden = _make_person("s@example.com", "B In Sweden", country="SE")
+    _credit(in_sweden, game, disciplines["Art"])
+
+    assert _users(engine_family_ids=[family.pk], countries=["FR"]) == [in_france]
+
+
+def test_one_person_on_two_spellings_appears_once(disciplines: dict[str, Discipline]) -> None:
+    """The family filter joins through an M2M, so it can fan a credit into
+    several rows the way `engine_ids` already can."""
+    family = _family("Unity", "Unity", "Unity3D")
+    a, b = family.engines.order_by("name")
+    person = _make_person("p@example.com", "One Person")
+    _credit(person, _engine_game("Both", a, b), disciplines["Art"])
+
+    page = recruiter_search(engine_family_ids=[family.pk])
+
+    assert page.total == 1
+    assert len(page.results[0].matching_credits) == 1

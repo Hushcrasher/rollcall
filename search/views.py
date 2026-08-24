@@ -7,6 +7,7 @@ query returns nothing (anti-scraping posture, docs/02-ARCHITECTURE.md §5).
 from typing import Any
 
 from django.conf import settings
+from django.db.models import Q
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
 from django.utils.decorators import method_decorator
@@ -18,7 +19,7 @@ from django_ratelimit.exceptions import Ratelimited
 
 from contributions.models import Contribution
 from games.igdb import IGDBClient
-from games.models import Engine, Genre
+from games.models import Engine, EngineFamily, Genre
 from search.forms import RecruiterSearchForm
 from search.services import recruiter_search, search_companies, search_games, search_people
 
@@ -103,6 +104,7 @@ class PeopleSearchView(TemplateView):
             context["results_page"] = recruiter_search(
                 discipline_id=cleaned["discipline"].pk if cleaned.get("discipline") else None,
                 engine_ids=[engine.pk for engine in cleaned.get("engines") or []],
+                engine_family_ids=[fam.pk for fam in cleaned.get("engine_families") or []],
                 genre_ids=[genre.pk for genre in cleaned.get("genres") or []],
                 game_ids=[game.pk for game in cleaned.get("games") or []],
                 countries=list(cleaned.get("countries") or []),
@@ -226,10 +228,59 @@ def _reference_options(model: type[Engine] | type[Genre], query: str) -> list[tu
     return [(row.pk, row.name) for row in rows]
 
 
+# Families come first and bring their members with them, so a head plus a few
+# versions still fits the panel. Deliberately larger than _FILTER_OPTIONS_SHOWN:
+# with Unity's thirteen spellings, a flat ten-row cap would show versions and
+# push the family option — the one worth picking — off the bottom.
+_ENGINE_FAMILIES_SHOWN = 4
+_ENGINE_MEMBERS_SHOWN = 3
+
+
+def _engine_options(query: str) -> list[dict[str, Any]]:
+    """The engine facet's mixed list: family heads, their matching members
+    indented beneath them, then engines that belong to no family.
+
+    A head is offered when the FAMILY name matches and also when only a MEMBER
+    does — typing "2021" should still let a recruiter take all of Unity, which
+    is the pick they are more likely to want than the bare version.
+    """
+    stripped = query.strip()
+    if not stripped:
+        return []
+
+    matches = list(
+        Engine.objects.filter(name__icontains=stripped).select_related("family")[
+            : _FILTER_OPTIONS_SHOWN * 3
+        ]
+    )
+    families = list(
+        EngineFamily.objects.filter(
+            Q(name__icontains=stripped) | Q(engines__name__icontains=stripped)
+        ).distinct()[:_ENGINE_FAMILIES_SHOWN]
+    )
+
+    options: list[dict[str, Any]] = []
+    for family in families:
+        options.append(
+            {"param": "engine_families", "value": family.pk, "label": family.name, "child": False}
+        )
+        members = [e for e in matches if e.family_id == family.pk][:_ENGINE_MEMBERS_SHOWN]
+        options += [
+            {"param": "engines", "value": e.pk, "label": e.name, "child": True} for e in members
+        ]
+
+    loose = [e for e in matches if e.family_id is None][:_FILTER_OPTIONS_SHOWN]
+    options += [{"param": "engines", "value": e.pk, "label": e.name, "child": False} for e in loose]
+    return options
+
+
 @ratelimit(key="ip", rate=_search_rate, method="GET", block=True)
 def engine_autocomplete(request: HttpRequest) -> HttpResponse:
-    options = _reference_options(Engine, request.GET.get("q", ""))
-    return render(request, "search/_filter_options.html", {"options": options})
+    return render(
+        request,
+        "search/_engine_options.html",
+        {"options": _engine_options(request.GET.get("q", ""))},
+    )
 
 
 @ratelimit(key="ip", rate=_search_rate, method="GET", block=True)

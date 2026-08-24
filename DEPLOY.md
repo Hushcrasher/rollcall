@@ -150,6 +150,12 @@ python manage.py prepare_seed_parquet --source-dir data --out data/rollcall_game
 
 # 2. Load it into Postgres (reads PARQUET_SOURCE_URL, or --source).
 python manage.py seed_games
+
+# 3. Group the engine rows the seed just created into curated families, so a
+#    recruiter filtering "Unity" reaches all thirteen spellings the catalogue
+#    carries for it. Idempotent; must run AFTER every seed, because a seed can
+#    introduce engine names the mapping already knows about.
+python manage.py link_engine_families
 ```
 
 - **`steam.parquet`** is the Steam-derived catalog; that filename is the
@@ -163,8 +169,13 @@ python manage.py seed_games
 - The prepared parquet is ~392k games (all IGDB + Steam-only). If the upstream
   files change column names, adjust `games/seed/prepare.py`.
 - Set `SEED_ALERT_EMAIL` to be notified on failure. Weekly: a Railway cron
-  service can run both commands (prepare then seed), or Hushcrasher's pipeline
-  produces the prepared parquet and the cron only runs `seed_games`.
+  service can run all three commands (prepare, seed, then
+  `link_engine_families`), or Hushcrasher's pipeline produces the prepared
+  parquet and the cron runs `seed_games && link_engine_families`.
+- **`link_engine_families` prints what it could not match.** A mapped name that
+  matches no engine row means either a typo in `games/engine_families.py` or a
+  name the upstream catalogue has renamed; either way the filter silently
+  covers one spelling fewer until it is fixed, so the output is worth reading.
 - **Performance:** the bulk loader does the full ~392k catalog in ~2 minutes
   (prepare ~2s + seed ~2min), so both the cold load and the weekly refresh are
   cheap.

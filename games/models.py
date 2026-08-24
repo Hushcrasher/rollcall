@@ -49,6 +49,36 @@ class Genre(models.Model):
         return str(self.name)
 
 
+class EngineFamily(models.Model):
+    """One engine under all the names the catalogue spells it with.
+
+    PLATFORM-OWNED, unlike `Engine` itself: the seed knows nothing about this
+    table or about `Engine.family`, and `games/seed/upsert.py` never updates an
+    engine row it did not just create, so a curated family survives every
+    reseed and a newly seeded engine simply arrives unfamilied.
+
+    Populated from `games/engine_families.py` by `link_engine_families`.
+    """
+
+    objects: ClassVar[models.Manager["EngineFamily"]] = models.Manager()
+    # `ty` runs without a Django plugin and cannot see a reverse accessor. A
+    # bare annotation is the smallest way to declare one: Django's metaclass
+    # only inspects class attributes with values, so this creates no field.
+    engines: models.Manager["Engine"]
+
+    name = models.CharField(_("name"), max_length=100, unique=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["name"]
+        verbose_name_plural = _("engine families")
+
+    def __str__(self) -> str:
+        return str(self.name)
+
+
 class Engine(models.Model):
     """Reference table populated by the seed from IGDB taxonomies (§4)."""
 
@@ -56,6 +86,17 @@ class Engine(models.Model):
 
     igdb_id = models.IntegerField(null=True, blank=True, unique=True)
     name = models.CharField(_("name"), max_length=100, unique=True)
+
+    # Platform-owned; see EngineFamily above. SET_NULL rather than CASCADE — a
+    # family is a grouping, and deleting one must never delete the engines.
+    family = models.ForeignKey(
+        EngineFamily,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="engines",
+        verbose_name=_("family"),
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

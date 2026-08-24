@@ -10,7 +10,7 @@ import pytest
 from django.utils import translation
 
 from contributions.models import Discipline
-from games.models import Engine, Game, Genre
+from games.models import Engine, EngineFamily, Game, Genre
 from search.forms import RecruiterSearchForm
 
 pytestmark = pytest.mark.django_db
@@ -32,12 +32,14 @@ def test_each_filter_alone_satisfies_the_rule() -> None:
     (Task 5's review mutation-tested this: with only the plan's original
     tests, 4 of the 7 entries could be deleted with the suite still green.)"""
     engine = Engine.objects.create(name="Unreal Engine")
+    family = EngineFamily.objects.create(name="Unity")
     genre = Genre.objects.create(name="RPG")
     game = Game.objects.create(title="Hades", source=Game.Source.MANUAL)
     discipline = Discipline.objects.get(name="Design")
     for data in (
         {"discipline": str(discipline.pk)},
         {"engines": [str(engine.pk)]},
+        {"engine_families": [str(family.pk)]},
         {"genres": [str(genre.pk)]},
         {"games": [str(game.pk)]},
         {"countries": ["FR"]},
@@ -177,3 +179,25 @@ def test_a_field_error_does_not_also_report_the_conflict() -> None:
     assert not form.is_valid()
     assert "countries" in form.errors
     assert _CONFLICT not in form.non_field_errors()
+
+
+def test_an_engine_family_conflicts_with_specific_games() -> None:
+    """A family is a game criterion like any other, so it must fall on the same
+    side of the OR as the engine field it shares a box with."""
+    game = Game.objects.create(title="Hades", source=Game.Source.MANUAL)
+    family = EngineFamily.objects.create(name="Unity")
+
+    form = RecruiterSearchForm({"games": [str(game.pk)], "engine_families": [str(family.pk)]})
+
+    assert not form.is_valid()
+    assert _CONFLICT in form.non_field_errors()
+
+
+def test_engine_families_is_multi_select() -> None:
+    unity = EngineFamily.objects.create(name="Unity")
+    godot = EngineFamily.objects.create(name="Godot")
+
+    form = RecruiterSearchForm({"engine_families": [str(unity.pk), str(godot.pk)]})
+
+    assert form.is_valid()
+    assert set(form.cleaned_data["engine_families"]) == {unity, godot}

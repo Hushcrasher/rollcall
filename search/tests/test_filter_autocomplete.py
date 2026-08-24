@@ -14,7 +14,7 @@ from django.test import Client, RequestFactory
 from django.urls import reverse
 from django.utils import translation
 
-from games.models import Engine, Game, Genre
+from games.models import Engine, EngineFamily, Game, Genre
 from search.views import country_autocomplete
 
 pytestmark = pytest.mark.django_db
@@ -159,6 +159,110 @@ def test_filter_autocomplete_is_rate_limited(client: Client, settings: Any, url_
     url = reverse(url_name)
     assert client.get(url, {"q": "a"}).status_code == 200
     assert client.get(url, {"q": "a"}).status_code == 403
+
+
+# --- The engine facet's mixed list ------------------------------------------
+
+
+def _unity_family() -> EngineFamily:
+    family = EngineFamily.objects.create(name="Unity")
+    Engine.objects.create(name="Unity", family=family)
+    Engine.objects.create(name="Unity 2021", family=family)
+    return family
+
+
+def test_engine_autocomplete_puts_the_family_before_its_members(client: Client) -> None:
+    """The head is the pick worth making — it reaches every spelling — so it
+    must not be pushed under the versions it stands for."""
+    _unity_family()
+
+    content = client.get(reverse("search:engine_autocomplete"), {"q": "unity"}).content.decode()
+
+    assert content.index('data-param="engine_families"') < content.index('data-param="engines"')
+
+
+def test_engine_autocomplete_tags_each_option_with_its_field(client: Client) -> None:
+    """A chip's hidden input has to be named for the field that will clean it,
+    and the two kinds post to different fields — without this the client has no
+    way to tell a family pick from a version pick."""
+    family = _unity_family()
+
+    content = client.get(reverse("search:engine_autocomplete"), {"q": "unity"}).content.decode()
+
+    assert f'data-param="engine_families" data-id="{family.pk}"' in content
+    version = Engine.objects.get(name="Unity 2021")
+    assert f'data-param="engines" data-id="{version.pk}"' in content
+
+
+def test_engine_autocomplete_offers_the_family_when_only_a_member_matches(
+    client: Client,
+) -> None:
+    """Typing "2021" should still let a recruiter take all of Unity — that is
+    the broader pick, and the more likely intent."""
+    family = _unity_family()
+
+    content = client.get(reverse("search:engine_autocomplete"), {"q": "2021"}).content.decode()
+
+    assert f'data-param="engine_families" data-id="{family.pk}"' in content
+
+
+def test_engine_autocomplete_indents_members_and_not_heads(client: Client) -> None:
+    """The indent IS the relationship; a head rendered as a child would read as
+    a version of itself.
+
+    Note the engine row literally named "Unity" is a MEMBER of the Unity family
+    and indents like any other — the head above it is the family, a different
+    thing that happens to share the name. Asserted per option rather than by
+    counting, which was how the first version of this test got it wrong.
+    """
+    _unity_family()
+
+    content = client.get(reverse("search:engine_autocomplete"), {"q": "unity"}).content.decode()
+    options = re.findall(r'<button[^>]*data-param="([a-z_]+)"[^>]*>', content)
+    classes = re.findall(r'class="(autocomplete-option[^"]*)"', content)
+
+    assert options[0] == "engine_families"
+    assert "autocomplete-child" not in classes[0]
+    assert all("autocomplete-child" in c for c in classes[1:])
+    assert all(p == "engines" for p in options[1:])
+
+
+def test_an_engine_with_no_family_stays_a_plain_option(client: Client) -> None:
+    """~1,200 engines belong to no family and must behave as they always have."""
+    loose = Engine.objects.create(name="PICO-8")
+
+    content = client.get(reverse("search:engine_autocomplete"), {"q": "pico"}).content.decode()
+
+    assert f'data-param="engines" data-id="{loose.pk}"' in content
+    assert "autocomplete-child" not in content
+    assert "engine_families" not in content
+
+
+def test_engine_autocomplete_blank_query_is_empty(client: Client) -> None:
+    _unity_family()
+
+    response = client.get(reverse("search:engine_autocomplete"), {"q": "   "})
+
+    assert response.status_code == 200
+    assert b"autocomplete-option" not in response.content
+
+
+@pytest.mark.parametrize("junk", ["abc", "1;DROP", "-1", "99999999999999999999"])
+def test_junk_engine_family_id_does_not_break_the_public_page(client: Client, junk: str) -> None:
+    """Same guard as the games facet: the chips are rendered from the raw
+    querystring during render, before field validation has had its say."""
+    response = client.get(reverse("home"), {"engine_families": junk})
+
+    assert response.status_code == 200
+
+
+def test_selected_family_renders_as_a_chip(client: Client) -> None:
+    family = _unity_family()
+
+    content = _search(client, f"?engine_families={family.pk}")
+
+    assert f'<input type="hidden" name="engine_families" value="{family.pk}">' in content
+    assert "Unity" in content
 
 
 # --- The widget -------------------------------------------------------------

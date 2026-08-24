@@ -104,6 +104,17 @@ nav form button[type=submit] { background: none; border: none; color: var(--pico
   background: var(--pico-primary-background); color: var(--pico-primary-inverse);
 }
 .igdb-trigger { border-top: 1px solid var(--pico-muted-border-color); font-style: italic; }
+/* A version listed under its family head. The indent IS the relationship: the
+   row above picks every spelling of the engine, this one picks just this
+   version (spec 2026-08-24-engine-families §6).
+
+   The selector is specificity plumbing, measured rather than guessed: these
+   options are <button type="button">, so theme.css's
+   `:root[data-theme=light] [type=button]` padding matches them at (0,3,0).
+   `.autocomplete-child` (0,1,0) and `:root button.autocomplete-child` (0,2,1)
+   both lost to it and indented nothing. Going through the panel gets to
+   (0,3,1) without app.css naming the theme. */
+:root .results button.autocomplete-child { padding-left: 2rem; }
 .suggest-item small { opacity: .6; }
 
 /* Used by profile.html, _github_block.html and the search cards — global,
