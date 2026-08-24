@@ -112,6 +112,37 @@
         chips.appendChild(chip);
       }
 
+      // The OR between the two game cards (spec 2026-08-24 §7). The filled side
+      // stays live and the empty one is disabled — disabled controls are not
+      // submitted, so this IS the mechanism in the browser, not a hint on top
+      // of one. The form's clean() is still the boundary: this only spares the
+      // visitor from reaching it.
+      function isFilled(group) {
+        if (group.querySelector(".chips input")) return true;
+        const numbers = group.querySelectorAll("input[type=number]");
+        for (const number of numbers) {
+          if (number.value.trim() !== "") return true;
+        }
+        return false;
+      }
+
+      function syncExclusion() {
+        const groups = Array.from(document.querySelectorAll(".filters [data-filter-group]"));
+        const filled = groups.filter(isFilled);
+        // Exactly one filled is the only state that disables anything. Neither
+        // filled is the empty form; BOTH filled is only reachable from a
+        // crafted querystring, and there the server's error is what should
+        // speak — disabling half of it would hide the value being complained
+        // about.
+        groups.forEach(function (group) {
+          const off = filled.length === 1 && !filled.includes(group);
+          group.toggleAttribute("data-off", off);
+          group.querySelectorAll("input, select, button").forEach(function (control) {
+            control.disabled = off;
+          });
+        });
+      }
+
       document.addEventListener("click", function (event) {
         const option = event.target.closest(".typeahead .autocomplete-option");
         if (option) {
@@ -121,11 +152,27 @@
           const input = widget.querySelector(".autocomplete-input");
           input.value = "";
           input.focus();  // keep picking without reaching for the mouse
+          syncExclusion();
           return;
         }
         const remove = event.target.closest(".typeahead .chip-remove");
-        if (remove) remove.closest(".chip").remove();
+        if (remove) {
+          remove.closest(".chip").remove();
+          syncExclusion();
+        }
       });
+
+      // Typing in the rating box is the other way a side becomes filled. The
+      // typeahead's own `q` box is a DOM descendant of the form even though
+      // <form id="typeahead-scratch"> owns it for submission, so its events
+      // bubble here too — harmless, since only chips count as filled.
+      document.addEventListener("input", function (event) {
+        const target = event.target;
+        if (target && target.closest && target.closest(".filters")) syncExclusion();
+      });
+
+      // Server-rendered chips are a filled state the page arrives in.
+      syncExclusion();
     })();
   </script>
 
