@@ -16,7 +16,7 @@
   <div class="autocomplete typeahead" data-typeahead
        data-remove-label="{% blocktranslate with label='%s' %}Remove {{ label }}{% endblocktranslate %}">
     {# One physical line: `.chips:empty` is the hiding mechanism and a lone whitespace node defeats `:empty`. #}
-    <ul class="chips" data-chips>{% for param, value, label in form.engine_chips %}{% include "search/widgets/_chip.html" with name=param value=value label=label %}{% endfor %}</ul>
+    <ul class="chips" data-chips>{% for param, value, label, family in form.engine_chips %}{% include "search/widgets/_chip.html" with name=param value=value label=label family=family %}{% endfor %}</ul>
     <input type="text" class="autocomplete-input js-only" id="id_engines" name="q" autocomplete="off"
            placeholder="{% translate 'Search engines…' %}"
            form="typeahead-scratch"

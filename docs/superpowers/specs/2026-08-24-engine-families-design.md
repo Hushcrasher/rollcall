@@ -93,14 +93,41 @@ produce, exactly as it does for the existing `game__engines__in`.
 
 ## 6. The typeahead
 
-One box, one endpoint, a mixed list. Typing `unity` returns the family head
-first and its matching members indented beneath it:
+One box, one endpoint, a mixed list of **checkboxes** (amended 2026-08-24 after
+the first round: a plain row of text gave no way to tell whether a click was
+taking the family or one version, which is the distinction the whole feature
+exists to draw). Typing `unity` returns the family head first and its matching
+versions indented beneath it:
 
 ```
-Unity                     ← picks the whole family
-    Unity 2021            ← picks that version only
-    Unity 2022
+☑ Unity                   ← picks the whole family
+  ☑ Unity 2021            ← ticked and locked: covered by the family above
+  ☑ Unity 2022
 ```
+
+**The member whose name is the family name is not listed.** `Unity` under
+`Unity` reads as a version of itself and offers nothing the head does not
+already cover. The consequence is deliberate: that unversioned row — the
+catalogue's largest at 15,968 links — is reachable only through its family,
+which is the right place for it.
+
+**Picking a family ticks and locks its versions**, so a reader can see what the
+family reaches, and drops any version chips it supersedes: both together post
+two filters that mean exactly what the family means alone. Unticking the family
+releases them. Only one chip is ever added — the family's.
+
+**The panel stays open** after a tick, because a checkbox promises you can tick
+several. That is a departure from the other three typeaheads, where a pick adds
+its chip and closes; it follows from the control, not from taste.
+
+The option checkboxes carry no `name`. They sit inside the search form, and a
+named one would post alongside the chips it is only mirroring.
+
+**They must also be exempt from the OR exclusion's blanket `disabled`**
+(`syncExclusion`, spec 2026-08-24 §7), which assigns `disabled` to every
+`input, select, button` in a filter group. It was undoing the family lock a
+millisecond after it was set — a defect no test could see, since the project
+runs no JavaScript in tests.
 
 Each option carries the parameter it posts to — `data-param="engine_families"`
 for a head, `data-param="engines"` for a member — because a chip's hidden input

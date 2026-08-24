@@ -110,7 +110,7 @@
     // hidden input that actually posts the value, so adding and removing chips IS
     // adding and removing `?engines=3` params — there is no separate state to sync.
     (function () {
-      function addChip(widget, value, label, param) {
+      function addChip(widget, value, label, param, family) {
         const chips = widget.querySelector("[data-chips]");
         const name = param || widget.dataset.name;
         // Scoped by NAME as well as value: the engine box holds chips for two
@@ -127,8 +127,71 @@
         chip.querySelector(".chip-remove").setAttribute(
           "aria-label", widget.dataset.removeLabel.replace("%s", label)
         );
+        // A version chip remembers its family so that picking the family later
+        // can find and drop it.
+        if (family) chip.dataset.family = family;
         chips.appendChild(chip);
       }
+
+      // --- The engine box's checkable options ------------------------------
+      //
+      // The engine facet is the only typeahead whose options are checkboxes: a
+      // family and one of its versions are different picks, and a plain row of
+      // text gave no way to tell which one a click was about. The boxes mirror
+      // the chips — the chips remain the thing that posts.
+      function removeChip(widget, name, value) {
+        const input = widget.querySelector(
+          '[data-chips] input[name="' + name + '"][value="' + CSS.escape(value) + '"]'
+        );
+        if (input) input.closest(".chip").remove();
+      }
+
+      function syncEngineOptions(widget) {
+        const chips = widget.querySelector("[data-chips]");
+        function picked(name, value) {
+          return !!chips.querySelector(
+            'input[name="' + name + '"][value="' + CSS.escape(value) + '"]'
+          );
+        }
+        widget.querySelectorAll(".autocomplete-check input[type=checkbox]").forEach(function (box) {
+          // A version whose family is picked is covered by it: shown ticked so
+          // the reader can see what the family reaches, and locked because
+          // unticking it alone would not narrow anything.
+          const covered = box.dataset.family && picked("engine_families", box.dataset.family);
+          box.checked = !!covered || picked(box.dataset.param, box.dataset.id);
+          box.disabled = !!covered;
+        });
+      }
+
+      document.addEventListener("change", function (event) {
+        const box = event.target.closest
+          ? event.target.closest(".autocomplete-check input[type=checkbox]")
+          : null;
+        if (!box) return;
+        const widget = box.closest(".typeahead");
+        if (box.checked) {
+          addChip(widget, box.dataset.id, box.dataset.label, box.dataset.param, box.dataset.family);
+          if (box.dataset.param === "engine_families") {
+            // Picking a family supersedes any version of it picked separately:
+            // both together post two filters that mean exactly what the family
+            // means alone.
+            widget
+              .querySelectorAll('[data-chips] .chip[data-family="' + box.dataset.id + '"]')
+              .forEach(function (chip) { chip.remove(); });
+          }
+        } else {
+          removeChip(widget, box.dataset.param, box.dataset.id);
+        }
+        syncEngineOptions(widget);
+        syncExclusion();
+      });
+
+      // The panel is replaced wholesale on every keystroke, so freshly swapped
+      // boxes start blank and have to be told what is already picked.
+      document.addEventListener("htmx:afterSwap", function (event) {
+        const widget = event.target.closest ? event.target.closest(".typeahead") : null;
+        if (widget) syncEngineOptions(widget);
+      });
 
       // The OR between the two game cards (spec 2026-08-24 §7). The filled side
       // stays live and the empty one is disabled — disabled controls are not
@@ -156,6 +219,13 @@
           const off = filled.length === 1 && !filled.includes(group);
           group.toggleAttribute("data-off", off);
           group.querySelectorAll("input, select, button").forEach(function (control) {
+            // Not the dropdown panel's own controls. Those are option
+            // checkboxes mirroring the chips, and the engine box disables some
+            // of them for its own reason (a version covered by a picked
+            // family). A blanket assignment here undid that lock a
+            // millisecond after it was set — and only ever showed up in a
+            // browser, never in a test.
+            if (control.closest(".results")) return;
             control.disabled = off;
           });
         });
@@ -175,7 +245,9 @@
         }
         const remove = event.target.closest(".typeahead .chip-remove");
         if (remove) {
+          const widget = remove.closest(".typeahead");
           remove.closest(".chip").remove();
+          syncEngineOptions(widget);
           syncExclusion();
         }
       });

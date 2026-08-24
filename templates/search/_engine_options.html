@@ -1,18 +1,23 @@
 {% load i18n %}
 {% comment %}
-  The engine facet's mixed list. A family head picks every spelling the
-  catalogue carries for that engine; a member picks that version alone.
+  The engine facet's mixed list, as checkboxes. The box is the point: a family
+  head and one of its versions are different picks, and a plain row of text gave
+  a recruiter no way to tell which one a click was about.
 
-  `data-param` is load-bearing, not decoration: the two kinds of option post to
-  different form fields (`engine_families` vs `engines`), so a chip's hidden
-  input has to be named for the field that will clean it. people_search.html's
-  addChip reads this to pick which <template> to clone.
+  `data-param` is load-bearing — the two kinds post to different form fields
+  (`engine_families` vs `engines`), so a chip's hidden input has to be named for
+  the field that will clean it. `data-family` on a version says which family
+  covers it, so picking that family can tick and lock it.
+
+  The checkboxes carry no `name`: they live inside the search form, and a named
+  one would post alongside the chips it is only mirroring.
 {% endcomment %}
 {% for option in options %}
-  <button type="button" class="autocomplete-option{% if option.child %} autocomplete-child{% endif %}"
-          data-param="{{ option.param }}" data-id="{{ option.value }}" data-label="{{ option.label }}">
-    {{ option.label }}
-  </button>
+  <label class="autocomplete-check{% if option.child %} autocomplete-child{% endif %}">
+    <input type="checkbox" data-param="{{ option.param }}" data-id="{{ option.value }}"
+           data-label="{{ option.label }}"{% if option.family %} data-family="{{ option.family }}"{% endif %}>
+    <span>{{ option.label }}</span>
+  </label>
 {% empty %}
   <p class="autocomplete-empty">{% translate "No matches." %}</p>
 {% endfor %}

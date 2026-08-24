@@ -218,8 +218,8 @@ def test_engine_autocomplete_indents_members_and_not_heads(client: Client) -> No
     _unity_family()
 
     content = client.get(reverse("search:engine_autocomplete"), {"q": "unity"}).content.decode()
-    options = re.findall(r'<button[^>]*data-param="([a-z_]+)"[^>]*>', content)
-    classes = re.findall(r'class="(autocomplete-option[^"]*)"', content)
+    options = re.findall(r'data-param="([a-z_]+)"', content)
+    classes = re.findall(r'class="(autocomplete-check[^"]*)"', content)
 
     assert options[0] == "engine_families"
     assert "autocomplete-child" not in classes[0]
@@ -375,3 +375,41 @@ def test_no_js_hides_the_dead_controls_and_says_so(client: Client) -> None:
     assert ".js-only { display: none; }" in content
     assert "need JavaScript" in content
     assert content.count('class="autocomplete-input js-only"') == 4
+
+
+def test_the_member_named_after_its_family_is_not_listed_under_it(client: Client) -> None:
+    """ "Unity" under "Unity" reads as a version of itself and offers nothing the
+    family above it does not already cover. The consequence is deliberate: that
+    unversioned row is reachable only through its family."""
+    family = EngineFamily.objects.create(name="Unity")
+    same_name = Engine.objects.create(name="Unity", family=family)
+    version = Engine.objects.create(name="Unity 2021", family=family)
+
+    content = client.get(reverse("search:engine_autocomplete"), {"q": "unity"}).content.decode()
+
+    assert f'data-id="{same_name.pk}"' not in content
+    assert f'data-id="{version.pk}"' in content
+    assert f'data-param="engine_families" data-id="{family.pk}"' in content
+
+
+def test_options_are_checkboxes(client: Client) -> None:
+    """A family head and one of its versions are different picks; a row of plain
+    text gave no way to tell which one a click was about."""
+    _unity_family()
+
+    content = client.get(reverse("search:engine_autocomplete"), {"q": "unity"}).content.decode()
+
+    assert '<input type="checkbox"' in content
+    # Unnamed on purpose: these live inside the search form, and a named one
+    # would post alongside the chips it is only mirroring.
+    assert 'checkbox" name=' not in content
+
+
+def test_a_version_says_which_family_covers_it(client: Client) -> None:
+    """Picking a family ticks and locks the versions it covers, and the page can
+    only find them if each one says which family it belongs to."""
+    family = _unity_family()
+
+    content = client.get(reverse("search:engine_autocomplete"), {"q": "2021"}).content.decode()
+
+    assert f'data-family="{family.pk}"' in content
