@@ -127,8 +127,12 @@ Two traps, both load-bearing:
   cost bounded by the selection.
 - **Non-numeric ids must be filtered before the query.** `?games=abc` would
   reach `pk__in=["abc"]` and raise `ValueError` — a 500 on a public page from
-  a hand-typed URL. The override drops anything failing `str.isdigit()`
-  before it queries.
+  a hand-typed URL. The override drops anything failing `isascii()` and
+  `str.isdigit()` before it queries. (`isascii()` earns its place: `"²"` is a
+  digit to Python but not to `int()`.) An out-of-range integer needs no guard
+  — measured against the existing `engines` facet, Postgres promotes the
+  literal rather than overflowing, so `id IN (10^20)` matches nothing and the
+  page returns 200.
 
 `recruiter_search()` gains `game_ids: Sequence[int] = ()`, applied in
 `_matching_credits()` as `credits.filter(game_id__in=list(game_ids))` — OR

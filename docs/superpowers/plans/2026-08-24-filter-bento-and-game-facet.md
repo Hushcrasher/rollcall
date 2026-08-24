@@ -405,11 +405,15 @@ def test_unknown_game_id_renders_no_chip() -> None:
     assert 'value="424242"' not in rendered
 
 
-@pytest.mark.parametrize("junk", ["abc", "1;DROP", "-1", "٣", "99999999999999999999"])
+@pytest.mark.parametrize("junk", ["abc", "1;DROP", "-1", "²", "99999999999999999999"])
 def test_junk_game_id_does_not_break_the_public_page(client: Client, junk: str) -> None:
-    """`?games=abc` reaching pk__in as a string raises ValueError, and an
-    out-of-range integer overflows Postgres' int4 — either one is a 500 on a
-    public page from a hand-typed URL."""
+    """`?games=abc` reaching pk__in as a string raises ValueError — a 500 on a
+    public page from a hand-typed URL.
+
+    The out-of-range value is here to pin the surprise rather than a fix:
+    Postgres promotes the literal instead of overflowing, so `id IN (10^20)`
+    simply matches nothing. Measured against the existing `engines` facet
+    before this branch — all five shapes already returned 200 there."""
     response = client.get(reverse("home"), {"games": junk})
 
     assert response.status_code == 200
@@ -521,11 +525,6 @@ Expected: FAIL — `KeyError: 'games'` / `"games" is not one of the available ch
 In `search/forms.py`, change the games import to `from games.models import Engine, Game, Genre`, then add after `TypeaheadSelectMultiple`:
 
 ```python
-# Postgres' int4 ceiling, which is what AutoField's column holds. A larger
-# value passes str.isdigit() and int() but overflows on execution.
-_MAX_PK = 2_147_483_647
-
-
 class GameTypeaheadSelectMultiple(TypeaheadSelectMultiple):
     """Chip labels from a targeted query instead of from `self.choices`.
 
@@ -538,16 +537,11 @@ class GameTypeaheadSelectMultiple(TypeaheadSelectMultiple):
     """
 
     def _chips(self, value: Any) -> list[tuple[str, Any]]:
-        # Filtered BEFORE the query, not after: `?games=abc` would reach
-        # `pk__in` as a string and raise ValueError, and a 20-digit id would
-        # overflow int4 — either one a 500 on a public page from a hand-typed
-        # URL. isascii() is part of the guard: "٣".isdigit() is True but
-        # int() rejects it.
-        ids = [
-            v
-            for v in map(str, value or [])
-            if v.isascii() and v.isdigit() and 0 < int(v) <= _MAX_PK
-        ]
+        # Filtered BEFORE the query, not after: `?games=abc` reaching `pk__in`
+        # as a string raises ValueError — a 500 on a public page from a
+        # hand-typed URL. isascii() is part of the guard, not decoration:
+        # "²".isdigit() is True and int("²") raises.
+        ids = [v for v in map(str, value or []) if v.isascii() and v.isdigit()]
         if not ids:
             return []
         labels = {
@@ -591,7 +585,7 @@ In `search/views.py`, inside the `recruiter_search(...)` call, after the `genre_
 uv run pytest search/tests/ -v
 ```
 
-Expected: PASS. If `test_junk_game_id_does_not_break_the_public_page` still fails for one of the junk values, the failure is in Django's own field validation, not in `_chips` — read the traceback before touching the guard. Note whether the pre-existing `engines`/`genres` facets share the overflow risk; if they do, that is a **pre-existing issue to file, not to fix here** (out of this spec's scope).
+Expected: PASS. If `test_junk_game_id_does_not_break_the_public_page` fails for one of the junk values, the failure is in Django's own field validation, not in `_chips` — read the traceback before touching the guard. Do not widen the guard beyond `isascii() and isdigit()`: the same five shapes were measured against the existing `engines` facet before this branch and all returned 200, so anything more is guarding against a failure mode that does not exist.
 
 - [ ] **Step 9: Full toolchain**
 
@@ -615,8 +609,7 @@ keeps the property the base class exists for — a label is never derived from
 the raw value, so an unknown id renders no chip.
 
 Junk ids are filtered before the query, not after: ?games=abc would reach
-pk__in as a string and ?games=<20 digits> would overflow int4, and both are a
-500 on a public page from a hand-typed URL.
+pk__in as a string and 500 a public page from a hand-typed URL.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 ```
@@ -1370,7 +1363,7 @@ In the long `**Recruiter search filters:**` bullet at line 100, make three edits
 In `ROADMAP.md`, immediately after the `**Profile-only Message button + layout polish** (2026-08-24)` bullet, add:
 
 ```markdown
-- [x] **Filter bento + a specific-games facet** (2026-08-24): the home page's filter block becomes one drawn card with a real type hierarchy (`theme.css` gave `label`, `legend` and `th` one `.8rem` mono bold, so the section names grouped nothing — legends now sit at `1.05rem`). Inside it, the three game criteria and a **new `games` facet** are drawn as two mutually exclusive cards with `OR` between them: naming games outright and describing them by genre/rating/engine answer the same question two ways, and combining them can only narrow a list of named games into nonsense. `clean()` refuses both at once; the page disables the empty side (disabled controls are not submitted, so that IS the browser-side mechanism), and the person section stays available in both modes. Row 1 reorders to genre · rating · engine, every label is renamed out of database vocabulary ("Engines" → "Game engine", "Discipline" → "Their role"), and the field cells pack left — the old `minmax(13rem, 1fr)` stretched four controls across the full 72rem column. Two traps carried the real work: `TypeaheadSelectMultiple._chips()` builds its label map by iterating `self.choices`, which for `Game` would materialise ~391k rows **on every render of the home page** (a subclass looks up only the selected ids), and `?games=abc` would reach `pk__in` as a string while a 20-digit id would overflow `int4` — both a 500 on a public page from a hand-typed URL. The games typeahead gets its own `filters/games/` endpoint rather than reusing the credit form's, which offers an IGDB import that cannot produce a match. **The narrow-viewport pass is deliberately deferred** — this ships only the stacking that keeps a phone usable. Spec: `docs/superpowers/specs/2026-08-24-filter-bento-and-game-facet-design.md`.
+- [x] **Filter bento + a specific-games facet** (2026-08-24): the home page's filter block becomes one drawn card with a real type hierarchy (`theme.css` gave `label`, `legend` and `th` one `.8rem` mono bold, so the section names grouped nothing — legends now sit at `1.05rem`). Inside it, the three game criteria and a **new `games` facet** are drawn as two mutually exclusive cards with `OR` between them: naming games outright and describing them by genre/rating/engine answer the same question two ways, and combining them can only narrow a list of named games into nonsense. `clean()` refuses both at once; the page disables the empty side (disabled controls are not submitted, so that IS the browser-side mechanism), and the person section stays available in both modes. Row 1 reorders to genre · rating · engine, every label is renamed out of database vocabulary ("Engines" → "Game engine", "Discipline" → "Their role"), and the field cells pack left — the old `minmax(13rem, 1fr)` stretched four controls across the full 72rem column. Two traps carried the real work: `TypeaheadSelectMultiple._chips()` builds its label map by iterating `self.choices`, which for `Game` would materialise ~391k rows **on every render of the home page** (a subclass looks up only the selected ids), and `?games=abc` would reach `pk__in` as a string — a 500 on a public page from a hand-typed URL. The games typeahead gets its own `filters/games/` endpoint rather than reusing the credit form's, which offers an IGDB import that cannot produce a match. **The narrow-viewport pass is deliberately deferred** — this ships only the stacking that keeps a phone usable. Spec: `docs/superpowers/specs/2026-08-24-filter-bento-and-game-facet-design.md`.
 ```
 
 - [ ] **Step 3: Confirm the suite still passes**
