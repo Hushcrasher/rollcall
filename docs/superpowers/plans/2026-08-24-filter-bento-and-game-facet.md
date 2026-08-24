@@ -1425,13 +1425,14 @@ Record a pass/fail for each. Any failure is diagnosed in source and fixed before
 5. **Packing** — the person row's four cells sit close together on the left, not spread across the full width.
 6. **Checkbox alignment** — "Open to work only" still sits on its row's input line (this is the measured value Task 7 was told not to disturb).
 7. **Games typeahead** — type `hade`; real titles appear within a keystroke or two; **no "deeper search" option** is offered; picking one adds a chip.
-8. **Exclusion, games → criteria** — with a game chip present, the left card is dimmed and its inputs refuse focus.
+8. **Exclusion, games → criteria** — with a game chip present, the left card is dimmed and its inputs refuse focus. Look at the dimming specifically: `.filter-group[data-off]`'s `opacity: .45` stacks on top of the browser's own dimming of `disabled` controls, so the card may read as far fainter than intended. Raised by the Task 8 review. If it is unreadable, raise the opacity rather than removing the disabled state — the disabling is the mechanism, the opacity is only its sign.
 9. **Exclusion, criteria → games** — clear the chip, type `85` into the rating box: the right card dims instead.
 10. **Switch back** — clear the rating box; both cards go live again.
 11. **Submit in games mode** — pick a game a real member is credited on, Search: results render, and the URL carries `?games=<pk>` and *no* `engines=`/`genres=`/`min_rating=` (proving the disabled inputs did not submit).
 12. **Both sides via a crafted URL** — load `/?games=<pk>&min_rating=85` by hand: the page renders 200 with `Filter either by game criteria or by specific games, not both.` and **both** cards live.
 13. **Junk id** — load `/?games=abc`: 200, no chip, no 500.
 14. **Narrow screen** — resize to 375px: the cards stack, the OR rule is horizontal, nothing overflows sideways. (Polish is out of scope; *broken* is not.)
+15. **The 768–820px band** — raised by the Task 7 review, from the box model rather than from a render. At 768px the left card's content box works out to roughly 27.3rem, against the 28.6rem that three `minmax(9rem, 13.5rem)` tracks plus two `.8rem` gaps need: `auto-fit` would drop to two columns and wrap the third criterion onto its own line *inside* the card. This band sits **above** the `max-width: 767px` stacking rule, so the deferred mobile pass does not cover it. Check 768, 800 and 820px explicitly. If it wraps, the cheap fixes are narrowing the track minimum below `9rem` or widening the left column's `1.9fr` share — decide in the browser, with the measurement in hand.
 
 - [ ] **Step 4: Capture the evidence**
 
