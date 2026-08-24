@@ -23,8 +23,8 @@ def _fieldsets(body: str) -> dict[str, str]:
 def test_two_rows_hold_the_right_filters(client: Client) -> None:
     body = client.get(reverse("home")).content.decode()
     rows = _fieldsets(body)
-    assert set(rows) == {"Games they worked on", "About the person"}
-    game, person = rows["Games they worked on"], rows["About the person"]
+    assert set(rows) == {"The games they've worked on", "The person"}
+    game, person = rows["The games they've worked on"], rows["The person"]
     for name in ("engines", "genres", "min_rating"):
         assert f'name="{name}"' in game or f'id="id_{name}"' in game
     for name in ("discipline", "countries", "year_from", "open_to_work"):
@@ -51,7 +51,7 @@ def test_game_criteria_are_ordered_genre_rating_engine(client: Client) -> None:
     """Genre is the coarsest facet a recruiter reaches for and comes first;
     engine is the specialist's and comes last (spec 2026-08-24 §3)."""
     body = client.get(reverse("home")).content.decode()
-    row = _fieldsets(body)["Games they worked on"]
+    row = _fieldsets(body)["The games they've worked on"]
 
     assert (
         row.index('id="id_genres"') < row.index('id="id_min_rating"') < row.index('id="id_engines"')
@@ -74,7 +74,7 @@ def test_the_two_game_cards_are_alternatives(client: Client) -> None:
     this test passed with `games` deliberately misplaced.
     """
     body = client.get(reverse("home")).content.decode()
-    row = _fieldsets(body)["Games they worked on"]
+    row = _fieldsets(body)["The games they've worked on"]
     criteria, _or, games = row.partition('class="filter-or"')
 
     assert row.count('class="filter-group"') == 2
@@ -86,5 +86,24 @@ def test_the_two_game_cards_are_alternatives(client: Client) -> None:
 
 
 def test_the_games_facet_is_not_in_the_person_row(client: Client) -> None:
-    person = _fieldsets(client.get(reverse("home")).content.decode())["About the person"]
+    person = _fieldsets(client.get(reverse("home")).content.decode())["The person"]
     assert 'id="id_games"' not in person
+
+
+def test_fields_are_named_in_plain_words(client: Client) -> None:
+    """The old labels named the database column ("Engines", "Discipline"), not
+    the question a visitor is answering (spec 2026-08-24 §5)."""
+    body = client.get(reverse("home")).content.decode()
+
+    for label in (
+        "Game genre",
+        "Minimum player rating (%)",
+        "Game engine",
+        "Specific games",
+        "Their role",
+        "Based in",
+        "Credited since (year)",
+    ):
+        assert f">{label}</label>" in body, label
+    assert ">Engines</label>" not in body
+    assert ">Discipline</label>" not in body

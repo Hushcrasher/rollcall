@@ -103,12 +103,12 @@ class GameTypeaheadSelectMultiple(TypeaheadSelectMultiple):
 
 class RecruiterSearchForm(forms.Form):
     discipline = forms.ModelChoiceField(
-        queryset=Discipline.objects.all(), required=False, label=_("Discipline")
+        queryset=Discipline.objects.all(), required=False, label=_("Their role")
     )
     engines = forms.ModelMultipleChoiceField(
         queryset=Engine.objects.all(),
         required=False,
-        label=_("Engines"),
+        label=_("Game engine"),
         widget=TypeaheadSelectMultiple(
             url_name="search:engine_autocomplete", placeholder=_("Search engines…")
         ),
@@ -116,7 +116,7 @@ class RecruiterSearchForm(forms.Form):
     genres = forms.ModelMultipleChoiceField(
         queryset=Genre.objects.all(),
         required=False,
-        label=_("Genres"),
+        label=_("Game genre"),
         widget=TypeaheadSelectMultiple(
             url_name="search:genre_autocomplete", placeholder=_("Search genres…")
         ),
@@ -138,7 +138,7 @@ class RecruiterSearchForm(forms.Form):
     countries = forms.MultipleChoiceField(
         choices=_country_choices,
         required=False,
-        label=_("Countries"),
+        label=_("Based in"),
         widget=TypeaheadSelectMultiple(
             url_name="search:country_autocomplete", placeholder=_("Search countries…")
         ),
@@ -149,13 +149,13 @@ class RecruiterSearchForm(forms.Form):
         required=False,
         min_value=1,
         max_value=100,
-        label=_("Min. rating (%)"),
+        label=_("Minimum player rating (%)"),
         # Same honest caveat as genres: the current data carries ratings for
         # Steam-linked games only — surfaced in the template's shared footnote
         # (spec 2026-08-21-search-chrome §2), not repeated here per field.
     )
     year_from = forms.IntegerField(
-        required=False, min_value=1970, max_value=2100, label=_("Worked on a game since (year)")
+        required=False, min_value=1970, max_value=2100, label=_("Credited since (year)")
     )
     open_to_work = forms.BooleanField(required=False, label=_("Open to work only"))
 

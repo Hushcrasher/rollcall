@@ -6,7 +6,7 @@
 {% block extra_head %}
 <link rel="canonical" href="{% url 'home' %}">
 {% comment %}
-  No-JS is an ACCEPTED limitation for these three facets, not a graceful
+  No-JS is an ACCEPTED limitation for these four facets, not a graceful
   degradation — the typeahead is htmx, and htmx is JavaScript. Rather than leave
   a dead search box and inert remove buttons on the page, hide them and say so.
   Everything else still works: discipline, rating, year and open-to-work are
@@ -47,7 +47,7 @@
   <form id="typeahead-scratch" hidden></form>
 
   <p class="noscript-note">
-    {% translate "The engine, genre and country filters need JavaScript. Without it you can still filter by discipline, rating, year and open-to-work." %}
+    {% translate "The genre, game, engine and country filters need JavaScript. Without it you can still filter by role, rating, year and open-to-work." %}
   </p>
 
   <form class="filters" method="get" action="{% url 'home' %}#results">
@@ -61,7 +61,7 @@
       discoverable before the visitor trips it.
     {% endcomment %}
     <fieldset class="filter-section">
-      <legend>{% translate "Games they worked on" %}</legend>
+      <legend>{% translate "The games they've worked on" %}</legend>
       <div class="filter-split">
         <div class="filter-group" data-filter-group>
           <p class="filter-group-head"><small class="muted">{% translate "Games matching all of:" %}</small></p>
@@ -83,7 +83,7 @@
       </div>
     </fieldset>
     <fieldset class="filter-section">
-      <legend>{% translate "About the person" %}</legend>
+      <legend>{% translate "The person" %}</legend>
       <div class="filter-row">
         {% for field in form.person_fields %}{% include "search/_filter_field.html" %}{% endfor %}
       </div>

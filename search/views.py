@@ -184,7 +184,7 @@ def company_autocomplete(request: HttpRequest) -> HttpResponse:
 
 # --- Recruiter-filter typeahead ---------------------------------------------
 #
-# These three back the engines/genres/countries filters on the public
+# These four back the genres/games/engines/countries filters on the public
 # recruiter search and carry `key="ip"` unconditionally, unlike
 # game_autocomplete/company_autocomplete just above. Those two key by
 # `"user_or_ip"` instead (django_ratelimit.core._SIMPLE_KEYS's built-in
@@ -201,7 +201,7 @@ def company_autocomplete(request: HttpRequest) -> HttpResponse:
 # account instead of exempting it keeps both properties — every member is
 # still metered, on `settings.SEARCH_RATELIMIT` like everyone else, just
 # never on a counter shared with whoever else is behind the same router.
-# These three engine/genre/country endpoints have no such already-
+# These four genre/game/engine/country endpoints have no such already-
 # authenticated caller to protect, so there is nothing to carve out.
 #
 # `suggest`, above, is the one endpoint in this module that stays unmetered:

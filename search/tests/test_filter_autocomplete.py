@@ -1,4 +1,4 @@
-"""Typeahead behind the recruiter search's engines / genres / countries filters.
+"""Typeahead behind the recruiter search's genres / games / engines / countries filters.
 
 The filters used to be checkbox lists — one `<input>` per choice, 249 of them
 for countries alone, on every anonymous hit. These cover the replacement: the
