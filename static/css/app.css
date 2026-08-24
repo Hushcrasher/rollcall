@@ -44,7 +44,30 @@ nav, nav ul { flex-wrap: wrap; }
 nav [role=button] { white-space: nowrap; }
 .nav-search li { display: block; }
 @media (max-width: 767px) {
-  .nav-search { flex-basis: 100%; order: 1; }
+  /* The search shares the brand's row rather than taking one of its own: the
+     wordmark is 54px and the input shrinks to fit (min-width:0 above), so a
+     row spent on the search box was a row spent on nothing else. */
+  .nav-search { flex: 1 1 auto; }
+  /* Logged in, the item group is CTA + My profile + Account + Log out — 389px
+     of content in a 375px row. Free wrapping fitted three and orphaned Log out
+     alone underneath. Giving the CTA its own full row instead leaves the three
+     secondary links 230px to share, which fits with room over, and puts the
+     primary action where a thumb reaches it. Anonymous (CTA + Log in) this is
+     the same shape with one link. The CTA li is first in both branches of
+     base.html's nav. */
+  header nav > ul:last-child {
+    /* The group takes the whole row before anything inside it can: `nav` is a
+       wrapping flex container, so this <ul> otherwise sizes to its content and
+       the CTA's own `flex-basis: 100%` resolves against that content width —
+       which is why the anonymous CTA (two items) came out 218px wide while the
+       logged-in one (four) looked full. */
+    flex-basis: 100%;
+    display: flex; flex-wrap: wrap; align-items: center;
+  }
+  header nav > ul:last-child > li:first-child { flex-basis: 100%; }
+  header nav > ul:last-child > li:first-child [role=button] {
+    display: flex; justify-content: center;
+  }
   /* Stacked rows double up the per-item vertical padding. */
   nav { --pico-nav-element-spacing-vertical: .35rem; }
 }
@@ -170,6 +193,18 @@ nav form button[type=submit] { background: none; border: none; color: var(--pico
    (spec 2026-08-24 §10), deliberately not attempted here. */
 @media (max-width: 767px) {
   .filter-split { grid-template-columns: 1fr; }
+  /* One full-width column. The desktop rules cap a cell at 13.5rem and pack
+     left, which on a 375px screen left 144px — 38% of the row — empty beside
+     every person field, and squeezed the criteria card into two 141px columns
+     whose labels wrapped and whose placeholders clipped mid-word. Legibility
+     costs one extra row here; the padding below pays most of it back. */
+  .filter-row, .filter-group > .filter-row { grid-template-columns: 1fr; }
+  .filters { padding: .8rem .8rem .4rem; margin-bottom: 1.5rem; }
+  .filter-group { padding: .5rem .6rem .2rem; }
+  .filter { margin: .45rem 0; }
+  /* The checkbox cell's desktop padding exists to lift it onto its row's input
+     line. Stacked one per row there is no line to meet. */
+  .filter-checkbox { align-self: start; padding-bottom: 0; }
   .filter-or { padding: .2rem 0; }
   .filter-or::before {
     top: 50%; bottom: auto; left: 0; right: 0;
