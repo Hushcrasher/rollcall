@@ -104,8 +104,14 @@ nav form button[type=submit] { background: none; border: none; color: var(--pico
   background: var(--pico-primary-background); color: var(--pico-primary-inverse);
 }
 /* A checkable option. Pico gives form checkboxes a bottom margin meant for
-   stacked fields; in a dropdown row it pushes the label off its own baseline. */
-.autocomplete-check { display: flex; align-items: center; gap: .5rem; }
+   stacked fields; in a dropdown row it pushes the label off its own baseline.
+
+   `label.` is not decoration: Pico ships
+   `label:has([type="checkbox"], [type="radio"]) { width: fit-content }`, and
+   `:has()` takes the specificity of its argument — (0,1,1) against a bare
+   class's (0,1,0). The row shrank to its text, so the hover highlight covered
+   the label and not the row. Measured, after three wrong guesses. */
+label.autocomplete-check { display: flex; align-items: center; gap: .5rem; width: 100%; }
 .autocomplete-check input[type=checkbox] { margin: 0; flex: none; }
 /* Covered by the family above it: still readable, plainly not actionable. */
 .autocomplete-check input:disabled { cursor: not-allowed; }

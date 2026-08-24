@@ -11,13 +11,6 @@
 <div class="autocomplete typeahead" data-typeahead data-name="{{ widget.name }}"
      data-remove-label="{% blocktranslate with label='%s' %}Remove {{ label }}{% endblocktranslate %}">
 
-  {% comment %}
-    One physical line, so an empty selection renders zero text nodes:
-    app.css hides the empty list with `.chips:empty`, and `:empty` fails
-    on a lone whitespace node (spec 2026-08-24 §3.1).
-  {% endcomment %}
-  <ul class="chips" data-chips>{% for value, label in widget.chips %}{% include "search/widgets/_chip.html" with name=widget.name value=value label=label %}{% endfor %}</ul>
-
   <input type="text" class="autocomplete-input js-only" name="q" autocomplete="off"
          placeholder="{{ widget.placeholder }}"
          {% comment %}
@@ -31,6 +24,17 @@
          {% include "django/forms/widgets/attrs.html" %}>
 
   <div class="results js-only"></div>
+
+  {% comment %}
+    Below the box, not above it (changed 2026-08-24): picking a value used to
+    push the field itself further down the page, so the box moved out from
+    under the cursor that had just used it.
+
+    One physical line, so an empty selection renders zero text nodes: app.css
+    hides the empty list with `.chips:empty`, and `:empty` fails on a lone
+    whitespace node.
+  {% endcomment %}
+  <ul class="chips" data-chips>{% for value, label in widget.chips %}{% include "search/widgets/_chip.html" with name=widget.name value=value label=label %}{% endfor %}</ul>
 
   <template data-chip-template>
     {% include "search/widgets/_chip.html" with name=widget.name value="" label="" %}

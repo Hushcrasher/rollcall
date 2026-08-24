@@ -15,14 +15,19 @@
   {{ form.engines.errors }}{{ form.engine_families.errors }}
   <div class="autocomplete typeahead" data-typeahead
        data-remove-label="{% blocktranslate with label='%s' %}Remove {{ label }}{% endblocktranslate %}">
-    {# One physical line: `.chips:empty` is the hiding mechanism and a lone whitespace node defeats `:empty`. #}
-    <ul class="chips" data-chips>{% for param, value, label, family in form.engine_chips %}{% include "search/widgets/_chip.html" with name=param value=value label=label family=family %}{% endfor %}</ul>
     <input type="text" class="autocomplete-input js-only" id="id_engines" name="q" autocomplete="off"
            placeholder="{% translate 'Search engines…' %}"
            form="typeahead-scratch"
            hx-get="{% url 'search:engine_autocomplete' %}" hx-trigger="keyup changed delay:250ms"
            hx-target="next .results">
     <div class="results js-only"></div>
+    {% comment %}
+      Below the box, not above it (changed 2026-08-24): picking a value used to
+      push the field itself further down the page. One physical line —
+      `.chips:empty` is the hiding mechanism and `:empty` fails on a lone
+      whitespace node.
+    {% endcomment %}
+    <ul class="chips" data-chips>{% for param, value, label, family in form.engine_chips %}{% include "search/widgets/_chip.html" with name=param value=value label=label family=family %}{% endfor %}</ul>
     {# One template per field, keyed by the name its chips post to. #}
     <template data-chip-template="engines">
       {% include "search/widgets/_chip.html" with name="engines" value="" label="" %}
